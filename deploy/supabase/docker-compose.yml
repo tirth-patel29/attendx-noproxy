@@ -1,0 +1,167 @@
+# Self-hosted Supabase for the attendance gateway
+# Tuned for: homelab — i3-6000T, 8GB RAM, power-cut-prone, behind proxycore.
+#
+# This is a MINIMAL Supabase (Postgres + Kong API gateway + GoTrue auth + Realtime
+# + PostgREST). We deliberately OMIT the heavyweight extras (Studio, Analytics,
+# Vector, Functions) to keep the 8GB footprint usable and to leave headroom for the
+# other 7 stacks already running on the box.
+#
+# HOW TO USE
+#   cp .env.example .env          # set keys/secrets
+#   docker network create proxycore    # if not already your proxy network
+#   docker compose --env-file .env -p supabase up -d
+#
+# POWER-CUT SAFETY (non-negotiable for this project):
+#   * Postgres data is bind-mounted on the SSD and uses restart: always
+#   * fsync is ON (slow but durable — never disable on a power-cut-prone box)
+#   * Every service has restart: unless-stopped
+#   * Nightly backups copy the DB to the 500GB WD (see scripts/backup.sh)
+#   * Services talk by NAME on the docker network, so IPs may change on restart safely
+
+version: "3.9"
+
+networks:
+  proxycore:
+    external: true   # attach the new stack to your existing proxy/reverse-proxy network
+  internal:
+    driver: bridge   # isolation between supabase services
+
+services:
+  # ---------- Postgres (the source of truth) ----------
+  db:
+    image: postgres:15-alpine        # pinned, small footprint
+    container_name: supabase-db
+    restart: always                  # MUST come back after a blackout
+    mem_limit: 1536m                 # hard cap: DB gets 1.5GB, the stack no more
+    cpuset: "0"                      # pin to a core so it owns its L2/L3 cache slot
+    networks:
+      - internal
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+    volumes:
+      - ./volumes/db:/var/lib/postgresql/data   # bind-mounted on the SSD -> survives reboot
+      - ../migrations:/docker-entrypoint-initdb.d:ro   # apply schema on first boot
+    # Durability over speed (we are power-cut-prone, NOT a cloud)
+    command:
+      - "postgres"
+      - "-c"
+      - "fsync=on"
+      - "-c"
+      - "synchronous_commit=on"
+      - "-c"
+      - "shared_buffers=384MB"      # ~25% of mem_limit
+      - "-c"
+      - "work_mem=16MB"
+      - "-c"
+      - "effective_cache_size=1GB"
+      - "-c"
+      - "max_connections=100"
+      - "-c"
+      - "wal_buffers=8MB"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ---------- Kong (routes everything under one entrypoint) ----------
+  kong:
+    image: kong:2.8.3-alpine
+    container_name: supabase-kong
+    restart: unless-stopped
+    mem_limit: 384m
+    networks:
+      - proxycore
+      - internal
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /home/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl
+      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: "128k"
+    volumes:
+      - ./volumes/api/kong.yml:/home/kong/kong.yml:ro
+    ports:
+      - "${KONG_HTTP_PORT:-8000}:8000/tcp"
+      - "${KONG_HTTPS_PORT:-8443}:8443/tcp"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ---------- GoTrue (Auth) ----------
+  auth:
+    image: supabase/gotrue:v2.151.0
+    container_name: supabase-auth
+    restart: unless-stopped
+    mem_limit: 384m
+    networks:
+      - proxycore
+      - internal
+    environment:
+      GOTRUE_API_HOST: "0.0.0.0"
+      GOTRUE_API_PORT: "9999"
+      API_EXTERNAL_URL: ${PUBLIC_SITE_URL}
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
+      GOTRUE_SITE_URL: ${PUBLIC_SITE_URL}
+      GOTRUE_URI_ALLOW_LIST: ${GOTRUE_URI_ALLOW_LIST}
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_JWT_EXP: ${JWT_EXP:-3600}
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_SMTP_HOST: ${SMTP_HOST}
+      GOTRUE_SMTP_PORT: ${SMTP_PORT}
+      GOTRUE_SMTP_USER: ${SMTP_USER}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS}
+      GOTRUE_SMTP_SENDER_NAME: ${SMTP_SENDER_NAME}
+      GOTRUE_MAILER_AUTOCONFIRM: ${GOTRUE_MAILER_AUTOCONFIRM:-true}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ---------- PostgREST (auto REST from the Postgres schema) ----------
+  rest:
+    image: postgrest/postgrest:v12.2.3
+    container_name: supabase-rest
+    restart: unless-stopped
+    mem_limit: 256m
+    networks:
+      - proxycore
+      - internal
+    environment:
+      PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS:-public,storage,graphql_public}
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_EXTRA_SEARCH_PATH: public
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ---------- Realtime (the 3s metronome channel) ----------
+  realtime:
+    image: supabase/realtime:v2.27.7
+    container_name: supabase-realtime
+    restart: unless-stopped
+    mem_limit: 384m
+    networks:
+      - proxycore
+      - internal
+    environment:
+      PORT: "4000"
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: postgres
+      DB_USER: postgres
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      SECRET_KEY_BASE: ${REALTIME_SECRET}
+      APP_NAME: "attendance-gateway"
+      ERL_AFLAGS: "-proto_dist inet_tcp"
+    depends_on:
+      db:
+        condition: service_healthy
+
+# You may add a lightweight watchdog/backup sidecar later (see scripts/backup.sh)
+# that runs pg_dump on a cron into /backups (mounted to the 500GB WD).
