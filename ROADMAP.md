@@ -7,19 +7,17 @@ Legend: `[ ]` todo · `[x]` done · `>` currently in progress
 
 ---
 
-## Phase 0 — Foundation (scaffold + context) `>` NOW
-
-We are here. The goal is a repo that documents *why*, a homelab-aware deployment baseline,
-and a shared understanding before any real code.
+## Phase 0 — Foundation (scaffold + context) ✅ COMPLETE
 
 - [x] SRS ingested into `docs/` (the 19-page blueprint).
 - [x] `CONTEXT.md` written (gates, stack, homelab constraints).
 - [x] Monorepo scaffold (`docs`, `deploy`, `migrations`, `backend`, `app`, `scripts`).
-- [ ] **Push this repo to Gitea** on the homelab (or wherever the group lives).
-- [ ] Decide access model: do the other group members clone from Gitea (LAN/Tailscale) or
-      GitHub? *This depends on how you want to link the homelab Gitea to the group.*
-- [ ] Write `docs/CONTRIBUTING.md` (branch/label/PR protocol for the group).
-- [ ] Pin the **exact** self-hosted Supabase versions that fit 8GB RAM.
+- [x] **Push this repo to Gitea** → `het/attendance-gateway` live at `http://gitea:3000/het/attendance-gateway`
+- [x] Access model decided: Team clones via Tailscale + SSH to homelab Gitea
+- [x] Write `docs/CONTRIBUTING.md` (branch/label/PR protocol + homelab impact statement)
+- [x] Gitea issue template for task tracking (`.gitea/issue_template/task.md`)
+- [x] **PROJECT_PLAN.md** created with detailed phases, timeline, RACI, risks, success metrics
+- [ ] Pin the **exact** self-hosted Supabase versions that fit 8GB RAM (in compose)
 
 ## Phase 1 — Database & schema (Supabase on the homelab)
 
