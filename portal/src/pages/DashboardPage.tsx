@@ -63,18 +63,6 @@ export default function DashboardPage() {
     }
   };
 
-  const handleStartSession = async () => {
-    try {
-      await portalApi.startSession({ 
-        course_code: '', 
-        professor_id: '', 
-      });
-      loadData();
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   const handleStopSession = async (sessionId: string) => {
     try {
       await portalApi.stopSession(sessionId);
@@ -184,9 +172,9 @@ export default function DashboardPage() {
                             <ViewIcon />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title={session.is_active ? 'Stop Session' : 'Restart Session'}>
+                        <Tooltip title={session.is_active ? 'Stop Session' : 'Start New Session'}>
                           <IconButton
-                            onClick={session.is_active ? () => handleStopSession(session.id) : () => handleStartSession()}
+                            onClick={session.is_active ? () => handleStopSession(session.id) : () => navigate('/sessions/new')}
                             color={session.is_active ? 'error' : 'success'}
                           >
                             {session.is_active ? <StopIcon /> : <PlayIcon />}

@@ -5,6 +5,8 @@ services:
     build:
       context: ./portal
       dockerfile: Dockerfile
+      args:
+        CACHE_BUST: "${CACHE_BUST:-$(date +%s)}"
     container_name: attendance-portal
     restart: unless-stopped
     environment:

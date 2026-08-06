@@ -41,7 +41,7 @@ export default function SessionPage() {
   const { loading: authLoading } = useAuth();
   const [session, setSession] = useState<any>(null);
   const [attendance, setAttendance] = useState<any[]>([]);
-  const [loading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
   const [currentToken, setCurrentToken] = useState<string | null>(null);
   const [qrRefreshing, setQrRefreshing] = useState(false);
@@ -63,11 +63,14 @@ export default function SessionPage() {
   }, [sessionId]);
 
   const loadSession = async () => {
+    setLoading(true);
     try {
       const res = await portalApi.getSession(sessionId!);
       setSession(res.data);
     } catch (err) {
       console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 

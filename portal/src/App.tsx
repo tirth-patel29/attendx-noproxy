@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import SessionPage from './pages/SessionPage';
+import NewSessionPage from './pages/NewSessionPage';
 import Layout from './components/Layout';
 
 const queryClient = new QueryClient({
@@ -110,6 +111,7 @@ export default function App() {
               >
                 <Route index element={<Navigate to="/dashboard" replace />} />
                 <Route path="dashboard" element={<DashboardPage />} />
+                <Route path="sessions/new" element={<NewSessionPage />} />
                 <Route path="sessions/:sessionId" element={<SessionPage />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />

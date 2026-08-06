@@ -13,14 +13,9 @@ const claimAttendanceSchema = z.object({
   student_uuid: z.string().uuid(),
   token_val: z.string().length(6),
   client_claimed_time: z.number().int().positive(),
-  device_id_hash: z.string().length(64), // SHA-256 hex
-  nonce: z.string().length(32), // 16 bytes hex
-  hmac_signature: z.string().length(64), // HMAC-SHA256 hex
-});
-
-const timeSyncResponseSchema = z.object({
-  server_epoch: z.number(),
-  server_iso: z.string(),
+  device_id_hash: z.string().length(64),
+  nonce: z.string().length(32),
+  hmac_signature: z.string().length(64),
 });
 
 const sessionStartSchema = z.object({
@@ -34,10 +29,39 @@ const deviceRegisterSchema = z.object({
   device_id_hash: z.string().length(64),
 });
 
+// ===== Helpers to shape DB rows into frontend-friendly contract =====
+
+function shapeProfessor(row: any) {
+  return {
+    id: row.prof_uuid,
+    email: row.email,
+    name: row.name,
+    department: row.department,
+  };
+}
+
+async function shapeSession(row: any) {
+  const counts = await query(
+    `SELECT
+       (SELECT COUNT(*) FROM students) AS total_students,
+       (SELECT COUNT(*) FROM attendance_ledger WHERE session_uuid = $1 AND status = 'PRESENT') AS present_count`,
+    [row.session_uuid]
+  );
+  return {
+    id: row.session_uuid,
+    course_code: row.course_code,
+    professor_id: row.prof_uuid,
+    session_date: row.session_date,
+    is_active: row.is_active,
+    created_at: row.created_at,
+    total_students: parseInt(counts.rows[0].total_students, 10),
+    present_count: parseInt(counts.rows[0].present_count, 10),
+  };
+}
+
 /**
  * GET /api/v1/time-sync
- * Returns server epoch time for Cristian's Algorithm clock synchronization
- * Client uses this to calculate drift_offset = server_epoch - client_epoch
+ * Server epoch time for Cristian's Algorithm clock synchronization
  */
 router.get('/time-sync', async (_req: Request, res: Response, next: NextFunction) => {
   try {
@@ -52,34 +76,81 @@ router.get('/time-sync', async (_req: Request, res: Response, next: NextFunction
 });
 
 /**
- * POST /api/v1/claim-attendance
- * Main 4-gate attendance claim endpoint
+ * GET /api/v1/professors
+ * List all professors (for the portal's session-create dropdown)
  */
-router.post('/claim-attendance', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/professors', async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    // Validate payload
-    const parseResult = claimAttendanceSchema.safeParse(req.body);
-    if (!parseResult.success) {
-      return res.status(400).json({
-        error: 'Invalid payload',
-        details: parseResult.error.flatten().fieldErrors,
-      });
+    const result = await query(`SELECT prof_uuid, email, name, department FROM professors ORDER BY name`);
+    res.json(result.rows.map(shapeProfessor));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/v1/professors/:profUuid
+ * Single professor
+ */
+router.get('/professors/:profUuid', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { profUuid } = req.params;
+    const result = await query(
+      `SELECT prof_uuid, email, name, department FROM professors WHERE prof_uuid = $1`,
+      [profUuid]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Professor not found' });
     }
+    res.json(shapeProfessor(result.rows[0]));
+  } catch (err) {
+    next(err);
+  }
+});
 
-    const payload = parseResult.data;
-    const result = await judgeService.processClaim(payload);
+/**
+ * GET /api/v1/sessions?professor_id=xxx
+ * List sessions (optionally filtered by professor)
+ */
+router.get('/sessions', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const professorId = req.query.professor_id as string | undefined;
+    let result;
+    if (professorId) {
+      result = await query(
+        `SELECT session_uuid, course_code, prof_uuid, session_date, is_active, created_at
+         FROM course_sessions WHERE prof_uuid = $1 ORDER BY created_at DESC`,
+        [professorId]
+      );
+    } else {
+      result = await query(
+        `SELECT session_uuid, course_code, prof_uuid, session_date, is_active, created_at
+         FROM course_sessions ORDER BY created_at DESC`
+      );
+    }
+    const shaped = await Promise.all(result.rows.map(shapeSession));
+    res.json(shaped);
+  } catch (err) {
+    next(err);
+  }
+});
 
-    // Map status to HTTP status
-    const statusMap: Record<string, number> = {
-      PRESENT: 200,
-      HARDWARE_MISMATCH: 403,
-      STREAM_DETECTED: 403,
-      FORGED_RESPONSE: 403,
-      EXPIRED_TOKEN: 410,
-      INVALID_CLAIM: 404,
-    };
-
-    res.status(statusMap[result.status] || 400).json(result);
+/**
+ * GET /api/v1/sessions/:sessionUuid
+ * Single session
+ */
+router.get('/sessions/:sessionUuid', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { sessionUuid } = req.params;
+    const result = await query(
+      `SELECT session_uuid, course_code, prof_uuid, session_date, is_active, created_at
+       FROM course_sessions WHERE session_uuid = $1`,
+      [sessionUuid]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+    res.json(await shapeSession(result.rows[0]));
   } catch (err) {
     next(err);
   }
@@ -112,7 +183,7 @@ router.post('/sessions/start', async (req: Request, res: Response, next: NextFun
     await metronomeService.startSession(session.session_uuid);
 
     res.status(201).json({
-      ...session,
+      ...(await shapeSession(session)),
       metronome_started: true,
     });
   } catch (err) {
@@ -127,7 +198,7 @@ router.post('/sessions/start', async (req: Request, res: Response, next: NextFun
 router.post('/sessions/:sessionUuid/stop', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { sessionUuid } = req.params;
-    
+
     await query(
       `UPDATE course_sessions SET is_active = FALSE WHERE session_uuid = $1 RETURNING *`,
       [sessionUuid]
@@ -135,7 +206,7 @@ router.post('/sessions/:sessionUuid/stop', async (req: Request, res: Response, n
 
     metronomeService.stopSession(sessionUuid);
 
-    res.json({ session_uuid: sessionUuid, stopped: true });
+    res.json({ id: sessionUuid, stopped: true, is_active: false });
   } catch (err) {
     next(err);
   }
@@ -143,7 +214,7 @@ router.post('/sessions/:sessionUuid/stop', async (req: Request, res: Response, n
 
 /**
  * GET /api/v1/sessions/:sessionUuid/tokens
- * Debug endpoint: get current active tokens for a session
+ * Current active tokens for a session (the 3s rotating QR payload)
  */
 router.get('/sessions/:sessionUuid/tokens', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -157,13 +228,70 @@ router.get('/sessions/:sessionUuid/tokens', async (req: Request, res: Response, 
 
 /**
  * GET /api/v1/sessions/:sessionUuid/attendance
- * Get attendance records for a session (professor view)
+ * Attendance records for a session (professor view) — returns bare array
  */
 router.get('/sessions/:sessionUuid/attendance', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { sessionUuid } = req.params;
     const records = await judgeService.getSessionAttendance(sessionUuid);
-    res.json({ session_uuid: sessionUuid, count: records.length, records });
+    // Align with frontend contract: bare array with id / student_roll_no / student_email
+    const shaped = records.map((r: any) => ({
+      id: r.ledger_uuid,
+      session_id: r.session_uuid,
+      student_roll_no: r.roll_no,
+      student_email: r.email,
+      client_claimed_time: r.client_claimed_time,
+      server_logged_time: r.server_logged_time,
+      verification_delta_ms: r.verification_delta_ms,
+      status: r.status,
+    }));
+    res.json(shaped);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/v1/students/:studentUuid/attendance
+ * A student's attendance history
+ */
+router.get('/students/:studentUuid/attendance', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { studentUuid } = req.params;
+    const records = await judgeService.getStudentAttendance(studentUuid);
+    res.json(records);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/v1/claim-attendance
+ * Main 4-gate attendance claim endpoint
+ */
+router.post('/claim-attendance', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parseResult = claimAttendanceSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({
+        error: 'Invalid payload',
+        details: parseResult.error.flatten().fieldErrors,
+      });
+    }
+
+    const payload = parseResult.data;
+    const result = await judgeService.processClaim(payload);
+
+    const statusMap: Record<string, number> = {
+      PRESENT: 200,
+      HARDWARE_MISMATCH: 403,
+      STREAM_DETECTED: 403,
+      FORGED_RESPONSE: 403,
+      EXPIRED_TOKEN: 410,
+      INVALID_CLAIM: 404,
+    };
+
+    res.status(statusMap[result.status] || 400).json(result);
   } catch (err) {
     next(err);
   }
@@ -172,7 +300,6 @@ router.get('/sessions/:sessionUuid/attendance', async (req: Request, res: Respon
 /**
  * POST /api/v1/devices/register
  * Register a device to a student (Gate 1 binding)
- * Called during initial provisioning
  */
 router.post('/devices/register', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -202,7 +329,6 @@ router.post('/devices/register', async (req: Request, res: Response, next: NextF
 
 /**
  * GET /api/v1/health
- * Health check endpoint
  */
 router.get('/health', async (_req: Request, res: Response) => {
   const dbHealthy = await (await import('../utils/db')).checkDbHealth();

@@ -15,12 +15,13 @@ export interface Session {
   session_date: string;
   is_active: boolean;
   created_at: string;
+  total_students?: number;
+  present_count?: number;
 }
 
 export interface AttendanceRecord {
   id: string;
   session_id: string;
-  student_uuid: string;
   student_roll_no: string;
   student_email: string;
   client_claimed_time: number;
@@ -44,9 +45,9 @@ export const portalApi = {
   // Auth
   login: (email: string, password: string) =>
     api.post('/auth/login', { email, password }),
-  
+
   logout: () => api.post('/auth/logout'),
-  
+
   me: () => api.get('/auth/me'),
 
   // Professors
@@ -54,15 +55,15 @@ export const portalApi = {
   getProfessor: (id: string) => api.get<Professor>(`/professors/${id}`),
 
   // Sessions
-  startSession: (data: { course_code: string; professor_id: string; session_date?: string }) =>
+  startSession: (data: { course_code: string; prof_uuid: string; session_date?: string }) =>
     api.post<Session>('/sessions/start', data),
-  
+
   stopSession: (sessionId: string) =>
     api.post(`/sessions/${sessionId}/stop`),
-  
+
   getSessions: (professorId?: string) =>
     api.get<Session[]>('/sessions', { params: { professor_id: professorId } }),
-  
+
   getSession: (id: string) => api.get<Session>(`/sessions/${id}`),
 
   // Tokens
@@ -72,7 +73,7 @@ export const portalApi = {
   // Attendance
   getSessionAttendance: (sessionId: string) =>
     api.get<AttendanceRecord[]>(`/sessions/${sessionId}/attendance`),
-  
+
   getStudentAttendance: (studentId: string) =>
     api.get<AttendanceRecord[]>(`/students/${studentId}/attendance`),
 
