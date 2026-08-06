@@ -15,9 +15,11 @@ services:
       - DB_PORT=5432
       - DB_NAME=postgres
       - DB_USER=supabase_admin
-      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_PASSWORD=7567@Hetp
       - DB_SSL=false
       - CORS_ORIGIN=https://supabase.atmyhome.tech
+      - VIRTUAL_HOST=api.atmyhome.tech
+      - VIRTUAL_PORT=3001
       - METRONOME_INTERVAL_MS=3000
       - METRONOME_TOKEN_LENGTH=6
       - METRONOME_TOKEN_CHARSET=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
