@@ -34,15 +34,15 @@ Legend: `[ ]` todo · `[x]` done · `>` currently in progress
 - [ ] **Power-cut drill #1**: force-reboot the homelab, confirm DB comes back clean,
       confirm a recent backup exists. (Do this early — it's cheap now, expensive later.)
 
-## Phase 2 — Backend judge + metronome (Node/TS)
+## Phase 2 — Backend judge + metronome (Node/TS) ✅ COMPLETE
 
-- [ ] `GET /api/v1/time-sync` (returns `server_epoch`).
-- [ ] Socket.io/WS metronome: mint a base62 token every 3s, broadcast, persist to
-      `active_tokens`.
-- [ ] `POST /api/v1/claim-attendance` implementing all 4 gates (hardware match, HMAC verify,
-      token lookup, 250ms latency check) + unique-claim handling.
-- [ ] Professor portal: start/stop session, live QR, attendance table, 1-click device reset.
-- [ ] Unit tests for the judge (honest/fast/streamed/forged cases from the SRS state matrix).
+- [x] `GET /api/v1/time-sync` (returns `server_epoch`).
+- [x] Socket.io/WS metronome: mint a base62 token every 3s, broadcast, persist to `active_tokens`.
+- [x] `POST /api/v1/claim-attendance` implementing all 4 gates (hardware match, HMAC verify, token lookup, 250ms latency check) + unique-claim handling.
+- [x] Professor portal: start/stop session, live QR, attendance table, 1-click device reset.
+- [x] Unit tests for the judge (honest/fast/streamed/forged cases from the SRS state matrix).
+- [x] Docker image built and deployed on homelab (`attendance-backend:latest`, proxynet).
+- [x] All 6 SRS attack vectors verified blocked.
 
 ## Phase 3 — Flutter client (4 gates + pre-check UI)
 
