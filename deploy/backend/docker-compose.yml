@@ -40,6 +40,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+    labels:
+      - "nginx-proxy-ondemand.enable=true"
+      - "nginx-proxy-ondemand.timeout=1800"
+      - "nginx-proxy-ondemand.group=dev-suite"
+      - "VIRTUAL_HOST=api.atmyhome.tech"
+      - "VIRTUAL_PORT=3001"
 
 networks:
   proxynet:
