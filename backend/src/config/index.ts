@@ -35,6 +35,9 @@ export const config = {
   // CORS
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3000',
 
+  // JWT
+  jwtSecret: process.env.JWT_SECRET || 'dev-secret-change-in-production-min-32-chars-long',
+
   // Logging
   logLevel: process.env.LOG_LEVEL || 'info',
 };

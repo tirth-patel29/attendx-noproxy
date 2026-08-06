@@ -6,6 +6,7 @@ interface User {
   id: string;
   email: string;
   name: string;
+  department: string;
   role: 'professor' | 'admin';
 }
 
@@ -42,10 +43,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     const response = await api.post('/auth/login', { email, password });
-    const { access_token, refresh_token, user } = response.data;
+    const { access_token, refresh_token, user: userData } = response.data;
     localStorage.setItem('access_token', access_token);
     localStorage.setItem('refresh_token', refresh_token);
-    setUser(user);
+    setUser(userData);
   };
 
   const logout = () => {

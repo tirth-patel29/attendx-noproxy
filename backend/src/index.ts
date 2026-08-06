@@ -8,6 +8,7 @@ import { config } from './config';
 import { pool, checkDbHealth } from './utils/db';
 import { metronomeService } from './services/metronome';
 import attendanceRoutes from './routes/attendance';
+import authRoutes from './routes/auth';
 
 const app = express();
 const httpServer = createServer(app);
@@ -47,6 +48,7 @@ app.get('/health', async (_req, res) => {
 
 // API routes
 app.use('/api/v1', attendanceRoutes);
+app.use('/api/v1/auth', authRoutes);
 
 // Socket.io connection handling
 io.on('connection', (socket: Socket) => {

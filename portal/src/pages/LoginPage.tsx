@@ -1,6 +1,6 @@
 // src/pages/LoginPage.tsx
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -12,10 +12,23 @@ import {
   CircularProgress,
   Container,
   Paper,
+  Link,
   InputAdornment,
   IconButton,
+  Divider,
+  Grid,
+  useTheme,
 } from '@mui/material';
-import { LockOutlined, EmailOutlined, Visibility, VisibilityOff } from '@mui/icons-material';
+import {
+  LockOutlined,
+  EmailOutlined,
+  Visibility,
+  VisibilityOff,
+  School,
+  Security,
+  VerifiedUser,
+  ArrowForward,
+} from '@mui/icons-material';
 
 interface LoginFormData {
   email: string;
@@ -23,6 +36,7 @@ interface LoginFormData {
 }
 
 export default function LoginPage() {
+  const theme = useTheme();
   const { login } = useAuth();
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
@@ -38,36 +52,193 @@ export default function LoginPage() {
       await login(data.email, data.password);
       navigate('/dashboard');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid credentials');
+      setError(err.response?.data?.error || 'Invalid credentials. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Container maxWidth="sm" sx={{ mt: 8 }}>
-      <Paper elevation={3} sx={{ p: 4, borderRadius: 3 }}>
-        <Box sx={{ textAlign: 'center', mb: 4 }}>
-          <Typography variant="h3" fontWeight={700} color="primary.main" gutterBottom>
+    <Container maxWidth="xs" sx={{ mt: 8, mb: 8 }}>
+      {/* Background decorative elements */}
+      <Box
+        sx={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: -1,
+          overflow: 'hidden',
+          pointerEvents: 'none',
+        }}
+      >
+        <Box
+          sx={{
+            position: 'absolute',
+            top: -150,
+            right: -150,
+            width: 400,
+            height: 400,
+            borderRadius: '50%',
+            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
+            opacity: 0.08,
+            filter: 'blur(100px)',
+          }}
+        />
+        <Box
+          sx={{
+            position: 'absolute',
+            bottom: -200,
+            left: -200,
+            width: 500,
+            height: 500,
+            borderRadius: '50%',
+            background: `linear-gradient(135deg, ${theme.palette.secondary.main} 0%, ${theme.palette.secondary.light} 100%)`,
+            opacity: 0.06,
+            filter: 'blur(120px)',
+          }}
+        />
+      </Box>
+
+      <Paper
+        elevation={0}
+        sx={{
+          p: { xs: 4, sm: 5 },
+          borderRadius: 3,
+          background: 'rgba(255, 255, 255, 0.9)',
+          backdropFilter: 'blur(20px)',
+          border: '1px solid',
+          borderColor: 'divider',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.06)',
+          position: 'relative',
+          zIndex: 1,
+        }}
+      >
+        {/* Header */}
+        <Box sx={{ textAlign: 'center', mb: 5 }}>
+          <Box
+            sx={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 72,
+              height: 72,
+              borderRadius: '20px',
+              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
+              mb: 3,
+              boxShadow: `0 12px 32px ${theme.palette.primary.main}40`,
+            }}
+          >
+            <School sx={{ fontSize: 36, color: 'white' }} />
+          </Box>
+          <Typography variant="h3" fontWeight={800} color="text.primary" gutterBottom letterSpacing={-0.5}>
             Attendance Gateway
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="h6" fontWeight={400} color="text.secondary">
             Professor Portal — Zero-Trust Attendance
           </Typography>
         </Box>
 
-        <form onSubmit={handleSubmit(onSubmit)}>
+        {/* Features row */}
+        <Grid container spacing={2} sx={{ mb: 4 }}>
+          <Grid item xs={4}>
+            <Box sx={{ textAlign: 'center', p: 1 }}>
+              <Box
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 40,
+                  height: 40,
+                  borderRadius: '12px',
+                  background: `${theme.palette.primary.main}15`,
+                  color: theme.palette.primary.main,
+                  mb: 1,
+                }}
+              >
+                <Security fontSize="small" />
+              </Box>
+              <Typography variant="caption" fontWeight={600} color="text.primary">
+                Hardware Lock
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Device binding
+              </Typography>
+            </Box>
+          </Grid>
+          <Grid item xs={4}>
+            <Box sx={{ textAlign: 'center', p: 1 }}>
+              <Box
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 40,
+                  height: 40,
+                  borderRadius: '12px',
+                  background: `${theme.palette.secondary.main}15`,
+                  color: theme.palette.secondary.main,
+                  mb: 1,
+                }}
+              >
+                <VerifiedUser fontSize="small" />
+              </Box>
+              <Typography variant="caption" fontWeight={600} color="text.primary">
+                Biometric
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Fingerprint/FaceID
+              </Typography>
+            </Box>
+          </Grid>
+          <Grid item xs={4}>
+            <Box sx={{ textAlign: 'center', p: 1 }}>
+              <Box
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 40,
+                  height: 40,
+                  borderRadius: '12px',
+                  background: `${theme.palette.warning?.main || '#f59e0b'}15`,
+                  color: theme.palette.warning?.main || '#f59e0b',
+                  mb: 1,
+                }}
+              >
+                <ArrowForward fontSize="small" />
+              </Box>
+              <Typography variant="caption" fontWeight={600} color="text.primary">
+                Crypto Seal
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                250ms window
+              </Typography>
+            </Box>
+          </Grid>
+        </Grid>
+
+        <Divider sx={{ mb: 4 }} />
+
+        {/* Login Form */}
+        <form onSubmit={handleSubmit(onSubmit)} noValidate>
           {error && (
-            <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
+            <Alert
+              severity="error"
+              sx={{ mb: 3, borderRadius: 2, border: `1px solid ${theme.palette.error.light}` }}
+              onClose={() => setError('')}
+            >
               {error}
             </Alert>
           )}
 
           <TextField
             fullWidth
-            label="Email"
+            label="Email Address"
             type="email"
             placeholder="professor@college.edu"
+            autoComplete="email"
             {...register('email', {
               required: 'Email is required',
               pattern: {
@@ -76,14 +247,18 @@ export default function LoginPage() {
               },
             })}
             error={!!errors.email}
-            helperText={errors.email?.message as string}
+            helperText={errors.email?.message}
             margin="normal"
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <EmailOutlined color="primary" />
+                  <EmailOutlined color="primary" sx={{ color: 'inherit', opacity: 0.7 }} />
                 </InputAdornment>
               ),
+            }}
+            sx={{ mb: 2 }}
+            inputProps={{
+              style: { fontSize: 16 }, // Prevent zoom on iOS
             }}
           />
 
@@ -92,6 +267,7 @@ export default function LoginPage() {
             label="Password"
             type={showPassword ? 'text' : 'password'}
             placeholder="Enter your password"
+            autoComplete="current-password"
             {...register('password', {
               required: 'Password is required',
               minLength: {
@@ -100,12 +276,12 @@ export default function LoginPage() {
               },
             })}
             error={!!errors.password}
-            helperText={errors.password?.message as string}
+            helperText={errors.password?.message}
             margin="normal"
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <LockOutlined color="primary" />
+                  <LockOutlined color="primary" sx={{ color: 'inherit', opacity: 0.7 }} />
                 </InputAdornment>
               ),
               endAdornment: (
@@ -113,11 +289,16 @@ export default function LoginPage() {
                   <IconButton
                     onClick={() => setShowPassword(!showPassword)}
                     edge="end"
+                    sx={{ color: 'inherit', opacity: 0.7 }}
                   >
-                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                    {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
                   </IconButton>
                 </InputAdornment>
               ),
+            }}
+            sx={{ mb: 3 }}
+            inputProps={{
+              style: { fontSize: 16 },
             }}
           />
 
@@ -127,17 +308,69 @@ export default function LoginPage() {
             size="large"
             variant="contained"
             disabled={loading}
-            sx={{ mt: 3, mb: 2, py: 1.5 }}
+            sx={{
+              py: 1.5,
+              fontSize: 16,
+              fontWeight: 600,
+              borderRadius: 12,
+              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+              boxShadow: `0 8px 24px ${theme.palette.primary.main}40`,
+              '&:hover': {
+                boxShadow: `0 12px 32px ${theme.palette.primary.main}50`,
+                transform: 'translateY(-2px)',
+              },
+              '&:active': {
+                transform: 'translateY(0)',
+              },
+              '&:disabled': {
+                background: theme.palette.action.disabledBackground,
+                boxShadow: 'none',
+                transform: 'none',
+              },
+              transition: 'all 0.2s ease',
+            }}
           >
-            {loading ? <CircularProgress size={24} color="inherit" /> : 'Sign In'}
+            {loading ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                <CircularProgress size={24} color="inherit" />
+                <span>Signing in...</span>
+              </Box>
+            ) : (
+              'Sign In'
+            )}
           </Button>
 
-          <Typography variant="body2" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 2 }}>
-            <Link to="#">
+          <Typography variant="body2" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 3 }}>
+            <Link href="#" variant="body2" sx={{ fontWeight: 500 }}>
               Forgot password?
             </Link>
           </Typography>
+
+          <Box sx={{ mt: 4, p: 3, borderRadius: 2, background: `${theme.palette.primary.main}08`, border: `1px solid ${theme.palette.primary.main}20` }}>
+            <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+              Demo Credentials
+            </Typography>
+            <Typography variant="caption" color="text.primary" display="block" fontFamily="monospace" fontSize="0.75rem">
+              Email: prof.alex@college.edu
+            </Typography>
+            <Typography variant="caption" color="text.primary" display="block" fontFamily="monospace" fontSize="0.75rem">
+              Password: prof123
+            </Typography>
+            <Typography variant="caption" color="text.primary" display="block" fontFamily="monospace" fontSize="0.75rem" sx={{ mt: 1 }}>
+              Also: prof.maria@college.edu / prof123
+            </Typography>
+          </Box>
         </form>
+
+        {/* Footer */}
+        <Box sx={{ mt: 5, pt: 3, borderTop: 1, borderColor: 'divider' }}>
+          <Typography variant="caption" color="text.secondary" textAlign="center">
+            Zero-Trust Cryptographic Attendance Gateway
+          </Typography>
+          <Typography variant="caption" color="text.secondary" textAlign="center" sx={{ mt: 0.5 }}>
+            4-Gate Verification • Hardware • Biometric • Visual • Cryptographic
+          </Typography>
+        </Box>
       </Paper>
     </Container>
   );
