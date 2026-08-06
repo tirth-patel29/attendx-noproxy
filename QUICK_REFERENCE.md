@@ -84,22 +84,27 @@ Homelab Impact:
 | Phase | Status | Next Action |
 |-------|--------|-------------|
 | 0 Foundation | ✅ **COMPLETE** | — |
-| 1 Database/Schema | 🔄 **IN PROGRESS** | Postgres tuning + backup setup + power-cut drill |
-| 2 Backend | ⏳ Waiting | Start after Phase 1 |
-| 3 Flutter | ⏳ Waiting | Start after Phase 2 |
-| 4 Integration | ⏳ Waiting | — |
-| 5 Polish | ⏳ Waiting | — |
+| 1 Database/Schema | ✅ **COMPLETE** | — |
+| 2 Backend | ✅ **COMPLETE** | — |
+| 3 Flutter Client | 🔄 **SCAFFOLD COMPLETE** | Build APK on teammate laptop, test on physical device |
+| 4 Integration | ⏳ | End-to-end test with live backend |
+| 5 Polish | ⏳ | Demo prep |
 
 ---
 
 ## IMMEDIATE NEXT STEPS (Tomorrow)
 
-1. **Team reviews PROJECT_PLAN.md** on Gitea
-2. **Postgres 8GB tuning** (shared_buffers=384MB, work_mem=16MB, max_conn=100)
-3. **Set up nightly backup cron** (02:30 → 500GB WD)
-4. **Test backup restore** (spin up test DB from dump)
-5. **Power-Cut Drill #1** — force reboot, verify recovery
-6. **Start Phase 2** — initialize Node/TS backend
+1. **Team reviews Flutter scaffold** on Gitea
+2. **Teammate builds APK** on their laptop:
+   ```bash
+   git clone http://gitea:3000/het/attendance-gateway.git
+   cd attendance-gateway/app
+   flutter pub get
+   flutter build apk --release
+   ```
+3. **Test on physical Android device** — scan QR from live backend at `api.atmyhome.tech`
+4. **End-to-end integration test** — professor starts session, student scans, verdict PRESENT
+5. **Run Power-Cut Drill #1** — force reboot homelab, verify DB + backups
 
 ---
 
