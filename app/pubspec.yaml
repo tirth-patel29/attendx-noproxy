@@ -1,0 +1,63 @@
+name: attendance_gateway
+description: Zero-Trust Cryptographic Student Attendance Gateway — Flutter client
+version: 1.0.0+1
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  
+  # Core dependencies
+  http: ^1.2.1
+  dio: ^5.4.3
+  web_socket_channel: ^2.4.5
+  
+  # Security / Cryptography
+  crypto: ^3.0.3
+  pointycastle: ^3.7.3
+  encrypt: ^5.0.3
+  
+  # Secure storage (KeyStore / Keychain)
+  flutter_secure_storage: ^9.2.2
+  
+  # Biometric authentication
+  local_auth: ^2.2.0
+  
+  # QR Code scanning
+  mobile_scanner: ^5.1.1
+  
+  # State management
+  provider: ^6.1.2
+  riverpod: ^2.5.1
+  flutter_riverpod: ^2.5.1
+  
+  # Device info
+  device_info_plus: ^10.1.0
+  
+  # Permissions
+  permission_handler: ^11.3.1
+  
+  # Utilities
+  uuid: ^4.4.0
+  intl: ^0.19.0
+  logger: ^2.3.0
+  equatable: ^2.0.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.2
+  mockito: ^5.4.4
+  build_runner: ^2.4.9
+  riverpod_generator: ^2.4.0
+  riverpod_lint: ^2.3.10
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/

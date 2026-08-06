@@ -1,0 +1,261 @@
+// lib/core/services/api_service.dart
+/// API service for communicating with the attendance-backend
+import 'dart:async';
+import 'package:dio/dio.dart';
+import 'package:attendance_gateway/core/constants/app_constants.dart';
+import 'package:attendance_gateway/core/services/secure_storage_service.dart';
+import 'package:attendance_gateway/core/services/time_sync_service.dart';
+import 'package:attendance_gateway/core/services/crypto_service.dart';
+
+class ApiService {
+  static const String _baseUrl = AppConstants.baseUrl;
+  static Dio? _dio;
+  static final TimeSyncService _timeSync = TimeSyncService();
+
+  static Dio get _client {
+    _dio ??= Dio(BaseOptions(
+      baseUrl: _baseUrl,
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 10),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+    ));
+    return _dio!;
+  }
+
+  /// Initialize the API service
+  static Future<void> initialize() async {
+    await _timeSync.initialize();
+    // Initial time sync
+    await _timeSync.syncTime();
+    _timeSync.startPeriodicSync();
+  }
+
+  /// Dispose resources
+  static void dispose() {
+    _timeSync.dispose();
+    _dio?.close();
+    _dio = null;
+  }
+
+  // ===== Time Sync =====
+
+  /// Sync time with server using Cristian's Algorithm
+  static Future<bool> syncTime({int retries = AppConstants.timeSyncRetries}) async {
+    return await _timeSync.syncTime(retries: retries);
+  }
+
+  /// Get current estimated server time in milliseconds
+  static int getEstimatedServerTimeMs() {
+    return _timeSync.getEstimatedServerTimeMs();
+  }
+
+  // ===== Time Sync Endpoint =====
+
+  /// GET /api/v1/time-sync
+  /// Returns server epoch time for Cristian's Algorithm
+  static Future<Map<String, dynamic>> timeSync() async {
+    try {
+      final response = await _client.get(AppConstants.timeSyncEndpoint);
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw ApiException('Time sync failed: ${e.message}', e.response?.statusCode);
+    }
+  }
+
+  // ===== Session Management =====
+
+  /// POST /api/v1/sessions/start
+  /// Start a new attendance session (professor only)
+  static Future<Map<String, dynamic>> startSession({
+    required String courseCode,
+    required String profUuid,
+    String? sessionDate,
+  }) async {
+    try {
+      final response = await _client.post(
+        AppConstants.startSessionEndpoint,
+        data: {
+          'course_code': courseCode,
+          'prof_uuid': profUuid,
+          if (sessionDate != null) 'session_date': sessionDate,
+        },
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw ApiException('Start session failed: ${e.message}', e.response?.statusCode);
+    }
+  }
+
+  /// POST /api/v1/sessions/:sessionUuid/stop
+  /// Stop a session (professor only)
+  static Future<Map<String, dynamic>> stopSession(String sessionUuid) async {
+    try {
+      final response = await _client.post(
+        '${AppConstants.sessionTokensEndpoint}/$sessionUuid/stop',
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw ApiException('Stop session failed: ${e.message}', e.response?.statusCode);
+    }
+  }
+
+  /// GET /api/v1/sessions/:sessionUuid/tokens
+  /// Get active tokens for a session (debug)
+  static Future<Map<String, dynamic>> getSessionTokens(String sessionUuid) async {
+    try {
+      final response = await _client.get(
+        '${AppConstants.sessionTokensEndpoint}/$sessionUuid/tokens',
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw ApiException('Get tokens failed: ${e.message}', e.response?.statusCode);
+    }
+  }
+
+  /// GET /api/v1/sessions/:sessionUuid/attendance
+  /// Get attendance records for a session (professor view)
+  static Future<Map<String, dynamic>> getSessionAttendance(String sessionUuid) async {
+    try {
+      final response = await _client.get(
+        '${AppConstants.sessionTokensEndpoint}/$sessionUuid/attendance',
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw ApiException('Get attendance failed: ${e.message}', e.response?.statusCode);
+    }
+  }
+
+  // ===== Device Registration =====
+
+  /// POST /api/v1/devices/register
+  /// Register a device to a student (Gate 1 binding)
+  static Future<Map<String, dynamic>> registerDevice({
+    required String studentUuid,
+    required String deviceIdHash,
+  }) async {
+    try {
+      final response = await _client.post(
+        AppConstants.deviceRegisterEndpoint,
+        data: {
+          'student_uuid': studentUuid,
+          'device_id_hash': deviceIdHash,
+        },
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw ApiException('Device registration failed: ${e.message}', e.response?.statusCode);
+    }
+  }
+
+  // ===== Attendance Claim =====
+
+  /// POST /api/v1/claim-attendance
+  /// Main 4-gate attendance claim endpoint
+  static Future<Map<String, dynamic>> claimAttendance({
+    required String sessionUuid,
+    required String studentUuid,
+    required String tokenVal,
+    required int clientClaimedTime,
+    required String deviceIdHash,
+    required String nonce,
+    required String hmacSignature,
+  }) async {
+    try {
+      final response = await _client.post(
+        AppConstants.claimAttendanceEndpoint,
+        data: {
+          'session_uuid': sessionUuid,
+          'student_uuid': studentUuid,
+          'token_val': tokenVal,
+          'client_claimed_time': clientClaimedTime,
+          'device_id_hash': deviceIdHash,
+          'nonce': nonce,
+          'hmac_signature': hmacSignature,
+        },
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw ApiException('Claim attendance failed: ${e.message}', e.response?.statusCode);
+    }
+  }
+
+  /// High-level claim attendance method (handles crypto + time sync)
+  static Future<Map<String, dynamic>> submitAttendance({
+    required String sessionUuid,
+    required String studentUuid,
+    required String tokenVal,
+    required String deviceIdHash,
+    String? nonce,
+  }) async {
+    // Ensure time is synced
+    if (!_timeSync.isTimeSyncFresh()) {
+      await _timeSync.syncTime();
+    }
+
+    // Get HMAC key
+    final hmacKey = await SecureStorageService.getHmacKey();
+    if (hmacKey == null) {
+      throw ApiException('HMAC key not found. Please provision device first.');
+    }
+
+    // Get current estimated server time (client claimed time)
+    final clientClaimedTime = _timeSync.getEstimatedServerTimeMs();
+
+    // Use provided nonce or generate new one
+    final challengeNonce = nonce ?? CryptoService.generateNonce();
+
+    // Get device ID hash
+    final deviceId = await SecureStorageService.getDeviceId();
+    if (deviceId == null) {
+      throw ApiException('Device ID not found. Please provision device first.');
+    }
+    final deviceIdHash = deviceId;
+
+    // Compute HMAC signature
+    final hmacSignature = CryptoService.computeHmac(
+      secretHmacKey: hmacKey,
+      sessionUuid: sessionUuid,
+      studentUuid: studentUuid,
+      tokenVal: tokenVal,
+      clientClaimedTime: clientClaimedTime,
+      deviceIdHash: deviceIdHash,
+      nonce: challengeNonce,
+    );
+
+    // Submit claim
+    return await claimAttendance(
+      sessionUuid: sessionUuid,
+      studentUuid: studentUuid,
+      tokenVal: tokenVal,
+      clientClaimedTime: clientClaimedTime,
+      deviceIdHash: deviceIdHash,
+      nonce: challengeNonce,
+      hmacSignature: hmacSignature,
+    );
+  }
+
+  // ===== Health =====
+
+  static Future<bool> checkHealth() async {
+    try {
+      final response = await _client.get('/health');
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+}
+
+/// Custom exception for API errors
+class ApiException implements Exception {
+  final String message;
+  final int? statusCode;
+
+  ApiException(this.message, [this.statusCode]);
+
+  @override
+  String toString() => 'ApiException: $message${statusCode != null ? ' (status: $statusCode)' : ''}';
+}
