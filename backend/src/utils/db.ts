@@ -1,4 +1,4 @@
-import { Pool, PoolClient, QueryResult } from 'pg';
+import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import { config } from '../config';
 
 export const pool = new Pool({
@@ -17,7 +17,7 @@ pool.on('error', (err) => {
   console.error('Unexpected database pool error:', err);
 });
 
-export async function query<T = any>(text: string, params?: any[]): Promise<QueryResult<T>> {
+export async function query<T extends QueryResultRow = any>(text: string, params?: any[]): Promise<QueryResult<T>> {
   const start = Date.now();
   const res = await pool.query<T>(text, params);
   const duration = Date.now() - start;
@@ -33,17 +33,18 @@ export async function getClient(): Promise<PoolClient> {
   const originalRelease = client.release.bind(client);
 
   // Optional: add query timing wrapper
-  client.query = async (...args) => {
+  const boundQuery = client.query.bind(client);
+  client.query = ((text: string, values?: any[]) => {
     const start = Date.now();
-    try {
-      return await originalQuery(...args);
-    } finally {
+    const p = boundQuery(text, values);
+    p.then(() => {
       const duration = Date.now() - start;
       if (config.logLevel === 'debug') {
-        console.log('Client query', { duration, text: String(args[0]).substring(0, 100) });
+        console.log('Client query', { duration, text: String(text).substring(0, 100) });
       }
-    }
-  };
+    }).catch(() => {});
+    return p;
+  }) as typeof client.query;
 
   client.release = () => {
     client.query = originalQuery;

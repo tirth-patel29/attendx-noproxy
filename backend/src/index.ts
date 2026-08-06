@@ -123,26 +123,35 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
 // Start server
-httpServer.listen(config.port, () => {
-  console.log(`
+function startServer() {
+  httpServer.listen(config.port, async () => {
+    console.log(`
 ╔══════════════════════════════════════════════════════════════╗
 ║  Attendance Backend — Zero-Trust Cryptographic Gateway       ║
 ║  Port: ${config.port}                                               ║
 ║  Env: ${config.nodeEnv}                                           ║
 ║  DB: ${config.db.host}:${config.db.port}/${config.db.database}                    ║
 ╚══════════════════════════════════════════════════════════════╝
-  `);
+    `);
 
-  // Auto-start metronomes for active sessions on boot
-  try {
-    const activeSessions = await pool.query(
-      `SELECT session_uuid FROM course_sessions WHERE is_active = TRUE`
-    );
-    for (const row of activeSessions.rows) {
-      await metronomeService.startSession(row.session_uuid);
+    // Auto-start metronomes for active sessions on boot
+    try {
+      const activeSessions = await pool.query(
+        `SELECT session_uuid FROM course_sessions WHERE is_active = TRUE`
+      );
+      for (const row of activeSessions.rows) {
+        await metronomeService.startSession(row.session_uuid);
+      }
+      console.log(`Auto-started metronomes for ${activeSessions.rows.length} active sessions`);
+    } catch (err) {
+      console.warn('Could not auto-start metronomes:', err);
     }
-    console.log(`Auto-started metronomes for ${activeSessions.rows.length} active sessions`);
-  } catch (err) {
-    console.warn('Could not auto-start metronomes:', err);
-  }
-});
+  });
+}
+
+try {
+  startServer();
+} catch (err: any) {
+  console.error('Failed to start server:', err);
+  process.exit(1);
+}
