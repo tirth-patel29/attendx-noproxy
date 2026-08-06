@@ -84,7 +84,7 @@ Homelab Impact:
 | Phase | Status | Next Action |
 |-------|--------|-------------|
 | 0 Foundation | ✅ **COMPLETE** | — |
-| 1 Database/Schema | 🔄 **READY TO START** | Apply migration (Task 1.2) |
+| 1 Database/Schema | 🔄 **IN PROGRESS** | Postgres tuning + backup setup + power-cut drill |
 | 2 Backend | ⏳ Waiting | Start after Phase 1 |
 | 3 Flutter | ⏳ Waiting | Start after Phase 2 |
 | 4 Integration | ⏳ Waiting | — |
@@ -95,10 +95,11 @@ Homelab Impact:
 ## IMMEDIATE NEXT STEPS (Tomorrow)
 
 1. **Team reviews PROJECT_PLAN.md** on Gitea
-2. **Create GitHub Issues** for Phase 1 tasks (use template)
-3. **Apply schema** to live Supabase (I'll run the migration)
-4. **Verify tables** and seed test data
-5. **Start Phase 2** — initialize Node/TS backend
+2. **Postgres 8GB tuning** (shared_buffers=384MB, work_mem=16MB, max_conn=100)
+3. **Set up nightly backup cron** (02:30 → 500GB WD)
+4. **Test backup restore** (spin up test DB from dump)
+5. **Power-Cut Drill #1** — force reboot, verify recovery
+6. **Start Phase 2** — initialize Node/TS backend
 
 ---
 
