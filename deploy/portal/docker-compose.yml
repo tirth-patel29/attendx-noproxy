@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  attendance-portal:
+    build:
+      context: ./portal
+      dockerfile: Dockerfile
+    container_name: attendance-portal
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - VITE_API_URL=https://api.atmyhome.tech
+      - VIRTUAL_HOST=portal.atmyhome.tech
+      - VIRTUAL_PORT=3000
+    networks:
+      - proxynet
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    labels:
+      - "nginx-proxy-ondemand.enable=true"
+      - "nginx-proxy-ondemand.timeout=1800"
+      - "nginx-proxy-ondemand.group=dev-suite"
+      - "VIRTUAL_HOST=portal.atmyhome.tech"
+      - "VIRTUAL_PORT=3000"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+networks:
+  proxynet:
+    external: true
