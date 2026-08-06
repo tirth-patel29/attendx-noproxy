@@ -3,6 +3,8 @@
 **Repo:** `het/attendance-gateway` on Gitea (`http://gitea:3000/het/attendance-gateway`)  
 **Clone:** `git clone http://gitea:3000/het/attendance-gateway.git`  
 **Supabase:** `https://supabase.atmyhome.tech` (all 7 services healthy)  
+**Backend API:** `https://api.atmyhome.tech` (4-gate judge + metronome)  
+**Professor Portal:** `https://portal.atmyhome.tech` (React/MUI dashboard)  
 **Homelab SSH:** `ssh hetp@<tailscale-ip>` (port 22) → `su -` for root (pass: 7567@Het)
 
 ---
@@ -87,8 +89,10 @@ Homelab Impact:
 | 1 Database/Schema | ✅ **COMPLETE** | — |
 | 2 Backend | ✅ **COMPLETE** | — |
 | 3 Flutter Client | 🔄 **SCAFFOLD COMPLETE** | Build APK on teammate laptop, test on physical device |
-| 4 Integration | ⏳ | End-to-end test with live backend |
-| 5 Polish | ⏳ | Demo prep |
+| 4 Professor Portal | ✅ **DEPLOYED** | `https://portal.atmyhome.tech` live |
+| 5 Integration | ⏳ | End-to-end test with live backend |
+| 6 Hardening | ⏳ | Power-cut drill #2, load test |
+| 7 Polish | ⏳ | Demo prep |
 
 ---
 
