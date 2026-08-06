@@ -44,14 +44,15 @@ Legend: `[ ]` todo · `[x]` done · `>` currently in progress
 - [x] Docker image built and deployed on homelab (`attendance-backend:latest`, proxynet).
 - [x] All 6 SRS attack vectors verified blocked.
 
-## Phase 3 — Flutter client (4 gates + pre-check UI)
+## Phase 3 — Flutter client (4 gates + pre-check UI) ✅ SCAFFOLD COMPLETE
 
-- [ ] Provisioning flow: hardware UUID generation → secure storage → bind to server account.
-- [ ] Cristian's Algorithm time calibration on boot (`DriftOffset`).
-- [ ] Pre-check UI (4 checkpoints), `local_auth` flesh check, `mobile_scanner`.
-- [ ] `assembleVerificationPacket` + HMAC wax seal + dispatch.
-- [ ] Result UI per the state machine (green PRESENT / hardware mismatch / stream detected…).
+- [x] Provisioning flow: hardware UUID generation → secure storage → bind to server account.
+- [x] Cristian's Algorithm time calibration on boot (`DriftOffset`).
+- [x] Pre-check UI (4 checkpoints), `local_auth` flesh check, `mobile_scanner` placeholders.
+- [x] `assembleVerificationPacket` + HMAC wax seal + dispatch.
+- [x] Result UI per the state machine (green PRESENT / hardware mismatch / stream detected…).
 - [ ] Run on a physical Android test device (the whole point — must work on real phones).
+- [ ] Integrate with live backend `api.atmyhome.tech` end-to-end.
 
 ## Phase 4 — Integrate + demo readiness
 
