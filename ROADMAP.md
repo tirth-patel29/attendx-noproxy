@@ -19,12 +19,14 @@ Legend: `[ ]` todo · `[x]` done · `>` currently in progress
 - [x] **PROJECT_PLAN.md** created with detailed phases, timeline, RACI, risks, success metrics
 - [ ] Pin the **exact** self-hosted Supabase versions that fit 8GB RAM (in compose)
 
-## Phase 1 — Database & schema (Supabase on the homelab)
+## Phase 1 — Database & schema (Supabase on the homelab) 🔄 IN PROGRESS
 
-Prove the storage layer survives the hardware before building on it.
-
-- [ ] Author full schema from the SRS into `migrations/` (students, professors,
+- [x] Author full schema from the SRS into `migrations/` (students, professors,
       course_sessions, active_tokens, attendance_ledger + indices + `RollNumber` domain).
+- [x] Migration 001 applied to live Supabase DB.
+- [x] Migration 002 applied (device_fingerprints, biometric_templates, crypto_challenges, audit_logs).
+- [x] Migration 003 applied (seed: 2 professors, 5 students, 2 sessions, 4 tokens).
+- [x] Verify indices & constraints (unique_attendance_claim, idx_tokens_fast_lookup, idx_student_auth working).
 - [ ] Tune Postgres for 8GB (`shared_buffers`, `work_mem`, `max_connections`) — see `deploy/`.
 - [ ] Bind-mount data on the SSD; wire automated nightly backup to the 500GB WD.
 - [ ] Stand up a `supabase` Portainer stack on the proxycore network.
