@@ -117,3 +117,16 @@
 ---
 
 ## Phase 1 status: COMPLETE — Ready for schema implementation approval.
+
+## PHASE 2: DATABASE MIGRATION — COMPLETE (commit ffcf9b8)
+
+### Executed & verified against live Supabase (`supabase-db`, PGPASSWORD auth)
+- Created tables: `admin_users`, `divisions`, `courses`, `teacher_assignments`
+- `ALTER TABLE professors` ADD `password_hash`
+- `ALTER TABLE students` ADD `name`, `division_id` (+ backfill name from email)
+- 4 performance indices: assignments by (prof,day), assignments by course, students by division, courses by division
+- Verified: 13 public tables present; both upgraded tables show new columns.
+- Migration file: `migrations/004_phase2_hierarchy.sql` (idempotent)
+
+### Phase 2 status: COMPLETE — awaiting approval for Phase 3 (Admin Portal).
+
