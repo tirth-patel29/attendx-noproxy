@@ -227,6 +227,51 @@ router.get('/sessions/:sessionUuid/tokens', async (req: Request, res: Response, 
 });
 
 /**
+ * POST /api/v1/sessions/:sessionUuid/challenge
+ * Issue a fresh cryptographic challenge nonce for Gate 4 (SRS §6).
+ * The nonce is persisted to crypto_challenges with a short TTL and marked
+ * single-use per session. The client includes it in the HMAC-wax-seal so the
+ * server can prove the claim is fresh and non-replayable.
+ */
+router.post('/sessions/:sessionUuid/challenge', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { sessionUuid } = req.params;
+
+    // Ensure the session exists and is active
+    const sessionCheck = await query(
+      `SELECT session_uuid FROM course_sessions WHERE session_uuid = $1 AND is_active = TRUE`,
+      [sessionUuid]
+    );
+    if (sessionCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Active session not found' });
+    }
+
+    const { generateChallengeNonce } = await import('../utils/crypto');
+    const nonce = generateChallengeNonce();
+    const now = Date.now();
+    const ttlMs = config.judge.tokenValidityWindowMs * 2; // e.g. 10s
+
+    const result = await query(
+      `INSERT INTO crypto_challenges (session_uuid, challenge_nonce, issued_at_epoch, expires_at_epoch, used)
+       VALUES ($1, $2, $3, $4, FALSE)
+       RETURNING challenge_nonce, issued_at_epoch, expires_at_epoch`,
+      [sessionUuid, nonce, now, now + ttlMs]
+    );
+
+    const challenge = result.rows[0];
+    // Server returns its own epoch so the client can compute the 250ms window
+    res.json({
+      session_uuid: sessionUuid,
+      nonce: challenge.challenge_nonce,
+      issued_at_epoch: challenge.issued_at_epoch,
+      expires_at_epoch: challenge.expires_at_epoch,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * GET /api/v1/sessions/:sessionUuid/attendance
  * Attendance records for a session (professor view) — returns bare array
  */

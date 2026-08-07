@@ -8,6 +8,7 @@ class AppConstants {
   static const String startSessionEndpoint = '/api/v1/sessions/start';
   static const String sessionTokensEndpoint = '/api/v1/sessions';
   static const String deviceRegisterEndpoint = '/api/v1/devices/register';
+  static const String challengeEndpoint = '/api/v1/sessions'; // + /:uuid/challenge
   
   // Metronome
   static const int metronomeIntervalMs = 3000;

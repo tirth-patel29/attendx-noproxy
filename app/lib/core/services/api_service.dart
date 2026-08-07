@@ -150,6 +150,23 @@ class ApiService {
     }
   }
 
+  // ===== Crypto Challenge (Gate 4) =====
+
+  /// POST /api/v1/sessions/:sessionUuid/challenge
+  /// Request a fresh single-use nonce from the server for the HMAC wax seal.
+  /// This is server-issued (SRS §6) so the server can prove claim freshness
+  /// and reject replays. Returns { nonce, issued_at_epoch, expires_at_epoch }.
+  static Future<Map<String, dynamic>> getChallenge(String sessionUuid) async {
+    try {
+      final response = await _client.post(
+        '$challengeEndpoint/$sessionUuid/challenge',
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw ApiException('Get challenge failed: ${e.message}', e.response?.statusCode);
+    }
+  }
+
   // ===== Attendance Claim =====
 
   /// POST /api/v1/claim-attendance
@@ -204,8 +221,11 @@ class ApiService {
     // Get current estimated server time (client claimed time)
     final clientClaimedTime = _timeSync.getEstimatedServerTimeMs();
 
-    // Use provided nonce or generate new one
-    final challengeNonce = nonce ?? CryptoService.generateNonce();
+    // Get server-issued challenge nonce (SRS §6). The server persists it to
+    // crypto_challenges with single-use semantics; a locally generated nonce
+    // would be rejected by the judge as invalid_or_expired_nonce.
+    final challenge = await getChallenge(sessionUuid);
+    final challengeNonce = (challenge['nonce'] as String?) ?? CryptoService.generateNonce();
 
     // Get device ID hash
     final deviceId = await SecureStorageService.getDeviceId();
