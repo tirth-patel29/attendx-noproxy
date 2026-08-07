@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { portalApi } from '../services/portalApi';
+import MoireQRDisplay from '../components/MoireQRDisplay';
 import {
   Box,
   Card,
@@ -233,9 +234,9 @@ export default function SessionPage() {
       </Grid>
 
       {/* QR Code Dialog */}
-      <Dialog open={qrDialogOpen} onClose={() => setQrDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={qrDialogOpen} onClose={() => setQrDialogOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6">Session QR Code</Typography>
+          <Typography variant="h6">Session QR Code — Photonic Display</Typography>
           <IconButton onClick={() => setQrDialogOpen(false)}>
             <CloseIcon />
           </IconButton>
@@ -248,12 +249,15 @@ export default function SessionPage() {
             </Typography>
             
             {currentToken ? (
-              <Box sx={{ mt: 2, p: 3, bgcolor: 'grey.50', borderRadius: 2, textAlign: 'center' }}>
-                <Typography variant="h2" fontFamily="monospace" fontWeight={700} letterSpacing="0.3em" color="primary.main">
-                  {currentToken}
-                </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                  Refreshes every 3 seconds
+              <Box sx={{ mt: 2, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                {/* The Moiré + flashing QR photonic display */}
+                <MoireQRDisplay token={currentToken} courseCode={session.course_code} />
+
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block', textAlign: 'center', maxWidth: 480 }}>
+                  Anti-relay display: the token QR flashes over a static Moiré pattern. A live
+                  video-call relay carries H.264 latency + Moiré interference that breaks the
+                  scanner's binarizer — so it fails the 250ms stream-kill window. In-room phones
+                  (~30fps) catch a flash frame and pass.
                 </Typography>
               </Box>
             ) : (
