@@ -9,6 +9,7 @@ import { pool, checkDbHealth } from './utils/db';
 import { metronomeService } from './services/metronome';
 import attendanceRoutes from './routes/attendance';
 import authRoutes from './routes/auth';
+import adminRouteModule from './routes/admin';
 
 const app = express();
 const httpServer = createServer(app);
@@ -49,6 +50,12 @@ app.get('/health', async (_req, res) => {
 // API routes
 app.use('/api/v1', attendanceRoutes);
 app.use('/api/v1/auth', authRoutes);
+
+// Admin console
+//   POST /api/v1/admin/login   -> public (admin auth)
+//   ALL  /api/v1/admin/*       -> requireAdmin (JWT role 'admin')
+app.use('/api/v1/admin', adminRouteModule.adminPublicRouter);
+app.use('/api/v1/admin', adminRouteModule.requireAdmin, adminRouteModule.adminRouter);
 
 // Socket.io connection handling
 io.on('connection', (socket: Socket) => {

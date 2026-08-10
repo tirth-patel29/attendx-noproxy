@@ -3,9 +3,34 @@
 **Repo:** `het/attendance-gateway` on Gitea (`http://gitea:3000/het/attendance-gateway`)  
 **Clone:** `git clone http://gitea:3000/het/attendance-gateway.git`  
 **Supabase:** `https://supabase.atmyhome.tech` (all 7 services healthy)  
-**Backend API:** `https://api.atmyhome.tech` (4-gate judge + metronome)  
-**Professor Portal:** `https://portal.atmyhome.tech` (React/MUI dashboard)  
-**Homelab SSH:** `ssh hetp@<tailscale-ip>` (port 22) → `su -` for root (pass: 7567@Het)
+**Backend API:** `https://api.atmyhome.tech` (4-gate judge + metronome + **Admin API**)  
+**Admin Console:** `https://admin.atmyhome.tech` (React/MUI — manage teachers, students/HMAC, divisions, courses, timetable)  
+**Professor Portal:** `https://portal.atmyhome.tech` (React/MUI — dumb-terminal projector)  
+**Homelab SSH:** `hetp@192.168.0.108` (port 22) → `su -` for root (pass: 7567@Hetp)
+
+**Default Admin seed:** `admin@atmyhome.tech` / `Admin@123` (CHANGE after first login)
+
+---
+
+## ADMIN CONSOLE (top of the database)
+
+**Login:** `POST /api/v1/admin/login` (JWT `role: 'admin'`) · refresh `POST /api/v1/admin/login/refresh`
+
+Protected routes (all under `/api/v1/admin/`, require `Authorization: Bearer <admin-jwt>`):
+| Resource | Endpoints |
+|----------|-----------|
+| Stats | `GET /stats` |
+| Teachers (professors) | `GET/POST /teachers`, `PUT/DELETE /teachers/:uuid`, `POST /teachers/:uuid/reset-password` |
+| Students | `GET/POST /students`, `GET/PUT/DELETE /students/:uuid`, `POST /students/:uuid/reset-device`, `POST /students/:uuid/rotate-hmac` |
+| Divisions | `GET/POST /divisions`, `PUT/DELETE /divisions/:uuid` |
+| Courses | `GET/POST /courses`, `PUT/DELETE /courses/:code` |
+| Timetable | `GET/POST /assignments`, `PUT/DELETE /assignments/:id` |
+
+**Security-sensitive ops** (`reset-device`, `rotate-hmac`, password resets, deletes) write an
+append-only `audit_logs` row. `reset-device` **unbinds the hardware tattoo AND rotates the
+Gate-4 HMAC** so the old device is permanently locked out — the student re-provisions.
+
+**Re-deploy:** `cd /home/hetp/docker-stacks/attendance-admin && CACHE_BUST=$(date +%s) docker compose up -d --build`
 
 ---
 

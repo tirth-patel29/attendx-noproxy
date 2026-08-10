@@ -87,15 +87,23 @@ Legend: `[ ]` todo · `[x]` done · `>` currently in progress
 
 ---
 
-## ✅ Current System Status (2026-08-06)
+## ✅ Current System Status (2026-08-10)
 
 | Component | Status | URL |
 |-----------|--------|-----|
 | **Supabase Stack** (7 services) | ✅ All Healthy | `https://supabase.atmyhome.tech` |
-| **Attendance Backend** (Node/TS) | ✅ Healthy + Public | `https://api.atmyhome.tech` |
-| **Professor Portal** (React/MUI) | ✅ Live | `https://portal.atmyhome.tech` |
+| **Attendance Backend** (Node/TS) | ✅ 4-gate judge + metronome + **Admin API** | `https://api.atmyhome.tech` |
+| **Admin Console** (React/MUI) | ✅ Built + deployed (`attendance-admin`) | `https://admin.atmyhome.tech` |
+| **Professor Portal** (React/MUI) | ✅ Dumb-terminal live | `https://portal.atmyhome.tech` |
 | **Flutter Client** | ✅ Scaffolded | `app/` in repo |
-| **Gitea Repo** | ✅ `het/attendance-gateway` | `http://gitea:3000/het/attendance-gateway` |
+| **Gitea Repo** | ✅ `het/attendance-gateway` (single `main`) | `http://gitea:3000/het/attendance-gateway` |
+
+> **Admin console** — "top of the database": manage teachers (CRUD + password reset),
+> students (CRUD + **device reset** = unbind hardware tattoo + rotate Gate-4 HMAC, and
+> standalone HMAC rotation), divisions, courses and the teacher timetable
+> (`teacher_assignments`). All security-sensitive ops are audit-logged (DEVICE_RESET,
+> HMAC_ROTATE, TEACHER_PASSWORD_RESET, …) to `audit_logs`. Default admin seed:
+> `admin@atmyhome.tech` / `Admin@123` (CHANGE after first login).
 
 ---
 
