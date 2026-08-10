@@ -1,0 +1,19 @@
+# ============================================================================
+# Port-publishing override for standalone servers WITHOUT a reverse proxy.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.ports.yml up -d
+# ============================================================================
+
+name: attendance-gateway
+
+services:
+  backend:
+    ports:
+      - "${BACKEND_PORT:-3001}:3001"
+
+  portal:
+    ports:
+      - "${PORTAL_PORT:-3000}:3000"
+
+  admin:
+    ports:
+      - "${ADMIN_PORT:-3002}:3000"

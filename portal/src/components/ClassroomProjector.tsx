@@ -104,9 +104,11 @@ export default function ClassroomProjector({
 
       {token ? (
         // Static, constantly-visible QR. Re-rendered only when the payload (token) rotates.
+        // Payload format: ATTN:<session_uuid>:<token> — the phone scans it to learn both
+        // the session identity and the rotating token in one shot (SRS Phase 2/3).
         <Box sx={{ bgcolor: '#ffffff', p: 1, borderRadius: 2 }}>
           <QRCodeSVG
-            value={token}
+            value={`ATTN:${sessionId}:${token}`}
             size={size}
             bgColor="#ffffff"
             fgColor="#000000"

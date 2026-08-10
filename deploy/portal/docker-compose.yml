@@ -11,8 +11,8 @@ services:
     restart: unless-stopped
     environment:
       - NODE_ENV=production
-      - VITE_API_URL=https://api.atmyhome.tech
-      - VIRTUAL_HOST=portal.atmyhome.tech
+      - BACKEND_UPSTREAM=${BACKEND_UPSTREAM:-attendance-backend:3001}
+      - VIRTUAL_HOST=${VIRTUAL_HOST:-portal.atmyhome.tech}
       - VIRTUAL_PORT=3000
     networks:
       - proxynet
@@ -28,7 +28,7 @@ services:
       - "nginx-proxy-ondemand.enable=true"
       - "nginx-proxy-ondemand.timeout=1800"
       - "nginx-proxy-ondemand.group=dev-suite"
-      - "VIRTUAL_HOST=portal.atmyhome.tech"
+      - "VIRTUAL_HOST=${VIRTUAL_HOST:-portal.atmyhome.tech}"
       - "VIRTUAL_PORT=3000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]

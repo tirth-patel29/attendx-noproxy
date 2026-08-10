@@ -128,7 +128,7 @@ class ApiService {
     }
   }
 
-  // ===== Device Registration =====
+  // ===== Device Registration / Provisioning =====
 
   /// POST /api/v1/devices/register
   /// Register a device to a student (Gate 1 binding)
@@ -147,6 +147,32 @@ class ApiService {
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
       throw ApiException('Device registration failed: ${e.message}', e.response?.statusCode);
+    }
+  }
+
+  /// POST /api/v1/provision
+  /// Full SRS provisioning: roll number + the HMAC secret issued by the Admin
+  /// Console (student detail panel) + this device's hardware hash.
+  /// The server validates the pair, binds the device (Gate 1) and returns the
+  /// student's UUID for storage. 401 on wrong secret, 409 if already bound
+  /// elsewhere (admin must reset-device first).
+  static Future<Map<String, dynamic>> provision({
+    required String rollNo,
+    required String secretHmacKey,
+    required String deviceIdHash,
+  }) async {
+    try {
+      final response = await _client.post(
+        AppConstants.provisionEndpoint,
+        data: {
+          'roll_no': rollNo,
+          'secret_hmac_key': secretHmacKey,
+          'device_id_hash': deviceIdHash,
+        },
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw ApiException('Provisioning failed: ${e.message}', e.response?.statusCode);
     }
   }
 

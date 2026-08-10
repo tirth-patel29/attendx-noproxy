@@ -148,44 +148,31 @@ export class MetronomeService {
   }
 
   /**
-   * Verify a token is valid and not used (for claim-attendance)
-   * Returns the token record if valid, null otherwise
+   * Verify a token is live (exists + not yet expired) WITHOUT consuming it.
+   *
+   * Per SRS §1 Phase 3/5 the token is SHARED: the entire class scans the same
+   * rotating token inside its validity window. Tradecraft is enforced purely by
+   * the 250ms latency check and the UNIQUE(session_uuid, student_uuid) ledger
+   * constraint — never by deleting the token after a single claim (that would
+   * let one student's packet DoS the other 69).
+   *
+   * Returns the token record if live, null otherwise.
    */
-  async verifyAndConsumeToken(sessionUuid: string, tokenVal: string, clientClaimedTime: number): Promise<TokenRecord | null> {
+  async verifyToken(sessionUuid: string, tokenVal: string): Promise<TokenRecord | null> {
     const now = Date.now();
-    
-    // 1. Find token
     const res = await query<TokenRecord>(
-      `SELECT * FROM active_tokens 
+      `SELECT * FROM active_tokens
        WHERE session_uuid = $1 AND token_val = $2 AND expires_at_epoch > $3`,
       [sessionUuid, tokenVal, now]
     );
+    return res.rows[0] ?? null;
+  }
 
-    if (res.rows.length === 0) {
-      return null; // Token not found or expired
-    }
-
-    const token = res.rows[0];
-
-    // 2. Check latency (Cristian's Algorithm tolerance)
-    // Server receives claim at 'now', token was created at token.created_at_epoch
-    // The drift is now - token.created_at_epoch - clientClaimedTime
-    // Actually: verification_delta_ms = client_claimed_time - token.created_at_epoch
-    // We need |verification_delta_ms| <= maxLatencyMs (250ms)
-    
-    const verificationDeltaMs = clientClaimedTime - token.created_at_epoch;
-    if (Math.abs(verificationDeltaMs) > config.judge.maxLatencyMs) {
-      console.log(`Token ${tokenVal} failed latency check: delta=${verificationDeltaMs}ms`);
-      return null; // Outside 250ms window
-    }
-
-    // 3. Mark token as consumed (delete it so it can't be reused)
-    await query(
-      `DELETE FROM active_tokens WHERE token_uuid = $1`,
-      [token.token_uuid]
-    );
-
-    return token;
+  /**
+   * Verify a token and that it is NOT expired (legacy alias kept for tests).
+   */
+  async verifyAndConsumeToken(sessionUuid: string, tokenVal: string): Promise<TokenRecord | null> {
+    return this.verifyToken(sessionUuid, tokenVal);
   }
 }
 

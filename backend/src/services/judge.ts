@@ -40,7 +40,16 @@ export interface AttendanceResult {
  */
 export class JudgeService {
   /**
-   * Process an attendance claim through all 4 gates
+   * Process an attendance claim through all 4 gates.
+   *
+   * Implements the SRS §5 judge ordering exactly:
+   *   1. Gate 1 — hardware tattoo match (X-Device-HW-Key equivalent)
+   *   2. Gate 4 — HMAC wax seal verified FIRST (forgeries never touch token state)
+   *   3. Gate 3 — token lookup (non-destructive: the whole class shares each token)
+   *   4. Gate 4 — latency: delta = observed - token_birth must be 0..250ms
+   *               (negative = forged clock, >250ms = live-stream artifact)
+   *   5. nonce single-use verification
+   *   6. Commit to ledger (UNIQUE(session, student) makes re-claims idempotent)
    */
   async processClaim(payload: AttendanceClaimPayload): Promise<AttendanceResult> {
     // First, get student record to check Gate 1 and get HMAC key
@@ -57,8 +66,6 @@ export class JudgeService {
     const student = studentRes.rows[0];
 
     // ===== GATE 1: Hardware Tattoo =====
-    // Client sends device_id_hash = SHA-256(hardware_UUID)
-    // Server compares with bound_device_id in students table
     if (student.bound_device_id && student.bound_device_id !== payload.device_id_hash) {
       await this.logAudit('CLAIM_ATTEMPT', payload.student_uuid, payload.session_uuid, {
         gate: 1,
@@ -69,55 +76,7 @@ export class JudgeService {
       return { status: 'HARDWARE_MISMATCH', message: 'Device not registered to this student' };
     }
 
-    // ===== GATE 3: Visual Micro-Twitch (3s rotating token) =====
-    // Verify token exists, is valid, and consume it
-    const token = await metronomeService.verifyAndConsumeToken(
-      payload.session_uuid,
-      payload.token_val,
-      payload.client_claimed_time
-    );
-
-    if (!token) {
-      // Check why it failed
-      const now = Date.now();
-      const tokenCheck = await query(
-        `SELECT * FROM active_tokens WHERE session_uuid = $1 AND token_val = $2`,
-        [payload.session_uuid, payload.token_val]
-      );
-
-      if (tokenCheck.rows.length === 0) {
-        // Token never existed or already consumed
-        await this.logAudit('CLAIM_ATTEMPT', payload.student_uuid, payload.session_uuid, {
-          gate: 3,
-          result: 'EXPIRED_TOKEN',
-          token: payload.token_val,
-        });
-        return { status: 'EXPIRED_TOKEN', message: 'Token expired or already used' };
-      }
-
-      const dbToken = tokenCheck.rows[0];
-      const delta = payload.client_claimed_time - dbToken.created_at_epoch;
-      if (Math.abs(delta) > config.judge.maxLatencyMs) {
-        // Token exists but latency too high (Gate 4 would also catch this)
-        await this.logAudit('CLAIM_ATTEMPT', payload.student_uuid, payload.session_uuid, {
-          gate: 3,
-          result: 'STREAM_DETECTED',
-          delta_ms: delta,
-        });
-        return { status: 'STREAM_DETECTED', message: 'Latency exceeds 250ms window', verification_delta_ms: delta };
-      }
-
-      // Token exists but already consumed (replay attack)
-      await this.logAudit('CLAIM_ATTEMPT', payload.student_uuid, payload.session_uuid, {
-        gate: 3,
-        result: 'FORGED_RESPONSE',
-        reason: 'token_already_consumed',
-      });
-      return { status: 'FORGED_RESPONSE', message: 'Token already consumed' };
-    }
-
-    // ===== GATE 4: Cryptographic Time-Stamp =====
-    // Verify HMAC signature
+    // ===== GATE 4: HMAC wax seal (verified before touching token state) =====
     const hmacValid = verifyHmac(student.secret_hmac_key, {
       session_uuid: payload.session_uuid,
       student_uuid: payload.student_uuid,
@@ -136,9 +95,55 @@ export class JudgeService {
       return { status: 'FORGED_RESPONSE', message: 'Invalid cryptographic signature' };
     }
 
+    // ===== GATE 3: Visual Micro-Twitch (3s rotating token, non-destructive) =====
+    const token = await metronomeService.verifyToken(payload.session_uuid, payload.token_val);
+
+    if (!token) {
+      const tokenCheck = await query(
+        `SELECT * FROM active_tokens WHERE session_uuid = $1 AND token_val = $2`,
+        [payload.session_uuid, payload.token_val]
+      );
+      if (tokenCheck.rows.length === 0) {
+        // Token never existed, already rotated out, expired, or wrong session
+        await this.logAudit('CLAIM_ATTEMPT', payload.student_uuid, payload.session_uuid, {
+          gate: 3,
+          result: 'EXPIRED_TOKEN',
+          token: payload.token_val,
+        });
+        return { status: 'EXPIRED_TOKEN', message: 'Token expired, re-scan the projector' };
+      }
+      // Exists but expired
+      await this.logAudit('CLAIM_ATTEMPT', payload.student_uuid, payload.session_uuid, {
+        gate: 3,
+        result: 'EXPIRED_TOKEN',
+        reason: 'expired',
+        token: payload.token_val,
+      });
+      return { status: 'EXPIRED_TOKEN', message: 'Token expired, re-scan the projector' };
+    }
+
+    // ===== GATE 4: The 250ms Stream Kill-Window (SRS §3 Proof 2) =====
+    // delta = TrueObservedTime − TokenBirthTime.
+    // Reject deltas > 250ms (live-stream artifact) AND negative deltas
+    // (impossible: the lens cannot witness a token before the server minted it —
+    // negative delta means the client clock was manipulated).
+    const verificationDeltaMs = payload.client_claimed_time - token.created_at_epoch;
+    if (verificationDeltaMs < 0 || verificationDeltaMs > config.judge.maxLatencyMs) {
+      await this.logAudit('CLAIM_ATTEMPT', payload.student_uuid, payload.session_uuid, {
+        gate: 4,
+        result: 'STREAM_DETECTED',
+        delta_ms: verificationDeltaMs,
+      });
+      return {
+        status: 'STREAM_DETECTED',
+        message: `Stream artifact detected (${verificationDeltaMs}ms > ${config.judge.maxLatencyMs}ms window)`,
+        verification_delta_ms: verificationDeltaMs,
+      };
+    }
+
     // Verify nonce (from crypto_challenges) - single use
     const nonceRes = await query(
-      `SELECT challenge_uuid, used FROM crypto_challenges 
+      `SELECT challenge_uuid, used FROM crypto_challenges
        WHERE session_uuid = $1 AND challenge_nonce = $2 AND expires_at_epoch > $3`,
       [payload.session_uuid, payload.nonce, Date.now()]
     );
@@ -158,28 +163,20 @@ export class JudgeService {
         result: 'FORGED_RESPONSE',
         reason: 'nonce_reused',
       });
-      return { status: 'FORGED_RESPONSE', message: 'Challenge nonce already used' };
+      return { status: 'FORGED_RESPONSE', message: 'Challenge nonce already used (replay)' };
     }
 
-    // Mark nonce as used
+    // Mark nonce as used (single-use, replay protection)
     await query(
       `UPDATE crypto_challenges SET used = TRUE, used_at_epoch = $1 WHERE challenge_uuid = $2`,
       [Date.now(), nonceRes.rows[0].challenge_uuid]
     );
 
-    // Verify latency again with precise delta
-    const verificationDeltaMs = payload.client_claimed_time - token.created_at_epoch;
-    if (Math.abs(verificationDeltaMs) > config.judge.maxLatencyMs) {
-      await this.logAudit('CLAIM_ATTEMPT', payload.student_uuid, payload.session_uuid, {
-        gate: 4,
-        result: 'STREAM_DETECTED',
-        delta_ms: verificationDeltaMs,
-      });
-      return { status: 'STREAM_DETECTED', message: 'Latency exceeds 250ms window', verification_delta_ms: verificationDeltaMs };
-    }
-
     // ===== ALL GATES PASSED =====
-    // Record in attendance_ledger
+    // Commit to the master ledger. The UNIQUE(session_uuid, student_uuid)
+    // constraint makes repeat claims idempotent (SRS §5: duplicate -> 200
+    // "Attendance already logged"). The token is intentionally NOT deleted:
+    // the whole class shares each 3s token within its validity window.
     const ledgerRes = await query(
       `INSERT INTO attendance_ledger (session_uuid, student_uuid, client_claimed_time, verification_delta_ms, status)
        VALUES ($1, $2, $3, $4, 'PRESENT')
@@ -192,7 +189,6 @@ export class JudgeService {
     if (ledgerRes.rows.length > 0) {
       ledgerUuid = ledgerRes.rows[0].ledger_uuid;
     } else {
-      // Duplicate claim (already present) - check existing
       const existing = await query(
         `SELECT ledger_uuid FROM attendance_ledger WHERE session_uuid = $1 AND student_uuid = $2`,
         [payload.session_uuid, payload.student_uuid]
@@ -206,11 +202,12 @@ export class JudgeService {
       gate: 'all_passed',
       ledger_uuid: ledgerUuid,
       verification_delta_ms: verificationDeltaMs,
+      already_logged: ledgerRes.rows.length === 0,
     });
 
     return {
       status: 'PRESENT',
-      message: 'Attendance verified',
+      message: ledgerRes.rows.length === 0 ? 'Attendance already logged' : 'Attendance verified',
       verification_delta_ms: verificationDeltaMs,
       ledger_uuid: ledgerUuid,
     };

@@ -148,7 +148,15 @@ class PrecheckOrchestrator extends ChangeNotifier {
     }
   }
 
-  /// Submit the attendance claim after all pre-checks pass
+  /// Submit the attendance claim after all pre-checks pass.
+  ///
+  /// Delegates to ApiService.submitAttendance() which:
+  ///   - re-syncs time if stale (Cristian's Algorithm),
+  ///   - fetches a SERVER-issued single-use nonce from
+  ///     POST /sessions/:uuid/challenge (the judge rejects locally generated
+  ///     nonces as FORGED_RESPONSE),
+  ///   - computes the HMAC wax seal over ONE canonical timestamp,
+  ///   - and dispatches the claim.
   Future<Map<String, dynamic>?> submitClaim() async {
     if (_currentPhase != PrecheckPhase.complete) {
       _errorMessage = 'Pre-check not complete';
@@ -156,46 +164,13 @@ class PrecheckOrchestrator extends ChangeNotifier {
     }
 
     try {
-      // Get current token
-      final token = await Gate3VisualTwitch.getCurrentToken(_sessionUuid);
-      if (token == null) {
-        _errorMessage = 'No active token available';
-        return null;
-      }
-
-      // Get required data
-      final hmacKey = await SecureStorageService.getHmacKey();
-      if (hmacKey == null) {
-        _errorMessage = 'HMAC key not found';
-        return null;
-      }
-
       final deviceIdHash = await DeviceInfoService.getDeviceIdHash();
-      final nonce = CryptoService.generateNonce();
-      final clientClaimedTime = TimeSyncService().getEstimatedServerTimeMs();
-
-      // Compute HMAC
-      final hmacSignature = CryptoService.computeHmac(
-        secretHmacKey: hmacKey!,
+      final result = await ApiService.submitAttendance(
         sessionUuid: _sessionUuid,
         studentUuid: _studentUuid,
         tokenVal: _tokenVal,
-        clientClaimedTime: TimeSyncService().getEstimatedServerTimeMs(),
-        deviceIdHash: await DeviceInfoService.getDeviceIdHash(),
-        nonce: CryptoService.generateNonce(),
+        deviceIdHash: deviceIdHash,
       );
-
-      // Submit claim
-      final result = await ApiService.claimAttendance(
-        sessionUuid: _sessionUuid,
-        studentUuid: _studentUuid,
-        tokenVal: token!,
-        clientClaimedTime: TimeSyncService().getEstimatedServerTimeMs(),
-        deviceIdHash: await DeviceInfoService.getDeviceIdHash(),
-        nonce: CryptoService.generateNonce(),
-        hmacSignature: hmacSignature,
-      );
-
       return result;
     } catch (e) {
       _errorMessage = 'Claim submission failed: $e';

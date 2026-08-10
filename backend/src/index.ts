@@ -7,6 +7,7 @@ import morgan from 'morgan';
 import { config } from './config';
 import { pool, checkDbHealth } from './utils/db';
 import { metronomeService } from './services/metronome';
+import { ensureDefaultAdmin } from './services/bootstrap';
 import attendanceRoutes from './routes/attendance';
 import authRoutes from './routes/auth';
 import adminRouteModule from './routes/admin';
@@ -14,10 +15,12 @@ import adminRouteModule from './routes/admin';
 const app = express();
 const httpServer = createServer(app);
 
-// Socket.io setup
+// Socket.io setup — CORS origin list comes from CORS_ORIGIN (comma-separated).
+// Same-origin deployments (nginx proxies /socket.io) are never blocked; this
+// governs cross-origin browser clients only.
 const io = new SocketIOServer(httpServer, {
   cors: {
-    origin: config.corsOrigin,
+    origin: config.corsOrigins.length > 0 ? config.corsOrigins : true,
     methods: ['GET', 'POST'],
     credentials: true,
   },
@@ -31,7 +34,7 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 app.use(cors({
-  origin: config.corsOrigin,
+  origin: config.corsOrigins.length > 0 ? config.corsOrigins : true,
   credentials: true,
 }));
 app.use(express.json({ limit: '1mb' }));
@@ -132,7 +135,14 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
 // Start server
-function startServer() {
+async function startServer() {
+  // Reliable admin initialization (env-driven upsert; see services/bootstrap.ts)
+  try {
+    await ensureDefaultAdmin();
+  } catch (err) {
+    console.error('Admin bootstrap failed (continuing):', err);
+  }
+
   httpServer.listen(config.port, async () => {
     console.log(`
 ╔══════════════════════════════════════════════════════════════╗

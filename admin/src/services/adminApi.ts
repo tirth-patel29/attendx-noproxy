@@ -75,6 +75,8 @@ export const adminApi = {
   // auth
   login: (email: string, password: string) =>
     api.post<{ access_token: string; refresh_token: string; user: AdminUser }>('/admin/login', { email, password }),
+  changePassword: (current: string, next: string) =>
+    api.post('/admin/change-password', { current_password: current, new_password: next }),
 
   // stats
   stats: () => api.get<Stats>('/admin/stats'),

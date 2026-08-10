@@ -50,10 +50,15 @@ class TimeSyncService {
         // Parse server time from response
         final serverEpoch = response['server_epoch'] as int;
         
-        // Cristian's Algorithm calculation
+        // Cristian's Algorithm (SRS §1 Phase 1 / §3 Proof 1):
+        //   RTT = T1 - T0
+        //   serverTimeAtReceive ≈ serverEpoch + RTT/2   (response one-way trip)
+        //   driftOffset = serverTimeAtReceive - T1      (T1 = client receive time)
+        // NOTE: T1, not T0. Using T0 skews the estimate by a full RTT, which can
+        // push honest students past the 250ms stream-kill window on slow Wi-Fi.
         final rtt = t1 - t0;
-        final serverTimeAtMidpoint = serverEpoch + (rtt / 2).round();
-        final driftOffset = serverTimeAtMidpoint - t0;
+        final serverTimeAtReceive = serverEpoch + (rtt / 2).round();
+        final driftOffset = serverTimeAtReceive - t1;
         
         // Store drift offset
         _driftOffsetMs = driftOffset;

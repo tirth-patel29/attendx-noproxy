@@ -8,6 +8,7 @@ import 'package:attendance_gateway/core/services/secure_storage_service.dart';
 import 'package:attendance_gateway/core/services/device_info_service.dart';
 import 'package:attendance_gateway/core/services/crypto_service.dart';
 import 'package:attendance_gateway/features/precheck/precheck_orchestrator.dart';
+import 'package:attendance_gateway/features/scan/attendance_scanner_page.dart';
 import 'package:attendance_gateway/features/gates/gate1_hardware_tattoo.dart';
 import 'package:attendance_gateway/features/gates/gate2_biometric_lock.dart';
 import 'package:attendance_gateway/features/gates/gate3_visual_twitch.dart';
@@ -23,8 +24,9 @@ class ClaimPage extends ConsumerStatefulWidget {
 
 class _ClaimPageState extends ConsumerState<ClaimPage> {
   final _rollNoController = TextEditingController();
+  final _secretController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  
+
   String? _studentUuid;
   String? _sessionUuid;
   String? _tokenVal;
@@ -55,32 +57,32 @@ class _ClaimPageState extends ConsumerState<ClaimPage> {
 
   Future<void> _provisionStudent() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     setState(() => _isLoading = true);
     try {
-      // For demo purposes, we'll create a mock student UUID
-      // In reality, this would call a provisioning endpoint
-      final studentUuid = CryptoService.generateToken(length: 36); // Not real UUID
-      
-      await SecureStorageService.saveStudentUuid(studentUuid);
-      await SecureStorageService.saveStudentRollNo(_rollNoController.text);
-      
-      // Generate and save HMAC key
-      final hmacKey = CryptoService.generateHmacKey();
-      await SecureStorageService.saveHmacKey(hmacKey);
-      
-      // Get and save device ID
+      // SRS §1 Phase 1 "The Blood Oath": submit roll_no + the admin-issued HMAC
+      // secret. The server validates the pair and binds this device (Gate 1).
       final deviceIdHash = await DeviceInfoService.getDeviceIdHash();
+      final result = await ApiService.provision(
+        rollNo: _rollNoController.text.trim().toUpperCase(),
+        secretHmacKey: _secretController.text.trim(),
+        deviceIdHash: deviceIdHash,
+      );
+
+      await SecureStorageService.saveStudentUuid(result['student_uuid'] as String);
+      await SecureStorageService.saveStudentRollNo(result['roll_no'] as String);
+      await SecureStorageService.saveHmacKey(_secretController.text.trim());
       await SecureStorageService.saveDeviceId(deviceIdHash);
-      
+      await SecureStorageService.saveBoundDeviceId(deviceIdHash);
+
       setState(() {
-        _studentUuid = studentUuid;
+        _studentUuid = result['student_uuid'] as String;
         _isLoading = false;
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Provisioned successfully!')),
+          const SnackBar(content: Text('Device provisioned & hardware-bound!')),
         );
       }
     } catch (e) {
@@ -99,27 +101,27 @@ class _ClaimPageState extends ConsumerState<ClaimPage> {
       return;
     }
 
+    // Gate 3: Photonic Intercept — scan the projector's ATTN QR.
+    final payload = await Navigator.of(context).push<AttendancePayload>(
+      MaterialPageRoute(builder: (_) => const AttendanceScannerPage()),
+    );
+    if (payload == null || !mounted) return;
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
       _claimResult = null;
+      _sessionUuid = payload.sessionUuid;
+      _tokenVal = payload.token;
     });
 
     try {
-      // Get session UUID (in real app, this would be selected from a list)
-      // For demo, we'll fetch the active session
-      final sessions = await ApiService.getSessionTokens('');
-      
-      // For demo, we'll use a mock session
-      // In real app, this would come from a session list
-      final sessionUuid = 'demo-session-uuid'; // Would be real UUID
-      
-      // Run pre-check
+      // Run the SRS pre-check pipeline (Gates 1→4) with the intercepted token.
       final precheck = PrecheckOrchestrator();
       final precheckPassed = await precheck.runPrecheck(
         studentUuid: _studentUuid!,
-        sessionUuid: sessionUuid,
-        tokenVal: '', // Will be fetched during precheck
+        sessionUuid: payload.sessionUuid,
+        tokenVal: payload.token,
       );
 
       if (!precheckPassed) {
@@ -130,9 +132,9 @@ class _ClaimPageState extends ConsumerState<ClaimPage> {
         return;
       }
 
-      // Submit claim
+      // Submit claim (server nonce + HMAC wax seal + 250ms judgment)
       final result = await precheck.submitClaim();
-      
+
       setState(() {
         _isLoading = false;
         _claimResult = result;
@@ -270,6 +272,22 @@ class _ClaimPageState extends ConsumerState<ClaimPage> {
                   }
                   if (!RegExp(r'^[0-9]{2}[A-Z]{3}[0-9]{3}$').hasMatch(value)) {
                     return 'Invalid roll number format (e.g., 24BCS001)';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _secretController,
+                decoration: const InputDecoration(
+                  labelText: 'Provisioning Secret (HMAC key)',
+                  hintText: '64-char key from the Admin Console',
+                  prefixIcon: Icon(Icons.key),
+                  helperText: 'Ask the admin to reveal it in the Students panel',
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().length != 64) {
+                    return 'Enter the 64-character HMAC secret';
                   }
                   return null;
                 },

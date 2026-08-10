@@ -13,9 +13,12 @@ server {
     add_header X-Content-Type-Options "nosniff";
     add_header X-XSS-Protection "1; mode=block";
 
-    # API proxy - MUST come before SPA fallback
+    # API proxy — MUST come before SPA fallback.
+    # BACKEND_UPSTREAM is injected by the nginx entrypoint (envsubst), e.g.
+    #   BACKEND_UPSTREAM=attendance-backend:3001   (docker-compose default)
+    #   BACKEND_UPSTREAM=api.example.com           (any deployment)
     location /api {
-        proxy_pass http://attendance-backend:3001;
+        proxy_pass http://${BACKEND_UPSTREAM};
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -24,6 +27,27 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Socket.IO (Gate 3 dumb-terminal projector) — websocket + long-polling.
+    # The ClassroomProjector connects to the SAME origin as the portal, so this
+    # location must pass /socket.io to the backend with upgrade headers. Without
+    # it the handshake fell through to the SPA fallback (index.html) and the
+    # projector could never receive token:new broadcasts.
+    location /socket.io {
+        proxy_pass http://${BACKEND_UPSTREAM};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 65s;
+        proxy_send_timeout 65s;
+        # Long-polling payload post bodies
+        proxy_buffer_size 16k;
+        proxy_buffers 4 16k;
     }
 
     # Health check

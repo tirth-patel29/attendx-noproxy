@@ -20,9 +20,6 @@ import {
   CircularProgress,
   Paper,
   Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Button,
   IconButton,
   Tooltip,
@@ -49,6 +46,7 @@ export default function SessionPage() {
   const [error, setError] = useState('');
 
   const pollingInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const attendanceInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!sessionId) {
@@ -58,8 +56,11 @@ export default function SessionPage() {
     loadSession();
     loadAttendance();
     startTokenPolling();
+    // Live attendance refresh while the session is projected
+    attendanceInterval.current = setInterval(loadAttendance, 4000);
     return () => {
       if (pollingInterval.current) clearInterval(pollingInterval.current);
+      if (attendanceInterval.current) clearInterval(attendanceInterval.current);
     };
   }, [sessionId]);
 
@@ -233,51 +234,59 @@ export default function SessionPage() {
         </Grid>
       </Grid>
 
-      {/* QR Code Dialog */}
-      <Dialog open={qrDialogOpen} onClose={() => setQrDialogOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6">Session QR Code — Photonic Display</Typography>
-          <IconButton onClick={() => setQrDialogOpen(false)}>
+      {/* QR Code — fullscreen photonic projector (smartboard) */}
+      <Dialog open={qrDialogOpen} onClose={() => setQrDialogOpen(false)} fullScreen>
+        <Box
+          sx={{
+            height: '100vh',
+            bgcolor: '#050b18',
+            color: '#fff',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            position: 'relative',
+          }}
+        >
+          <IconButton
+            onClick={() => setQrDialogOpen(false)}
+            sx={{ position: 'absolute', top: 16, right: 16, color: '#fff', bgcolor: 'rgba(255,255,255,0.1)' }}
+          >
             <CloseIcon />
           </IconButton>
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', p: 2 }}>
-            <Typography variant="h6" gutterBottom>{session.course_code}</Typography>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              Session: {session.session_date.split('T')[0]}
-            </Typography>
-            
-            {currentToken ? (
-              <Box sx={{ mt: 2, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                {/* Dumb-terminal photonic display — live payload updated via WebSocket */}
-                <ClassroomProjector sessionId={sessionId!} courseCode={session.course_code} />
 
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block', textAlign: 'center', maxWidth: 480 }}>
-                  Dumb-terminal display: a live WebSocket updates the QR payload every 3 seconds.
-                  The QR is static and constantly visible — Moiré interference is a physical LCD
-                  effect and the 250ms stream-kill window is enforced by the backend Judge,
-                  not by the frontend.
-                </Typography>
-              </Box>
-            ) : (
-              <CircularProgress />
-            )}
+          <Chip
+            label={session.is_active ? 'LIVE · token rotates every 3s' : 'SESSION ENDED'}
+            sx={{
+              mb: 2, fontWeight: 800, letterSpacing: '0.18em',
+              bgcolor: session.is_active ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.1)',
+              color: session.is_active ? '#4ADE80' : '#94A3B8',
+            }}
+          />
 
-            <Button
-              variant="outlined"
-              startIcon={<RefreshIcon />}
-              onClick={handleRefreshToken}
-              disabled={qrRefreshing}
-              sx={{ mt: 2 }}
-            >
-              Refresh Token
-            </Button>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setQrDialogOpen(false)}>Close</Button>
-        </DialogActions>
+          <Typography variant="h5" fontWeight={800} letterSpacing="0.3em" sx={{ mb: 0.5 }}>
+            {session.course_code}
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#64748B', mb: 3 }}>
+            {session.session_date.split('T')[0]} — scan with the Attendance app
+          </Typography>
+
+          {currentToken ? (
+            <ClassroomProjector sessionId={sessionId!} courseCode={session.course_code} size={460} />
+          ) : (
+            <CircularProgress sx={{ color: '#4cc9f0' }} />
+          )}
+
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={handleRefreshToken}
+            disabled={qrRefreshing}
+            sx={{ mt: 2, color: '#94A3B8', borderColor: 'rgba(255,255,255,0.25)' }}
+          >
+            {qrRefreshing ? 'Refreshing…' : 'Force refresh'}
+          </Button>
+        </Box>
       </Dialog>
 
       {/* Attendance Table */}
@@ -323,14 +332,24 @@ export default function SessionPage() {
                     <TableCell>
                       {new Date(record.client_claimed_time).toLocaleTimeString()}
                     </TableCell>
-                    <TableCell sx={{ fontFamily: 'monospace' }}>
-                      {record.verification_delta_ms}ms
+                    <TableCell>
+                      <Chip
+                        label={`${record.verification_delta_ms}ms`}
+                        size="small"
+                        sx={{
+                          fontFamily: 'monospace',
+                          bgcolor: record.verification_delta_ms <= 100 ? '#DCFCE7' : record.verification_delta_ms <= 250 ? '#FEF9C3' : '#FEE2E2',
+                          color: record.verification_delta_ms <= 100 ? '#15803D' : record.verification_delta_ms <= 250 ? '#A16207' : '#B91C1C',
+                          fontWeight: 700,
+                        }}
+                      />
                     </TableCell>
                     <TableCell>
                       <Chip
                         label={record.status}
                         color={record.status === 'PRESENT' ? 'success' : 'error'}
                         size="small"
+                        variant={record.status === 'PRESENT' ? 'filled' : 'outlined'}
                       />
                     </TableCell>
                   </TableRow>

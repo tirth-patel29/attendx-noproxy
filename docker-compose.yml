@@ -1,0 +1,121 @@
+# ============================================================================
+# Zero-Trust Cryptographic Attendance Gateway — portable deployment
+# ----------------------------------------------------------------------------
+# One command builds and runs the whole system on ANY host with Docker:
+#
+#   docker compose up -d --build
+#
+# Everything is environment-driven; nothing here is tied to the homelab.
+# Minimal required env: DB_HOST/DB_USER/DB_PASSWORD (point at any PostgreSQL,
+# e.g. self-hosted Supabase) and optionally ADMIN_EMAIL/ADMIN_PASSWORD to
+# bootstrap the admin console.
+#
+#   DB_HOST=db.example.com DB_USER=attendance DB_PASSWORD=... \
+#   ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='S3cure!' \
+#   docker compose up -d --build
+#
+# To expose ports directly (no reverse proxy), add the ports override:
+#   docker compose -f docker-compose.yml -f docker-compose.ports.yml up -d
+#
+# To route behind an nginx-proxy docker-gen (our homelab / any VPS), set:
+#   VIRTUAL_HOST_* (labels are added only when non-empty)
+# ============================================================================
+
+name: attendance-gateway
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ${BACKEND_CONTAINER:-attendance-backend}
+    restart: unless-stopped
+    environment:
+      PORT: "3001"
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-attendance}
+      DB_USER: ${DB_USER:-attendance}
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in the environment}
+      DB_SSL: ${DB_SSL:-false}
+      CORS_ORIGIN: ${CORS_ORIGIN:-}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production-min-32-chars-long}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_NAME: ${ADMIN_NAME:-System Admin}
+      METRONOME_INTERVAL_MS: ${METRONOME_INTERVAL_MS:-3000}
+      METRONOME_TOKEN_LENGTH: ${METRONOME_TOKEN_LENGTH:-4}
+      METRONOME_TOKEN_CHARSET: ${METRONOME_TOKEN_CHARSET:-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789}
+      METRONOME_LOOKAHEAD_TOKENS: ${METRONOME_LOOKAHEAD_TOKENS:-2}
+      JUDGE_MAX_LATENCY_MS: ${JUDGE_MAX_LATENCY_MS:-250}
+      JUDGE_TOKEN_VALIDITY_WINDOW_MS: ${JUDGE_TOKEN_VALIDITY_WINDOW_MS:-5000}
+      VIRTUAL_HOST: ${VIRTUAL_HOST_BACKEND:-}
+      VIRTUAL_PORT: "3001"
+    expose:
+      - "3001"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    labels:
+      - "nginx-proxy-ondemand.enable=true"
+      - "nginx-proxy-ondemand.timeout=1800"
+
+  portal:
+    build:
+      context: ./portal
+      dockerfile: Dockerfile
+      args:
+        CACHE_BUST: "${CACHE_BUST:-0}"
+    container_name: ${PORTAL_CONTAINER:-attendance-portal}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      # Where the nginx /api and /socket.io locations forward to.
+      BACKEND_UPSTREAM: ${BACKEND_UPSTREAM:-backend:3001}
+      VIRTUAL_HOST: ${VIRTUAL_HOST_PORTAL:-}
+      VIRTUAL_PORT: "3000"
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    labels:
+      - "nginx-proxy-ondemand.enable=true"
+      - "nginx-proxy-ondemand.timeout=1800"
+    depends_on:
+      - backend
+
+  admin:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile
+      args:
+        CACHE_BUST: "${CACHE_BUST:-0}"
+    container_name: ${ADMIN_CONTAINER:-attendance-admin}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      BACKEND_UPSTREAM: ${BACKEND_UPSTREAM:-backend:3001}
+      VIRTUAL_HOST: ${VIRTUAL_HOST_ADMIN:-}
+      VIRTUAL_PORT: "3000"
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    labels:
+      - "nginx-proxy-ondemand.enable=true"
+      - "nginx-proxy-ondemand.timeout=1800"
+    depends_on:
+      - backend

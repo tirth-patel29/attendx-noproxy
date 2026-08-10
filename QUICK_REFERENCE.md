@@ -8,7 +8,11 @@
 **Professor Portal:** `https://portal.atmyhome.tech` (React/MUI — dumb-terminal projector)  
 **Homelab SSH:** `hetp@192.168.0.108` (port 22) → `su -` for root (pass: 7567@Hetp)
 
-**Default Admin seed:** `admin@atmyhome.tech` / `Admin@123` (CHANGE after first login)
+**Default Admin seed:** `admin@atmyhome.tech` / `Admin@123` (CHANGE after first login — env-driven bootstrap: `ADMIN_EMAIL`/`ADMIN_PASSWORD` upsert on every boot; remove `ADMIN_PASSWORD` env to keep in-app changes)**
+
+**Token protocol (SRS):** 4-char base62 rotating token every 3s · 250ms Stream Kill-Window (`0 ≤ observed − birth ≤ 250ms`) · tokens are **NOT consumed** (whole class shares each token; ledger UNIQUE(session, student) prevents double-marking) · status codes: PRESENT 200, HARDWARE_MISMATCH 403, STREAM_DETECTED/EXPIRED_TOKEN 412, FORGED_RESPONSE 401, INVALID_CLAIM 404 · nonces come from `/sessions/:uuid/challenge` (single-use, server-issued).
+
+**Provisioning (mobile):** `POST /api/v1/provision` with `roll_no` + admin-issued 64-char HMAC secret + device hash (SRS "Blood Oath"). Verify with `scripts/live_flow_test.py "<admin-password>"` (20 live checks).
 
 ---
 

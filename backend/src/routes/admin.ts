@@ -190,6 +190,37 @@ const assignmentCreate = z.object({
 // ===========================================================================
 // Dashboard stats
 // ===========================================================================
+const changePasswordSchema = z.object({ current_password: z.string().min(1), new_password: z.string().min(8).max(128) });
+
+/**
+ * POST /admin/change-password — rotate the signed-in admin's password.
+ * Root-cause fix for reliable admin lifecycle: the default seeded credential
+ * must be changeable without DB access.
+ */
+adminRouter.post('/change-password', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = changePasswordSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'New password must be at least 8 characters' });
+
+    const admin = (req as any).admin as { sub: string };
+    const { current_password, new_password } = parsed.data;
+
+    const r = await query(`SELECT password_hash FROM admin_users WHERE admin_uuid = $1`, [admin.sub]);
+    if (r.rows.length === 0) return res.status(404).json({ error: 'Admin not found' });
+
+    if (!bcrypt.compareSync(current_password, r.rows[0].password_hash)) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    const hash = bcrypt.hashSync(new_password, 12);
+    await query(`UPDATE admin_users SET password_hash = $1 WHERE admin_uuid = $2`, [hash, admin.sub]);
+    await audit(admin.sub, 'ADMIN_PASSWORD_CHANGE', { admin_uuid: admin.sub });
+    res.json({ message: 'Password changed' });
+  } catch (err) {
+    next(err);
+  }
+});
+
 adminRouter.get('/stats', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const r = await query(`

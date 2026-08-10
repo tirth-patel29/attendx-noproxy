@@ -3,6 +3,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { query } from '../utils/db';
 import { config } from '../config';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 
 const router = Router();
@@ -46,10 +47,11 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
 
     const { email, password } = parseResult.data;
 
-    // For now, use a simple password check - in production use bcrypt
-    // Demo passwords: prof123 for both professors
+    // Look up the professor INCLUDING the bcrypt password_hash provisioned by
+    // the Admin Console (migrations/004). There is no hardcoded backdoor
+    // password — a professor whose password_hash is NULL cannot log in.
     const result = await query(
-      `SELECT prof_uuid, email, name, department FROM professors WHERE email = $1`,
+      `SELECT prof_uuid, email, name, department, password_hash FROM professors WHERE email = $1`,
       [email]
     );
 
@@ -59,8 +61,11 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
 
     const professor = result.rows[0];
 
-    // Simple password check (in production, use bcrypt.compare)
-    if (password !== 'prof123') {
+    if (!professor.password_hash) {
+      return res.status(401).json({ error: 'No password set — ask the admin to provision one' });
+    }
+
+    if (!bcrypt.compareSync(password, professor.password_hash)) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 

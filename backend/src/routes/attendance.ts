@@ -11,7 +11,7 @@ const router = Router();
 const claimAttendanceSchema = z.object({
   session_uuid: z.string().uuid(),
   student_uuid: z.string().uuid(),
-  token_val: z.string().length(6),
+  token_val: z.string().length(4), // SRS: 4-character base62 rotating token
   client_claimed_time: z.number().int().positive(),
   device_id_hash: z.string().length(64),
   nonce: z.string().length(32),
@@ -26,6 +26,16 @@ const sessionStartSchema = z.object({
 
 const deviceRegisterSchema = z.object({
   student_uuid: z.string().uuid(),
+  device_id_hash: z.string().length(64),
+});
+
+// Self-service provisioning (SRS §1 Phase 1 "The Blood Oath"): the student
+// enters their roll number + the HMAC secret handed to them by the Admin
+// Console during onboarding. The server validates the pair and binds this
+// device as the hardware tattoo.
+const provisionSchema = z.object({
+  roll_no: z.string().regex(/^[0-9]{2}[A-Z]{3}[0-9]{3}$/),
+  secret_hmac_key: z.string().length(64),
   device_id_hash: z.string().length(64),
 });
 
@@ -328,15 +338,77 @@ router.post('/claim-attendance', async (req: Request, res: Response, next: NextF
     const result = await judgeService.processClaim(payload);
 
     const statusMap: Record<string, number> = {
+      // SRS §6 state machine HTTP codes
       PRESENT: 200,
       HARDWARE_MISMATCH: 403,
-      STREAM_DETECTED: 403,
-      FORGED_RESPONSE: 403,
-      EXPIRED_TOKEN: 410,
+      STREAM_DETECTED: 412,   // "Stream Artifact Detected (310ms)" / "Visual Token Expired"
+      FORGED_RESPONSE: 401,   // "Security Exception: Forged Signature"
+      EXPIRED_TOKEN: 412,     // "Visual Token Expired"
       INVALID_CLAIM: 404,
     };
 
     res.status(statusMap[result.status] || 400).json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/v1/provision
+ * Self-service provisioning — SRS §1 Phase 1 ("The Blood Oath").
+ * Validates roll_no + the admin-issued HMAC secret, then binds this device as
+ * the hardware tattoo (Gate 1). 401 wrong secret / student not found,
+ * 409 device already bound to a different student (admin must reset-device).
+ */
+router.post('/provision', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parseResult = provisionSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ error: 'Invalid payload', details: parseResult.error.flatten().fieldErrors });
+    }
+
+    const { roll_no, secret_hmac_key, device_id_hash } = parseResult.data;
+
+    // Look up the student by roll number AND verify the admin-issued secret
+    // (constant-time HMAC comparison is overkill for a provisioning secret;
+    // a simple equality check is acceptable here because the secret is 256-bit).
+    const studentRes = await query(
+      `SELECT student_uuid, roll_no, bound_device_id FROM students
+       WHERE roll_no = $1 AND secret_hmac_key = $2`,
+      [roll_no, secret_hmac_key]
+    );
+
+    if (studentRes.rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid roll number or provisioning secret' });
+    }
+
+    const student = studentRes.rows[0];
+
+    // Already bound to this device → idempotent success
+    if (student.bound_device_id === device_id_hash) {
+      return res.json({ provisioned: true, student_uuid: student.student_uuid, roll_no: student.roll_no });
+    }
+
+    // Bound to a DIFFERENT device → the admin must reset-device first
+    if (student.bound_device_id) {
+      return res.status(409).json({
+        error: 'Device already bound elsewhere — the admin must unlock the student (device reset) to re-provision',
+      });
+    }
+
+    await query(
+      `UPDATE students SET bound_device_id = $1, updated_at = NOW() WHERE student_uuid = $2`,
+      [device_id_hash, student.student_uuid]
+    );
+
+    // Audit the provisioning event
+    await query(
+      `INSERT INTO audit_logs (event_type, actor_uuid, payload, user_agent)
+       VALUES ('PROVISION', $1, $2, 'attendance-mobile')`,
+      [student.student_uuid, JSON.stringify({ roll_no, device_id_hash_bind: true })]
+    );
+
+    res.status(201).json({ provisioned: true, student_uuid: student.student_uuid, roll_no: student.roll_no });
   } catch (err) {
     next(err);
   }
