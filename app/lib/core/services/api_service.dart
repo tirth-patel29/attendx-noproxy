@@ -128,6 +128,64 @@ class ApiService {
     }
   }
 
+  // ===== Student auth (self-registration + device binding) =====
+
+  /// POST /student/status — does this ID exist? does it have a password?
+  static Future<Map<String, dynamic>> studentStatus(String id) async {
+    try {
+      final response = await _client.post(AppConstants.studentStatusEndpoint, data: {'id': id});
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw ApiException('Status check failed: ${e.message}', e.response?.statusCode);
+    }
+  }
+
+  /// POST /student/register — create the account (only when not exists).
+  static Future<Map<String, dynamic>> studentRegister({required String id, required String name, required String password}) async {
+    try {
+      final response = await _client.post(AppConstants.studentRegisterEndpoint, data: {'id': id, 'name': name, 'password': password});
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw ApiException('Registration failed: ${e.message}', e.response?.statusCode);
+    }
+  }
+
+  /// POST /student/password/set — first-time or admin-forgot password set.
+  static Future<Map<String, dynamic>> studentSetPassword({required String id, required String newPassword}) async {
+    try {
+      final response = await _client.post(AppConstants.studentPasswordSetEndpoint, data: {'id': id, 'new_password': newPassword});
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw ApiException('Could not set password: ${e.message}', e.response?.statusCode);
+    }
+  }
+
+  /// POST /student/login — returns student JWT + identity.
+  static Future<Map<String, dynamic>> studentLogin({required String id, required String password}) async {
+    try {
+      final response = await _client.post(AppConstants.studentLoginEndpoint, data: {'id': id, 'password': password});
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw ApiException('Login failed: ${e.message}', e.response?.statusCode);
+    }
+  }
+
+  /// POST /student/device/bind (student JWT) — mints + stores the HMAC signer
+  /// server-side and returns it for the KeyStore. This is where the device's
+  /// permanent hardware identity is created (SRS §1 Phase 1).
+  static Future<Map<String, dynamic>> studentBindDevice({required String accessToken, required String deviceIdHash}) async {
+    try {
+      final response = await _client.post(
+        AppConstants.studentBindEndpoint,
+        data: {'device_id_hash': deviceIdHash},
+        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw ApiException('Device binding failed: ${e.message}', e.response?.statusCode);
+    }
+  }
+
   // ===== Device Registration / Provisioning =====
 
   /// POST /api/v1/devices/register

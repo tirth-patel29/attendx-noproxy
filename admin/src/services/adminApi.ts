@@ -35,6 +35,7 @@ export interface Student {
   bound_device_id: string | null;
   secret_hmac_key: string | null;
   is_bound: boolean;
+  has_password: boolean;
   created_at?: string;
 }
 
@@ -101,6 +102,7 @@ export const adminApi = {
   deleteStudent: (id: string) => api.delete(`/admin/students/${id}`),
   resetDevice: (id: string) => api.post(`/admin/students/${id}/reset-device`),
   rotateHmac: (id: string) => api.post(`/admin/students/${id}/rotate-hmac`),
+  forgotPassword: (id: string) => api.post(`/admin/students/${id}/forgot-password`),
 
   // divisions
   divisions: () => api.get<Division[]>('/admin/divisions'),

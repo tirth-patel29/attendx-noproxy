@@ -12,7 +12,20 @@
 
 **Token protocol (SRS):** 4-char base62 rotating token every 3s · 250ms Stream Kill-Window (`0 ≤ observed − birth ≤ 250ms`) · tokens are **NOT consumed** (whole class shares each token; ledger UNIQUE(session, student) prevents double-marking) · status codes: PRESENT 200, HARDWARE_MISMATCH 403, STREAM_DETECTED/EXPIRED_TOKEN 412, FORGED_RESPONSE 401, INVALID_CLAIM 404 · nonces come from `/sessions/:uuid/challenge` (single-use, server-issued).
 
-**Provisioning (mobile):** `POST /api/v1/provision` with `roll_no` + admin-issued 64-char HMAC secret + device hash (SRS "Blood Oath"). Verify with `scripts/live_flow_test.py "<admin-password>"` (20 live checks).
+**Provisioning (mobile):** `POST /api/v1/provision` with `roll_no` + admin-issued 64-char HMAC secret + device hash (SRS "Blood Oath"). Verify with `scripts/live_flow_test.py "<admin-password>"` (25 live checks).
+
+**Student self-registration (charusat identity):**
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/v1/student/status` `{id}` | exists? has_password? |
+| `POST /api/v1/student/register` `{id,name,password}` | self-register (email auto `id@charusat.edu.in`), returns student JWT |
+| `POST /api/v1/student/login` `{id,password}` | login → student JWT (30d) |
+| `POST /api/v1/student/password/set` `{id,new_password}` | first-time / post-forgot password set |
+| `POST /api/v1/student/device/bind` (JWT) `{device_id_hash}` | **mints HMAC signer + binds device** (Gate 1 + Gate 4 at once), returns secret to KeyStore |
+| Admin: `POST /admin/students/:uuid/forgot-password` | clears hash → app shows set-password screen |
+| Admin: `GET /admin/students` | now returns `has_password`; search in UI |
+
+**Teacher ownership (fundamental auth fix):** `POST /sessions/start`, `GET /sessions`, `GET/POST /sessions/:id`, `POST /sessions/:id/stop`, `GET /sessions/:id/attendance` all require the professor JWT and are scoped to it — `prof_uuid` in the request body is IGNORED (identity comes from the token). Teacher views: `GET /professor/timetable` (today + week) and `GET /professor/summary` (per-subject analytics).
 
 ---
 

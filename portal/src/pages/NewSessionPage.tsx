@@ -1,68 +1,29 @@
 // src/pages/NewSessionPage.tsx
-import { useEffect, useState } from 'react';
+// Manual session creation. NOTE: there is NO professor selector — the backend
+// derives the professor from the JWT, so a teacher can only ever start
+// sessions as themselves (fundamental auth fix).
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { portalApi, Professor } from '../services/portalApi';
+import { portalApi } from '../services/portalApi';
 import {
-  Box,
-  Typography,
-  Button,
-  TextField,
-  Alert,
-  CircularProgress,
-  Paper,
-  MenuItem,
+  Box, Typography, Button, TextField, Alert, CircularProgress, Paper, Stack, Avatar, Chip,
 } from '@mui/material';
-import { ArrowBack as ArrowBackIcon, Add as AddIcon } from '@mui/icons-material';
+import { ArrowBack as ArrowBackIcon, Bolt as BoltIcon, Lock as LockIcon } from '@mui/icons-material';
 
 export default function NewSessionPage() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const [professors, setProfessors] = useState<Professor[]>([]);
   const [courseCode, setCourseCode] = useState('');
-  const [professorId, setProfessorId] = useState('');
   const [sessionDate, setSessionDate] = useState(new Date().toISOString().split('T')[0]);
-  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await portalApi.getProfessors();
-        setProfessors(res.data);
-        // Default to logged-in professor if they are one
-        if (user?.id) {
-          setProfessorId(user.id);
-        } else if (res.data.length > 0) {
-          setProfessorId(res.data[0].id);
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [user]);
-
   const handleSubmit = async () => {
-    if (!courseCode.trim()) {
-      setError('Course code is required');
-      return;
-    }
-    if (!professorId) {
-      setError('Please select a professor');
-      return;
-    }
-    setError('');
-    setSubmitting(true);
+    if (!courseCode.trim()) { setError('Course code is required'); return; }
+    setError(''); setSubmitting(true);
     try {
-      const session = await portalApi.startSession({
-        course_code: courseCode.trim(),
-        prof_uuid: professorId,
-        session_date: sessionDate,
-      });
+      const session = await portalApi.startSession({ course_code: courseCode.trim(), session_date: sessionDate });
       navigate(`/sessions/${session.data.id}`);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to create session');
@@ -71,88 +32,44 @@ export default function NewSessionPage() {
   };
 
   if (authLoading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
-        <CircularProgress />
-      </Box>
-    );
+    return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '70vh' }}><CircularProgress /></Box>;
   }
 
   return (
-    <Box sx={{ maxWidth: 600, mx: 'auto' }}>
-      <Button
-        startIcon={<ArrowBackIcon />}
-        onClick={() => navigate('/dashboard')}
-        sx={{ mb: 2, color: 'text.secondary' }}
-      >
+    <Box sx={{ maxWidth: 560, mx: 'auto' }}>
+      <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/dashboard')} sx={{ mb: 2, color: 'text.secondary' }}>
         Back to Dashboard
       </Button>
 
-      <Typography variant="h4" fontWeight={700} sx={{ mb: 3 }}>
-        Start New Session
+      <Typography variant="h4" fontWeight={800} sx={{ mb: 1 }}>Start a session</Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+        Point the smartboard at this screen after starting — the QR is your dumb-terminal projector.
       </Typography>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
-          {error}
-        </Alert>
-      )}
+      {error && <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>{error}</Alert>}
 
-      <Paper sx={{ p: 4, borderRadius: 3 }}>
-        {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-            <CircularProgress />
+      <Paper sx={{ p: 4, borderRadius: 3, border: '1px solid rgba(139,163,184,0.15)' }}>
+        {/* Who is conducting — locked from the JWT */}
+        <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 3 }}>
+          <Avatar sx={{ bgcolor: 'primary.main', color: '#0d1b2a', fontWeight: 800 }}>
+            {user?.name?.charAt(0)?.toUpperCase() || 'P'}
+          </Avatar>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="subtitle1" fontWeight={700}>{user?.name}</Typography>
+            <Typography variant="caption" color="text.secondary">{user?.email}</Typography>
           </Box>
-        ) : (
-          <>
-            <TextField
-              fullWidth
-              label="Course Code"
-              placeholder="e.g. CS101"
-              value={courseCode}
-              onChange={(e) => setCourseCode(e.target.value)}
-              sx={{ mb: 3 }}
-            />
+          <Chip size="small" icon={<LockIcon />} label="You — from your login" sx={{ color: '#4cc9f0' }} variant="outlined" />
+        </Stack>
 
-            <TextField
-              fullWidth
-              select
-              label="Professor"
-              value={professorId}
-              onChange={(e) => setProfessorId(e.target.value)}
-              sx={{ mb: 3 }}
-              helperText="Who is conducting this session?"
-            >
-              {professors.map((p) => (
-                <MenuItem key={p.id} value={p.id}>
-                  {p.name} — {p.department}
-                </MenuItem>
-              ))}
-            </TextField>
+        <TextField fullWidth label="Course code" placeholder="e.g. CS201" value={courseCode}
+          onChange={(e) => setCourseCode(e.target.value.toUpperCase())} sx={{ mb: 3 }} />
 
-            <TextField
-              fullWidth
-              label="Session Date"
-              type="date"
-              value={sessionDate}
-              onChange={(e) => setSessionDate(e.target.value)}
-              sx={{ mb: 4 }}
-              InputLabelProps={{ shrink: true }}
-            />
+        <TextField fullWidth label="Session date" type="date" value={sessionDate}
+          onChange={(e) => setSessionDate(e.target.value)} sx={{ mb: 4 }} InputLabelProps={{ shrink: true }} />
 
-            <Button
-              variant="contained"
-              size="large"
-              fullWidth
-              startIcon={<AddIcon />}
-              onClick={handleSubmit}
-              disabled={submitting}
-              sx={{ py: 1.5 }}
-            >
-              {submitting ? <CircularProgress size={24} color="inherit" /> : 'Start Session'}
-            </Button>
-          </>
-        )}
+        <Button variant="contained" size="large" fullWidth startIcon={<BoltIcon />} onClick={handleSubmit} disabled={submitting} sx={{ py: 1.5 }}>
+          {submitting ? <CircularProgress size={24} color="inherit" /> : 'Start session'}
+        </Button>
       </Paper>
     </Box>
   );

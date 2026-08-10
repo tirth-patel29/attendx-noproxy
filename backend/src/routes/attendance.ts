@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
 import { judgeService } from '../services/judge';
 import { metronomeService } from '../services/metronome';
 import { query } from '../utils/db';
@@ -6,6 +7,35 @@ import { config } from '../config';
 import { z } from 'zod';
 
 const router = Router();
+
+/**
+ * requireProfessor — the session endpoints are OWNED operations.
+ * Decodes the professor JWT (issued by /api/v1/auth/login) and attaches
+ * req.professor. The client NEVER supplies prof_uuid: identity comes from the
+ * token, so a teacher can only ever create/see THEIR OWN sessions.
+ */
+export function requireProfessor(req: Request, res: Response, next: NextFunction) {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'No token provided' });
+  try {
+    const decoded = jwt.verify(auth.slice(7), config.jwtSecret || 'dev-secret-change-in-production-min-32-chars-long') as {
+      sub: string; email: string; name: string; role: string;
+    };
+    if (decoded.role !== 'professor') return res.status(403).json({ error: 'Professor access required' });
+    (req as any).professor = decoded;
+    next();
+  } catch {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}
+
+async function ensureOwnSession(sessionUuid: string, profUuid: string): Promise<boolean> {
+  const r = await query(
+    `SELECT 1 FROM course_sessions WHERE session_uuid = $1 AND prof_uuid = $2`,
+    [sessionUuid, profUuid]
+  );
+  return r.rows.length > 0;
+}
 
 // Validation schemas
 const claimAttendanceSchema = z.object({
@@ -20,7 +50,7 @@ const claimAttendanceSchema = z.object({
 
 const sessionStartSchema = z.object({
   course_code: z.string().min(1).max(20),
-  prof_uuid: z.string().uuid(),
+  prof_uuid: z.string().uuid().optional(), // legacy — ALWAYS overridden by JWT identity
   session_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
@@ -119,25 +149,18 @@ router.get('/professors/:profUuid', async (req: Request, res: Response, next: Ne
 });
 
 /**
- * GET /api/v1/sessions?professor_id=xxx
- * List sessions (optionally filtered by professor)
+ * GET /api/v1/sessions
+ * My sessions — ALWAYS filtered to the authenticated professor (JWT).
+ * A teacher never sees another teacher's sessions.
  */
-router.get('/sessions', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/sessions', requireProfessor, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const professorId = req.query.professor_id as string | undefined;
-    let result;
-    if (professorId) {
-      result = await query(
-        `SELECT session_uuid, course_code, prof_uuid, session_date, is_active, created_at
-         FROM course_sessions WHERE prof_uuid = $1 ORDER BY created_at DESC`,
-        [professorId]
-      );
-    } else {
-      result = await query(
-        `SELECT session_uuid, course_code, prof_uuid, session_date, is_active, created_at
-         FROM course_sessions ORDER BY created_at DESC`
-      );
-    }
+    const professorId = (req as any).professor.sub as string;
+    const result = await query(
+      `SELECT session_uuid, course_code, prof_uuid, session_date, is_active, created_at
+       FROM course_sessions WHERE prof_uuid = $1 ORDER BY created_at DESC`,
+      [professorId]
+    );
     const shaped = await Promise.all(result.rows.map(shapeSession));
     res.json(shaped);
   } catch (err) {
@@ -147,11 +170,13 @@ router.get('/sessions', async (req: Request, res: Response, next: NextFunction) 
 
 /**
  * GET /api/v1/sessions/:sessionUuid
- * Single session
+ * Single session (ownership-checked)
  */
-router.get('/sessions/:sessionUuid', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/sessions/:sessionUuid', requireProfessor, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { sessionUuid } = req.params;
+    const owns = await ensureOwnSession(sessionUuid, (req as any).professor.sub);
+    if (!owns) return res.status(404).json({ error: 'Session not found' });
     const result = await query(
       `SELECT session_uuid, course_code, prof_uuid, session_date, is_active, created_at
        FROM course_sessions WHERE session_uuid = $1`,
@@ -168,16 +193,19 @@ router.get('/sessions/:sessionUuid', async (req: Request, res: Response, next: N
 
 /**
  * POST /api/v1/sessions/start
- * Professor starts a new session (creates course_session + starts metronome)
+ * Professor starts a new session — the PROFESSOR IDENTITY COMES FROM THE JWT.
+ * The client-sent prof_uuid (if any) is ignored, which closes the
+ * "teacher creates a session as another teacher" hole.
  */
-router.post('/sessions/start', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/sessions/start', requireProfessor, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parseResult = sessionStartSchema.safeParse(req.body);
     if (!parseResult.success) {
       return res.status(400).json({ error: 'Invalid payload', details: parseResult.error.flatten().fieldErrors });
     }
 
-    const { course_code, prof_uuid, session_date } = parseResult.data;
+    const { course_code, session_date } = parseResult.data;
+    const prof_uuid = (req as any).professor.sub as string; // identity from token — never the client
     const date = session_date || new Date().toISOString().split('T')[0];
 
     const result = await query(
@@ -203,15 +231,18 @@ router.post('/sessions/start', async (req: Request, res: Response, next: NextFun
 
 /**
  * POST /api/v1/sessions/:sessionUuid/stop
- * Professor stops a session (stops metronome)
+ * Professor stops a session (ownership-checked, stops metronome)
  */
-router.post('/sessions/:sessionUuid/stop', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/sessions/:sessionUuid/stop', requireProfessor, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { sessionUuid } = req.params;
 
+    const owns = await ensureOwnSession(sessionUuid, (req as any).professor.sub);
+    if (!owns) return res.status(404).json({ error: 'Session not found' });
+
     await query(
-      `UPDATE course_sessions SET is_active = FALSE WHERE session_uuid = $1 RETURNING *`,
-      [sessionUuid]
+      `UPDATE course_sessions SET is_active = FALSE WHERE session_uuid = $1 AND prof_uuid = $2 RETURNING *`,
+      [sessionUuid, (req as any).professor.sub]
     );
 
     metronomeService.stopSession(sessionUuid);
@@ -231,6 +262,70 @@ router.get('/sessions/:sessionUuid/tokens', async (req: Request, res: Response, 
     const { sessionUuid } = req.params;
     const tokens = await metronomeService.getActiveTokens(sessionUuid);
     res.json({ session_uuid: sessionUuid, tokens });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/v1/professor/timetable
+ * The authenticated professor's lectures from the admin-created timetable.
+ * `week` = all 7 days for the professor (also used by the app), `today` is the
+ * server-date day_of_week. Each entry carries course + division so the portal
+ * can render "Today's lectures" and start attendance for them directly.
+ */
+router.get('/professor/timetable', requireProfessor, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const profUuid = (req as any).professor.sub as string;
+    const r = await query(
+      `SELECT a.assignment_id, a.course_code, c.title AS course_title, a.division_id,
+              d.name AS division_name, a.day_of_week,
+              to_char(a.start_time, 'HH24:MI') AS start_time,
+              to_char(a.end_time, 'HH24:MI') AS end_time
+       FROM teacher_assignments a
+       JOIN courses c ON c.course_code = a.course_code
+       JOIN divisions d ON d.division_id = a.division_id
+       WHERE a.prof_uuid = $1
+       ORDER BY a.day_of_week, a.start_time`,
+      [profUuid]
+    );
+    const todayDow = new Date().getDay(); // 0=Sun..6=Sat
+    res.json({
+      today_dow: todayDow,
+      today: r.rows.filter((x) => x.day_of_week === todayDow),
+      week: r.rows,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/v1/professor/summary
+ * Per-course attendance analytics for the authenticated professor:
+ * sessions run, last session date, present count, total students (their
+ * division roster) — powers the "my subjects" analytics cards.
+ */
+router.get('/professor/summary', requireProfessor, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const profUuid = (req as any).professor.sub as string;
+    const r = await query(
+      `SELECT c.course_code, c.title,
+              COUNT(DISTINCT cs.session_uuid)::int AS sessions_total,
+              COUNT(DISTINCT cs.session_uuid) FILTER (WHERE cs.is_active)::int AS sessions_active,
+              MAX(cs.session_date)::text AS last_session_date,
+              COUNT(DISTINCT al.ledger_uuid)::int AS present_count,
+              (SELECT COUNT(*) FROM students s
+               WHERE s.division_id = c.division_id)::int AS total_students
+       FROM courses c
+       JOIN teacher_assignments a ON a.course_code = c.course_code AND a.prof_uuid = $1
+       LEFT JOIN course_sessions cs ON cs.course_code = c.course_code AND cs.prof_uuid = $1
+       LEFT JOIN attendance_ledger al ON al.session_uuid = cs.session_uuid AND al.status = 'PRESENT'
+       GROUP BY c.course_code, c.title, c.division_id
+       ORDER BY c.course_code`,
+      [profUuid]
+    );
+    res.json(r.rows);
   } catch (err) {
     next(err);
   }
@@ -283,11 +378,13 @@ router.post('/sessions/:sessionUuid/challenge', async (req: Request, res: Respon
 
 /**
  * GET /api/v1/sessions/:sessionUuid/attendance
- * Attendance records for a session (professor view) — returns bare array
+ * Attendance records for a session (professor view, ownership-checked)
  */
-router.get('/sessions/:sessionUuid/attendance', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/sessions/:sessionUuid/attendance', requireProfessor, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { sessionUuid } = req.params;
+    const owns = await ensureOwnSession(sessionUuid, (req as any).professor.sub);
+    if (!owns) return res.status(404).json({ error: 'Session not found' });
     const records = await judgeService.getSessionAttendance(sessionUuid);
     // Align with frontend contract: bare array with id / student_roll_no / student_email
     const shaped = records.map((r: any) => ({

@@ -70,6 +70,15 @@ class SecureStorageService {
     return await _storage.read(key: AppConstants.storageStudentRollNo);
   }
 
+  // Student access token (JWT from /student/login|register)
+  static Future<void> saveAccessToken(String token) async {
+    await _storage.write(key: 'student_access_token', value: token);
+  }
+
+  static Future<String?> getAccessToken() async {
+    return await _storage.read(key: 'student_access_token');
+  }
+
   // Clear all (for device reset / logout)
   static Future<void> clearAll() async {
     await _storage.deleteAll();

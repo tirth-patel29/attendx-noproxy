@@ -18,6 +18,13 @@ class AppConstants {
   static const String deviceRegisterEndpoint = '/api/v1/devices/register';
   static const String provisionEndpoint = '/api/v1/provision';
   static const String challengeEndpoint = '/api/v1/sessions'; // + /:uuid/challenge
+  // Student self-registration/auth (SRS §1 Phase 1 + charusat identity)
+  static const String studentStatusEndpoint = '/api/v1/student/status';
+  static const String studentRegisterEndpoint = '/api/v1/student/register';
+  static const String studentLoginEndpoint = '/api/v1/student/login';
+  static const String studentPasswordSetEndpoint = '/api/v1/student/password/set';
+  static const String studentBindEndpoint = '/api/v1/student/device/bind';
+  static const String studentEmailDomain = String.fromEnvironment('STUDENT_EMAIL_DOMAIN', defaultValue: 'charusat.edu.in');
 
   // Metronome (SRS §1 Phase 2: 4-character base62 token every 3s)
   static const int metronomeIntervalMs = 3000;

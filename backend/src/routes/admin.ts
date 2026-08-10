@@ -348,7 +348,8 @@ adminRouter.get('/students', async (_req: Request, res: Response, next: NextFunc
   try {
     const r = await query(`
       SELECT s.student_uuid, s.roll_no, s.email, s.name, s.bound_device_id,
-             s.secret_hmac_key, s.division_id, d.name AS division_name, s.created_at
+             s.secret_hmac_key, s.division_id, d.name AS division_name, s.created_at,
+             s.password_hash IS NOT NULL AS has_password
       FROM students s
       LEFT JOIN divisions d ON d.division_id = s.division_id
       ORDER BY s.roll_no
@@ -361,6 +362,7 @@ adminRouter.get('/students', async (_req: Request, res: Response, next: NextFunc
       division_id: row.division_id,
       division_name: row.division_name,
       bound_device_id: row.bound_device_id,
+      has_password: row.has_password,
       // Mask long secrets for the dashboard list; full value via GET detail
       secret_hmac_key: row.secret_hmac_key ? `${row.secret_hmac_key.slice(0, 8)}…${row.secret_hmac_key.slice(-4)}` : null,
       is_bound: Boolean(row.bound_device_id),
@@ -499,6 +501,30 @@ adminRouter.post('/students/:uuid/rotate-hmac', async (req: Request, res: Respon
     const row = r.rows[0];
     await audit((req as any).admin.sub, 'HMAC_ROTATE', { student_uuid: req.params.uuid, roll_no: row.roll_no });
     res.json({ message: 'HMAC key rotated', roll_no: row.roll_no, secret_hmac_key: newSecret });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /students/:uuid/forgot-password
+ * Admin-initiated password reset (physical verification — SRS "Shame Air-Gap"
+ * philosophy applied to credentials). Clears password_hash so the NEXT time the
+ * student opens the app they are prompted to set a new password (twice), which
+ * is then stored. Audit logged.
+ */
+adminRouter.post('/students/:uuid/forgot-password', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const r = await query(
+      `UPDATE students SET password_hash = NULL, updated_at = NOW() WHERE student_uuid = $1 RETURNING roll_no`,
+      [req.params.uuid]
+    );
+    if (r.rows.length === 0) return res.status(404).json({ error: 'Student not found' });
+    await audit((req as any).admin.sub, 'STUDENT_FORGOT_PASSWORD', {
+      student_uuid: req.params.uuid,
+      roll_no: r.rows[0].roll_no,
+    });
+    res.json({ message: 'Password cleared — the student can now set a new one in the app' });
   } catch (err) {
     next(err);
   }

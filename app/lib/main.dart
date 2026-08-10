@@ -7,6 +7,7 @@ import 'package:attendance_gateway/core/services/secure_storage_service.dart';
 import 'package:attendance_gateway/core/services/time_sync_service.dart';
 import 'package:attendance_gateway/core/services/device_info_service.dart';
 import 'package:attendance_gateway/features/precheck/precheck_orchestrator.dart';
+import 'package:attendance_gateway/features/auth/student_auth_page.dart';
 import 'package:attendance_gateway/features/claim/claim_page.dart';
 
 void main() async {
@@ -132,7 +133,7 @@ class AttendanceGatewayApp extends StatelessWidget {
         fontFamily: 'Inter',
       ),
       themeMode: ThemeMode.system,
-      home: const ClaimPage(),
+      home: const StudentAuthPage(),
     );
   }
 }

@@ -55,16 +55,23 @@ export const portalApi = {
   getProfessor: (id: string) => api.get<Professor>(`/professors/${id}`),
 
   // Sessions
-  startSession: (data: { course_code: string; prof_uuid: string; session_date?: string }) =>
+  // NOTE: prof_uuid is intentionally NOT accepted — the backend takes the
+  // professor identity from the JWT, so a teacher can never create a session
+  // as someone else.
+  startSession: (data: { course_code: string; session_date?: string }) =>
     api.post<Session>('/sessions/start', data),
 
   stopSession: (sessionId: string) =>
     api.post(`/sessions/${sessionId}/stop`),
 
-  getSessions: (professorId?: string) =>
-    api.get<Session[]>('/sessions', { params: { professor_id: professorId } }),
+  getSessions: () =>
+    api.get<Session[]>('/sessions'),
 
   getSession: (id: string) => api.get<Session>(`/sessions/${id}`),
+
+  // Teacher timetable + analytics (JWT-scoped)
+  getTimetable: () => api.get<{ today_dow: number; today: any[]; week: any[] }>('/professor/timetable'),
+  getSummary: () => api.get<any[]>('/professor/summary'),
 
   // Tokens
   getSessionTokens: (sessionId: string) =>

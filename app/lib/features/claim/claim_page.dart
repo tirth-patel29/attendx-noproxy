@@ -193,9 +193,10 @@ class _ClaimPageState extends ConsumerState<ClaimPage> {
             
             const SizedBox(height: 16),
             
-            // Provisioning or Claim section
+            // Provisioning is handled by StudentAuthPage — if this device has
+            // no identity stored, route the student back to sign in.
             if (_studentUuid == null) ...[
-              _buildProvisioningForm(),
+              _buildReauth(),
             ] else ...[
               _buildClaimSection(),
             ],
@@ -238,83 +239,36 @@ class _ClaimPageState extends ConsumerState<ClaimPage> {
     );
   }
 
-  Widget _buildProvisioningForm() {
+  Widget _buildReauth() {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Device Provisioning',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Enter your roll number to provision this device for the first time.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey[600],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Not signed in', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            const Text(
+              'Sign in with your college ID to bind this device and mark attendance.',
+              style: TextStyle(color: Colors.grey),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () => Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (_) => const StudentAuthPage()),
                 ),
+                icon: const Icon(Icons.login),
+                label: const Text('Sign in / register'),
               ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _rollNoController,
-                decoration: const InputDecoration(
-                  labelText: 'Roll Number',
-                  hintText: 'e.g., 24BCS001',
-                  prefixIcon: Icon(Icons.badge),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your roll number';
-                  }
-                  if (!RegExp(r'^[0-9]{2}[A-Z]{3}[0-9]{3}$').hasMatch(value)) {
-                    return 'Invalid roll number format (e.g., 24BCS001)';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _secretController,
-                decoration: const InputDecoration(
-                  labelText: 'Provisioning Secret (HMAC key)',
-                  hintText: '64-char key from the Admin Console',
-                  prefixIcon: Icon(Icons.key),
-                  helperText: 'Ask the admin to reveal it in the Students panel',
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().length != 64) {
-                    return 'Enter the 64-character HMAC secret';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _isLoading ? null : _provisionStudent,
-                  icon: _isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.verified_user),
-                  label: Text(_isLoading ? 'Provisioning...' : 'Provision Device'),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
-
-  Widget _buildClaimSection() {
+              Widget _buildClaimSection() {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),

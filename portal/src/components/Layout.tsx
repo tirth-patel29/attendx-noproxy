@@ -50,50 +50,43 @@ export default function Layout() {
   ];
 
   const drawer = (
-    <Box onClick={handleDrawerToggle} sx={{ textAlign: 'center', p: 2 }}>
-      <Avatar sx={{ width: 60, height: 60, mx: 'auto', mb: 1, bgcolor: 'primary.main' }}>
-        {user?.name?.charAt(0)?.toUpperCase() || 'P'}
-      </Avatar>
-      <Typography variant="h6" component="div" sx={{ mb: 0.5 }}>
-        {user?.name || 'Professor'}
-      </Typography>
-      <Typography variant="body2" color="text.secondary" component="div">
-        {user?.email}
-      </Typography>
-      <Divider sx={{ my: 2 }} />
-      <List>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Box
+          sx={{
+            width: 42, height: 42, borderRadius: 2, display: 'flex', alignItems: 'center',
+            justifyContent: 'center', bgcolor: 'rgba(76,201,240,0.15)', color: 'primary.main',
+          }}
+        >
+          <Avatar sx={{ width: 34, height: 34, bgcolor: 'primary.main', color: '#0d1b2a', fontWeight: 800 }}>
+            {user?.name?.charAt(0)?.toUpperCase() || 'P'}
+          </Avatar>
+        </Box>
+        <Box>
+          <Typography variant="subtitle1" fontWeight={700} lineHeight={1.1}>Teacher Portal</Typography>
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>{user?.name}</Typography>
+        </Box>
+      </Box>
+      <Divider />
+      <List sx={{ flex: 1, px: 1, pt: 1 }}>
         {menuItems.map((item) => (
-          <ListItem
-            key={item.path}
-            sx={{
-              borderRadius: 2,
-              mx: 1,
-              mb: 0.5,
-            }}
-          >
+          <ListItem key={item.path} sx={{ p: 0, mb: 0.5 }}>
             <ListItemButton
-              selected={location.pathname === item.path}
+              selected={location.pathname.startsWith(item.path)}
               onClick={() => navigate(item.path)}
-              sx={{
-                '&.Mui-selected': {
-                  bgcolor: 'primary.light',
-                  color: 'white',
-                  '&:hover': { bgcolor: 'primary.dark' },
-                  '& .MuiListItemIcon-root': { color: 'white' },
-                },
-              }}
+              sx={{ borderRadius: 2 }}
             >
-              <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
+              <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
               <ListItemText primary={item.label} />
             </ListItemButton>
           </ListItem>
         ))}
       </List>
-      <Divider sx={{ my: 2 }} />
-      <List>
-        <ListItem>
-          <ListItemButton onClick={handleLogout}>
-            <ListItemIcon><LogoutIcon /></ListItemIcon>
+      <Divider />
+      <List sx={{ px: 1, pb: 1 }}>
+        <ListItem sx={{ p: 0 }}>
+          <ListItemButton onClick={handleLogout} sx={{ borderRadius: 2 }}>
+            <ListItemIcon sx={{ minWidth: 36 }}><LogoutIcon /></ListItemIcon>
             <ListItemText primary="Logout" />
           </ListItemButton>
         </ListItem>

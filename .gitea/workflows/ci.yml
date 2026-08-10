@@ -1,0 +1,70 @@
+# ============================================================================
+# Gitea Actions CI — build & typecheck everything on push to main.
+# Requires a Gitea Actions runner registered on the homelab; the runner needs
+# node + docker. Secrets (.env) are NOT needed for build jobs.
+# ============================================================================
+
+name: build-and-test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install
+        run: cd backend && npm ci
+      - name: Typecheck & build
+        run: cd backend && npm run build
+      # NOTE: vitest judge tests require a live PostgreSQL (Supabase) — run
+      # them in the homelab deploy job, not in CI, unless a test DB is provided.
+
+  portal:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: portal/package-lock.json
+      - name: Install
+        run: cd portal && npm ci
+      - name: Build (tsc + vite)
+        run: cd portal && npm run build
+
+  admin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install
+        run: cd admin && npm ci
+      - name: Build (vite)
+        run: cd admin && npm run build
+
+  docker-build:
+    needs: [backend, portal, admin]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: image=moby/buildkit:latest
+      - name: Build backend image
+        run: docker build -t attendance-backend:ci ./backend
+      - name: Build portal image
+        run: docker build -t attendance-portal:ci ./portal
+      - name: Build admin image
+        run: docker build -t attendance-admin:ci ./admin

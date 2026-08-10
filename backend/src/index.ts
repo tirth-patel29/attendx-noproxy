@@ -10,6 +10,7 @@ import { metronomeService } from './services/metronome';
 import { ensureDefaultAdmin } from './services/bootstrap';
 import attendanceRoutes from './routes/attendance';
 import authRoutes from './routes/auth';
+import studentRoutes from './routes/student';
 import adminRouteModule from './routes/admin';
 
 const app = express();
@@ -53,6 +54,7 @@ app.get('/health', async (_req, res) => {
 // API routes
 app.use('/api/v1', attendanceRoutes);
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/student', studentRoutes);
 
 // Admin console
 //   POST /api/v1/admin/login   -> public (admin auth)
