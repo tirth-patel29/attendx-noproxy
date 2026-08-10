@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { portalApi } from '../services/portalApi';
-import MoireQRDisplay from '../components/MoireQRDisplay';
+import ClassroomProjector from '../components/ClassroomProjector';
 import {
   Box,
   Card,
@@ -250,14 +250,14 @@ export default function SessionPage() {
             
             {currentToken ? (
               <Box sx={{ mt: 2, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                {/* The Moiré + flashing QR photonic display */}
-                <MoireQRDisplay token={currentToken} courseCode={session.course_code} />
+                {/* Dumb-terminal photonic display — live payload updated via WebSocket */}
+                <ClassroomProjector sessionId={sessionId!} courseCode={session.course_code} />
 
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block', textAlign: 'center', maxWidth: 480 }}>
-                  Anti-relay display: the token QR flashes over a static Moiré pattern. A live
-                  video-call relay carries H.264 latency + Moiré interference that breaks the
-                  scanner's binarizer — so it fails the 250ms stream-kill window. In-room phones
-                  (~30fps) catch a flash frame and pass.
+                  Dumb-terminal display: a live WebSocket updates the QR payload every 3 seconds.
+                  The QR is static and constantly visible — Moiré interference is a physical LCD
+                  effect and the 250ms stream-kill window is enforced by the backend Judge,
+                  not by the frontend.
                 </Typography>
               </Box>
             ) : (
