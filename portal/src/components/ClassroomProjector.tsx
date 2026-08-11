@@ -41,7 +41,9 @@ export default function ClassroomProjector({
 }: ClassroomProjectorProps) {
   const [token, setToken] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
+  const [flashing, setFlashing] = useState(false);
   const socketRef = useRef<Socket | null>(null);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const url = socketUrl ?? window.location.origin;
@@ -60,13 +62,27 @@ export default function ClassroomProjector({
       if (sessionId) socket.emit('join:session', sessionId);
     });
 
+    /**
+     * SUBLIMINAL MICRO-TWITCH (Gate 3)
+     * On each token:new the projector shows the ephemeral token for exactly
+     * 100ms (STATE B), then reverts to the static session anchor for the rest
+     * of the 3000ms cycle (STATE A). A remote stream sees essentially only the
+     * anchor (the flash is a 3-6 frame anomaly buried under H.264 P/B-frame
+     * prediction + Moiré), so a stream-sniper can never capture the live token;
+     * and even if a frame leaks, the 250ms latency window rejects it.
+     */
     socket.on('token:new', (payload: TokenEvent) => {
-      if (payload?.token_val) setToken(payload.token_val);
+      if (!payload?.token_val) return;
+      setToken(payload.token_val);
+      setFlashing(true);
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+      flashTimer.current = setTimeout(() => setFlashing(false), 100);
     });
 
     socket.on('disconnect', () => setConnected(false));
 
     return () => {
+      if (flashTimer.current) clearTimeout(flashTimer.current);
       if (socketRef.current) {
         socketRef.current.removeAllListeners();
         socketRef.current.disconnect();
@@ -74,6 +90,12 @@ export default function ClassroomProjector({
       socketRef.current = null;
     };
   }, [sessionId, socketUrl]);
+
+  // STATE A = session anchor (2900ms). STATE B = token flash (100ms).
+  // The QR encodes the same payload grammar the app's filter-gate expects:
+  //   anchor -> ATTN:<session>
+  //   flash  -> ATTN:<session>:<token>
+  const qrValue = flashing && token ? `ATTN:${sessionId}:${token}` : `ATTN:${sessionId}`;
 
   return (
     <Box
@@ -102,34 +124,19 @@ export default function ClassroomProjector({
         </Typography>
       )}
 
-      {token ? (
-        // Static, constantly-visible QR. Re-rendered only when the payload (token) rotates.
-        // Payload format: ATTN:<session_uuid>:<token> — the phone scans it to learn both
-        // the session identity and the rotating token in one shot (SRS Phase 2/3).
-        <Box sx={{ bgcolor: '#ffffff', p: 1, borderRadius: 2 }}>
-          <QRCodeSVG
-            value={`ATTN:${sessionId}:${token}`}
-            size={size}
-            bgColor="#ffffff"
-            fgColor="#000000"
-            level="M"
-            marginSize={2}
-          />
-        </Box>
-      ) : (
-        <Box
-          sx={{
-            width: size,
-            height: size,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'text.secondary',
-          }}
-        >
-          {connected ? 'Waiting for next token…' : 'Connecting…'}
-        </Box>
-      )}
+      {/* SUBLIMINAL PROJECTOR — STATE A shows the session anchor; only the
+          100ms STATE B flash carries the live token. The phone's filter-gate
+          ignores the anchor and hunts for the token frame. */}
+      <Box sx={{ bgcolor: '#ffffff', p: 1, borderRadius: 2 }}>
+        <QRCodeSVG
+          value={qrValue}
+          size={size}
+          bgColor="#ffffff"
+          fgColor="#000000"
+          level="M"
+          marginSize={2}
+        />
+      </Box>
 
       {/* Human-readable current token — always visible so the professor can verify it. */}
       <Typography

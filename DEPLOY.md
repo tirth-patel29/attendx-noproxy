@@ -84,6 +84,49 @@ The Flutter app is built against any backend via a compile-time define:
 flutter build apk --release --dart-define=API_BASE_URL=https://api.example.com
 ```
 
+### ⚠️ Android biometrics (Gate 2) — REQUIRED platform fix
+`local_auth` only works on Android if the host activity extends
+`FlutterFragmentActivity` (a plain `FlutterActivity` throws and the fingerprint
+prompt never appears — symptom: "biometric doesn't ask, error after scanning QR").
+
+Generate the platform folders once and commit them (also required for CI):
+
+```bash
+cd app
+flutter create .                          # creates android/ ios/ etc.
+# then edit android/app/src/main/kotlin/**/MainActivity.kt:
+```
+
+```kotlin
+// androidx.activity requires androidx-activity; io.flutter requires 2.x
+import io.flutter.embedding.android.FlutterFragmentActivity
+class MainActivity : FlutterFragmentActivity()
+```
+
+`android/app/src/main/AndroidManifest.xml`:
+
+```xml
+<manifest ...>
+    <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
+    <application ...>
+      <activity android:name=".MainActivity"
+                android:exported="true"
+                android:launchMode="singleTop"
+                android:theme="@style/LaunchTheme">
+      ...
+```
+
+(Target SDK 31+ removes the need for a separate `USE_FINGERPRINT`; keep
+`USE_BIOMETRIC`.)
+
+### QR payload grammar (Subliminal Micro-Twitch, Gate 3)
+The projector alternates two frames; the app's scanner filter-gate hunts for the
+**flash only**:
+- STATE A (anchor, 2900ms): `ATTN:<session_uuid>` — the app IGNORES these.
+- STATE B (flash, 100ms): `ATTN:<session_uuid>:<token>` — FLASH CAUGHT → scan,
+  apply drift + HMAC, POST.
+Deliberately no REST re-poll of the token on the client (would break the HMAC).
+
 ## Note on the homelab-specific wiring
 
 The current deployment additionally uses:

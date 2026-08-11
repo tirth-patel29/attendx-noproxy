@@ -4,6 +4,7 @@
 /// Prevents proxy devices (someone else using your phone)
 
 import 'package:local_auth/local_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:attendance_gateway/core/constants/app_constants.dart';
 
 enum Gate2Status {

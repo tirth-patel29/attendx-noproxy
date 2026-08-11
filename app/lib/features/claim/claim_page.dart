@@ -104,14 +104,8 @@ class _ClaimPageState extends ConsumerState<ClaimPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Attendance Gateway'),
+        title: const Text('Mark Attendance'),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () => _showSettingsDialog(),
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -180,11 +174,6 @@ class _ClaimPageState extends ConsumerState<ClaimPage> {
             if (_claimResult != null) ...[
               _buildResultCard(),
             ],
-            
-            const SizedBox(height: 16),
-            
-            // 4 Gates status display
-            _buildGatesStatus(),
           ],
         ),
       ),

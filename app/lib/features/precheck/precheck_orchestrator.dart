@@ -6,7 +6,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:attendance_gateway/features/gates/gate1_hardware_tattoo.dart';
 import 'package:attendance_gateway/features/gates/gate2_biometric_lock.dart';
-import 'package:attendance_gateway/features/gates/gate3_visual_twitch.dart';
 import 'package:attendance_gateway/features/gates/gate4_crypto_timestamp.dart';
 import 'package:attendance_gateway/core/services/api_service.dart';
 import 'package:attendance_gateway/core/services/device_info_service.dart';
@@ -96,21 +95,30 @@ class PrecheckOrchestrator extends ChangeNotifier {
       
       _gate2Result = await Gate2BiometricLock.getGate2Info();
 
-      // Phase 3: Gate 3 - Visual Micro-Twitch
+      // Phase 3: Gate 3 - Visual Micro-Twitch (subliminal flash)
+      // The token was already captured by the camera filter-gate (the 100ms
+      // flash). We must NOT re-fetch a token from the server here — that would
+      // produce a DIFFERENT token than the one we signed, breaking the HMAC.
       _currentPhase = PrecheckPhase.gate3;
       _progress = 75;
       notifyListeners();
       await Future.delayed(AppConstants.precheckStepDelay);
 
-      final token = await Gate3VisualTwitch.getCurrentToken(_sessionUuid);
-      if (token == null || token.isEmpty) {
-        _errorMessage = 'No active token. Please wait for the metronome to mint a new token.';
+      if (_tokenVal.isEmpty) {
+        _errorMessage = 'No token captured. Re-scan the projector flash.';
         _currentPhase = PrecheckPhase.failed;
         notifyListeners();
         return false;
       }
-      
-      _gate3Result = await Gate3VisualTwitch.getGate3Info(_sessionUuid);
+      _gate3Result = {
+        'title': AppConstants.gate3Title,
+        'description': AppConstants.gate3Description,
+        'message': 'Token intercepted',
+        'icon': '📱',
+        'isPassed': true,
+        'token': _tokenVal,
+        'status': 'tokenReceived',
+      };
 
       // Phase 4: Gate 4 - Cryptographic Time-Stamp
       _currentPhase = PrecheckPhase.gate4;
