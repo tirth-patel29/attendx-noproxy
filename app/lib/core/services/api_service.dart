@@ -1,5 +1,5 @@
 // lib/core/services/api_service.dart
-/// API service for communicating with the attendance-backend
+// API service for communicating with the attendance-backend
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:attendance_gateway/core/constants/app_constants.dart';

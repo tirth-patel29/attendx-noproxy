@@ -1,7 +1,7 @@
 // lib/features/precheck/precheck_orchestrator.dart
-/// Pre-check Orchestrator
-/// Runs all 4 gates in sequence with UI animations
-/// Matches the SRS pre-check flow
+// Pre-check Orchestrator
+// Runs all 4 gates in sequence with UI animations
+// Matches the SRS pre-check flow
 
 import 'package:flutter/foundation.dart';
 import 'package:attendance_gateway/features/gates/gate1_hardware_tattoo.dart';
@@ -9,7 +9,6 @@ import 'package:attendance_gateway/features/gates/gate2_biometric_lock.dart';
 import 'package:attendance_gateway/features/gates/gate3_visual_twitch.dart';
 import 'package:attendance_gateway/features/gates/gate4_crypto_timestamp.dart';
 import 'package:attendance_gateway/core/services/api_service.dart';
-import 'package:attendance_gateway/core/services/secure_storage_service.dart';
 import 'package:attendance_gateway/core/services/device_info_service.dart';
 import 'package:attendance_gateway/core/constants/app_constants.dart';
 

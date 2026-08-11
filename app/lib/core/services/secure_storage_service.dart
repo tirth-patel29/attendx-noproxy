@@ -1,6 +1,6 @@
 // lib/core/services/secure_storage_service.dart
-/// Secure storage service using flutter_secure_storage
-/// Handles: HMAC key, device ID, drift offset, student credentials
+// Secure storage service using flutter_secure_storage
+// Handles: HMAC key, device ID, drift offset, student credentials
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:attendance_gateway/core/constants/app_constants.dart';
 

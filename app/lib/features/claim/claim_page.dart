@@ -3,16 +3,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:attendance_gateway/core/constants/app_constants.dart';
-import 'package:attendance_gateway/core/services/api_service.dart';
 import 'package:attendance_gateway/core/services/secure_storage_service.dart';
-import 'package:attendance_gateway/core/services/device_info_service.dart';
-import 'package:attendance_gateway/core/services/crypto_service.dart';
 import 'package:attendance_gateway/features/precheck/precheck_orchestrator.dart';
 import 'package:attendance_gateway/features/scan/attendance_scanner_page.dart';
-import 'package:attendance_gateway/features/gates/gate1_hardware_tattoo.dart';
-import 'package:attendance_gateway/features/gates/gate2_biometric_lock.dart';
-import 'package:attendance_gateway/features/gates/gate3_visual_twitch.dart';
-import 'package:attendance_gateway/features/gates/gate4_crypto_timestamp.dart';
 import 'package:attendance_gateway/shared/utils/extensions.dart';
 
 class ClaimPage extends ConsumerStatefulWidget {
@@ -24,8 +17,6 @@ class ClaimPage extends ConsumerStatefulWidget {
 
 class _ClaimPageState extends ConsumerState<ClaimPage> {
   final _rollNoController = TextEditingController();
-  final _secretController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
 
   String? _studentUuid;
   String? _sessionUuid;
@@ -55,45 +46,6 @@ class _ClaimPageState extends ConsumerState<ClaimPage> {
     }
   }
 
-  Future<void> _provisionStudent() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() => _isLoading = true);
-    try {
-      // SRS §1 Phase 1 "The Blood Oath": submit roll_no + the admin-issued HMAC
-      // secret. The server validates the pair and binds this device (Gate 1).
-      final deviceIdHash = await DeviceInfoService.getDeviceIdHash();
-      final result = await ApiService.provision(
-        rollNo: _rollNoController.text.trim().toUpperCase(),
-        secretHmacKey: _secretController.text.trim(),
-        deviceIdHash: deviceIdHash,
-      );
-
-      await SecureStorageService.saveStudentUuid(result['student_uuid'] as String);
-      await SecureStorageService.saveStudentRollNo(result['roll_no'] as String);
-      await SecureStorageService.saveHmacKey(_secretController.text.trim());
-      await SecureStorageService.saveDeviceId(deviceIdHash);
-      await SecureStorageService.saveBoundDeviceId(deviceIdHash);
-
-      setState(() {
-        _studentUuid = result['student_uuid'] as String;
-        _isLoading = false;
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Device provisioned & hardware-bound!')),
-        );
-      }
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Provisioning failed: $e')),
-        );
-      }
-    }
-  }
 
   Future<void> _claimAttendance() async {
     if (_studentUuid == null) {
@@ -411,7 +363,7 @@ class _ClaimPageState extends ConsumerState<ClaimPage> {
   }) {
     return ListTile(
       leading: CircleAvatar(
-        backgroundColor: color.withOpacity(0.1),
+        backgroundColor: color.withValues(alpha: 0.1),
         child: Text(icon, style: const TextStyle(fontSize: 20)),
       ),
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -419,7 +371,7 @@ class _ClaimPageState extends ConsumerState<ClaimPage> {
       trailing: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Text(

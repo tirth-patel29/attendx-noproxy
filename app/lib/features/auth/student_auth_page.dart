@@ -1,19 +1,19 @@
 // lib/features/auth/student_auth_page.dart
-/// Student self-registration & login (SRS §1 Phase 1 + charusat identity).
-///
-/// Flow:
-///   1. Enter college ID (e.g. 24BCS001) — server resolves {id}@charusat.edu.in
-///   2. Branch by status:
-///        !exists      -> Register (name + password twice)
-///        exists & no pw -> Set password (twice) — also used after an admin
-///                          "forgot password" tap
-///        exists & pw  -> Login (password)
-///   3. First successful auth binds THIS device: the server mints the HMAC
-///      permanent signer, stores it in the DB and returns it into the KeyStore.
-///   4. Continue to the attendance ClaimPage.
-///
-/// The HMAC secret is NEVER generated on the phone — it is minted server-side
-/// during bind so the DB and the device stay in sync.
+// Student self-registration & login (SRS §1 Phase 1 + charusat identity).
+// 
+// Flow:
+// 1. Enter college ID (e.g. 24BCS001) — server resolves {id}@charusat.edu.in
+// 2. Branch by status:
+// !exists      -> Register (name + password twice)
+// exists & no pw -> Set password (twice) — also used after an admin
+// "forgot password" tap
+// exists & pw  -> Login (password)
+// 3. First successful auth binds THIS device: the server mints the HMAC
+// permanent signer, stores it in the DB and returns it into the KeyStore.
+// 4. Continue to the attendance ClaimPage.
+// 
+// The HMAC secret is NEVER generated on the phone — it is minted server-side
+// during bind so the DB and the device stay in sync.
 
 import 'package:flutter/material.dart';
 import 'package:attendance_gateway/core/constants/app_constants.dart';

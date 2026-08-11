@@ -1,6 +1,6 @@
 // lib/core/services/time_sync_service.dart
-/// Time synchronization service using Cristian's Algorithm
-/// Computes drift offset between client and server clocks
+// Time synchronization service using Cristian's Algorithm
+// Computes drift offset between client and server clocks
 import 'dart:async';
 import 'package:attendance_gateway/core/constants/app_constants.dart';
 import 'package:attendance_gateway/core/services/secure_storage_service.dart';

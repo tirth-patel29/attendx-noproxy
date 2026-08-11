@@ -1,11 +1,10 @@
 // lib/features/gates/gate4_crypto_timestamp.dart
-/// Gate 4: Cryptographic Time-Stamp
-/// 250ms kill window via Cristian's Algorithm + HMAC-SHA256
-/// Defeats live streams (Discord), replay attacks, and forged responses
+// Gate 4: Cryptographic Time-Stamp
+// 250ms kill window via Cristian's Algorithm + HMAC-SHA256
+// Defeats live streams (Discord), replay attacks, and forged responses
 
 import 'package:attendance_gateway/core/constants/app_constants.dart';
 import 'package:attendance_gateway/core/services/time_sync_service.dart';
-import 'package:attendance_gateway/core/services/crypto_service.dart';
 import 'package:attendance_gateway/core/services/secure_storage_service.dart';
 
 enum Gate4Status {

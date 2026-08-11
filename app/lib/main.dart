@@ -1,14 +1,10 @@
 // lib/main.dart
-/// Attendance Gateway - Flutter client entry point
+// Attendance Gateway - Flutter client entry point
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:attendance_gateway/core/services/api_service.dart';
 import 'package:attendance_gateway/core/services/secure_storage_service.dart';
-import 'package:attendance_gateway/core/services/time_sync_service.dart';
-import 'package:attendance_gateway/core/services/device_info_service.dart';
-import 'package:attendance_gateway/features/precheck/precheck_orchestrator.dart';
 import 'package:attendance_gateway/features/auth/student_auth_page.dart';
-import 'package:attendance_gateway/features/claim/claim_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -112,7 +108,7 @@ class AttendanceGatewayApp extends StatelessWidget {
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           color: Colors.white,
           surfaceTintColor: Colors.white,
-          shadowColor: Colors.black.withOpacity(0.08),
+          shadowColor: Colors.black.withValues(alpha: 0.08),
         ),
         bottomNavigationBarTheme: const BottomNavigationBarThemeData(
           elevation: 8,

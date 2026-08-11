@@ -1,12 +1,11 @@
 // lib/features/gates/gate1_hardware_tattoo.dart
-/// Gate 1: Hardware Tattoo
-/// Device UUID locked in Secure Enclave (KeyStore/Keychain)
-/// Prevents account sharing across devices
+// Gate 1: Hardware Tattoo
+// Device UUID locked in Secure Enclave (KeyStore/Keychain)
+// Prevents account sharing across devices
 
 import 'package:attendance_gateway/core/constants/app_constants.dart';
 import 'package:attendance_gateway/core/services/secure_storage_service.dart';
 import 'package:attendance_gateway/core/services/device_info_service.dart';
-import 'package:attendance_gateway/core/services/crypto_service.dart';
 import 'package:attendance_gateway/core/services/api_service.dart';
 
 enum Gate1Status {

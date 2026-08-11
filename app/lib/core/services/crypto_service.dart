@@ -1,6 +1,6 @@
 // lib/core/services/crypto_service.dart
-/// Cryptographic service for HMAC-SHA256 and related operations
-/// Implements Gate 4: Cryptographic Time-Stamp wax seal
+// Cryptographic service for HMAC-SHA256 and related operations
+// Implements Gate 4: Cryptographic Time-Stamp wax seal
 import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';

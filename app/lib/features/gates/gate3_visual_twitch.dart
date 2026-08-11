@@ -1,7 +1,7 @@
 // lib/features/gates/gate3_visual_twitch.dart
-/// Gate 3: Visual Micro-Twitch
-/// 3-second rotating QR token via WebSocket/polling
-/// Defeats static photos (WhatsApp photo attack)
+// Gate 3: Visual Micro-Twitch
+// 3-second rotating QR token via WebSocket/polling
+// Defeats static photos (WhatsApp photo attack)
 
 import 'package:flutter/material.dart';
 import 'package:attendance_gateway/core/constants/app_constants.dart';
@@ -163,7 +163,7 @@ class _TokenDisplayWidgetState extends State<TokenDisplayWidget> {
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withValues(alpha: 0.1),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),

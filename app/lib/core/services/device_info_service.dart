@@ -1,5 +1,5 @@
 // lib/core/services/device_info_service.dart
-/// Device info service for getting hardware UUID (Gate 1)
+// Device info service for getting hardware UUID (Gate 1)
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';

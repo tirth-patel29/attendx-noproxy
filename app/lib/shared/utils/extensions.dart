@@ -1,6 +1,5 @@
 // lib/shared/utils/extensions.dart
-/// Useful extensions for the app
-import 'dart:math';
+// Useful extensions for the app
 
 extension StringExtensions on String {
   /// Truncate string to max length
