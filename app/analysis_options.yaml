@@ -1,0 +1,29 @@
+# Flutter lint configuration for the Attendance Gateway client.
+# Tracks flutter_lints (in dev_dependencies); run locally with:
+#   cd app && flutter analyze
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  language:
+    strict-casts: true
+  errors:
+    # Local import ordering and unused-element checks are useful here.
+    unused_import: error
+    unused_local_variable: warning
+    deprecated_member_use: warning
+  exclude:
+    - build/**
+    - .dart_tool/**
+
+linter:
+  rules:
+    # Quality
+    prefer_const_constructors: true
+    prefer_const_literals_to_create_immutables: true
+    avoid_print: true
+    prefer_single_quotes: true
+    directives_ordering: true
+    # Keep hanging-library-doc-comments in check
+    dangling_library_doc_comments: true
+    # Deprecated APIs must be caught in CI
+    deprecated_member_use_from_same_package: warning

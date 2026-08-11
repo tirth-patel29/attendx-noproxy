@@ -19,6 +19,8 @@ HOST_STACKS="${HOST_STACKS:-/home/hetp/docker-stacks}"
 
 SSH_ARGS=()
 [ -n "$SSH_KEY" ] && SSH_ARGS=(-i "$SSH_KEY")
+# expand a leading ~ in SSH_KEY to the real home (works for CI runners too)
+if [[ "$SSH_KEY" == \~* ]]; then SSH_KEY="${SSH_KEY/#\~/$HOME}"; SSH_ARGS=(-i "$SSH_KEY"); fi
 RSYNC_SSH=ssh
 [ -n "$SSH_KEY" ] && RSYNC_SSH="ssh -i $SSH_KEY"
 
