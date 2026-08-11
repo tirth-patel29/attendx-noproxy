@@ -1,0 +1,30 @@
+# Flutter analyze — runs ONLY when the mobile app changes (avoids pulling the
+# ~2GB Flutter SDK on every push).
+name: flutter-analyze
+
+on:
+  push:
+    branches: [main]
+    paths: ['app/**']
+  pull_request:
+    paths: ['app/**']
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Flutter SDK (stable)
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get -qq install -y xz-utils curl git unzip
+          git clone -q --depth 1 -b stable https://github.com/flutter/flutter.git /opt/flutter
+          /opt/flutter/bin/flutter --version >/dev/null
+      - name: Analyze
+        run: |
+          cd app
+          /opt/flutter/bin/flutter pub get
+          /opt/flutter/bin/flutter analyze

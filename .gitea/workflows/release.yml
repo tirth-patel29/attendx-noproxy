@@ -1,0 +1,68 @@
+# ============================================================================
+# Gitea Actions — build the Flutter release APK and publish a Gitea release.
+#
+# Trigger: push a tag matching v*  ->  the job builds the APK and creates a
+# Gitea release with the binary attached (tag auto-created on release).
+#
+# Required:
+#   - A Gitea Actions runner with Flutter installed (or the job installs it via
+#     subosito/flutter-action, which needs network on the runner).
+#   - Repository secret `GITEA_TOKEN` = a personal access token with the
+#     `write:repository` permission.
+#   - Environment vars/settings so the runner can reach Gitea (GITEA_URL).
+#
+# Local runners can skip the remote flutter-action and use a pre-installed SDK.
+# ============================================================================
+
+name: release-apk
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag'
+        required: false
+        default: 'v1.0.0'
+
+env:
+  GITEA_URL: 'http://gitea:3000/api/v1'
+  OWNER: 'het'
+  REPO: 'attendance-gateway'
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.24.x'
+
+      - name: Android platform + biometric fix + memory guard
+        run: bash scripts/android_fix.sh
+
+      - name: Build release APK
+        working-directory: app
+        run: |
+          flutter pub get
+          flutter build apk --release \
+            --dart-define=API_BASE_URL="${{ secrets.API_BASE_URL || 'https://api.atmyhome.tech' }}"
+
+      - name: Resolve release tag
+        run: |
+          TAG="$(printf '%s' "${GITHUB_REF_NAME:-}" | sed 's#refs/tags/##')"
+          [ -z "$TAG" ] && TAG="${{ inputs.tag }}"
+          [ -z "$TAG" ] && TAG="v1.0.0"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+
+      - name: Publish Gitea release + attach APK
+        run: bash scripts/publish-gitea-release.sh
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          APK: 'app/build/app/outputs/flutter-apk/app-release.apk'
+        timeout-minutes: 15

@@ -56,22 +56,6 @@ jobs:
       - run: cd admin && npm ci
       - run: cd admin && npm run build
 
-  flutter-analyze:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Flutter SDK (stable)
-        run: |
-          sudo apt-get -qq update
-          sudo apt-get -qq install -y xz-utils curl git unzip
-          git clone -q --depth 1 -b stable https://github.com/flutter/flutter.git /opt/flutter
-          /opt/flutter/bin/flutter --version >/dev/null
-      - name: Analyze
-        run: |
-          cd app
-          /opt/flutter/bin/flutter pub get
-          /opt/flutter/bin/flutter analyze
-
   docker-build:
     needs: [backend, portal, admin]
     runs-on: ubuntu-latest
@@ -85,7 +69,7 @@ jobs:
   # ---- containers on the homelab. Code change -> image -> deploy, automated.
   deploy:
     if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' && secrets.SSH_HOST != '' }}
-    needs: [docker-build, flutter-analyze]
+    needs: [docker-build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
