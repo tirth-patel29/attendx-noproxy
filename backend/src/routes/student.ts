@@ -230,4 +230,82 @@ router.post('/device/bind', requireStudent, async (req: Request, res: Response, 
   }
 });
 
+// 6. ATTENDANCE HISTORY + ANALYTICS (student JWT) — powers the History tab.
+router.get('/attendance', requireStudent, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const student = (req as any).student as { sub: string; roll_no: string };
+
+    const prof = await query(
+      `SELECT s.name, s.roll_no, s.email, s.bound_device_id, s.secret_hmac_key, s.created_at,
+              d.name AS division_name
+       FROM students s
+       LEFT JOIN divisions d ON d.division_id = s.division_id
+       WHERE s.student_uuid = $1`,
+      [student.sub]
+    );
+    if (prof.rows.length === 0) return res.status(404).json({ error: 'Student not found' });
+    const profile = prof.rows[0];
+
+    const rec = await query(
+      `SELECT a.session_uuid, a.verification_delta_ms, a.status,
+              a.client_claimed_time, a.server_logged_time,
+              s.course_code, s.session_date, c.title AS course_title
+       FROM attendance_ledger a
+       JOIN course_sessions s ON s.session_uuid = a.session_uuid
+       JOIN courses c ON c.course_code = s.course_code
+       WHERE a.student_uuid = $1
+       ORDER BY a.server_logged_time DESC
+       LIMIT 200`,
+      [student.sub]
+    );
+    const records = rec.rows;
+
+    // Denominator: every session (≤ today) for courses of the student's division.
+    const held = await query(
+      `SELECT COUNT(*)::int AS held
+       FROM course_sessions s
+       JOIN courses c ON c.course_code = s.course_code
+       WHERE c.division_id = (SELECT division_id FROM students WHERE student_uuid = $1)
+         AND s.session_date <= CURRENT_DATE`,
+      [student.sub]
+    );
+    const present = records.length;
+    const heldCount = held.rows[0]?.held ?? 0;
+    const percent = heldCount > 0 ? Math.round((present / heldCount) * 1000) / 10 : 0;
+
+    const perCourse = await query(
+      `SELECT s.course_code, MAX(c.title) AS title, COUNT(a.*)::int AS present,
+              (SELECT COUNT(*) FROM course_sessions ss
+                 JOIN courses cc ON cc.course_code = ss.course_code
+                WHERE cc.course_code = s.course_code
+                  AND cc.division_id = (SELECT division_id FROM students WHERE student_uuid = $1)
+                  AND ss.session_date <= CURRENT_DATE)::int AS held
+       FROM attendance_ledger a
+       JOIN course_sessions s ON s.session_uuid = a.session_uuid
+       JOIN courses c ON c.course_code = s.course_code
+       WHERE a.student_uuid = $1
+       GROUP BY s.course_code
+       ORDER BY s.course_code`,
+      [student.sub]
+    );
+
+    res.json({
+      profile: {
+        name: profile.name,
+        roll_no: profile.roll_no,
+        email: profile.email,
+        bound_device_id: profile.bound_device_id,
+        has_hmac_key: Boolean(profile.secret_hmac_key),
+        division_name: profile.division_name,
+        joined_at: profile.created_at,
+      },
+      summary: { present, total_held: heldCount, percent, total_missed: Math.max(heldCount - present, 0) },
+      per_course: perCourse.rows,
+      records,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

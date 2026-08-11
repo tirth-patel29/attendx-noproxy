@@ -20,7 +20,7 @@ import 'package:attendance_gateway/core/constants/app_constants.dart';
 import 'package:attendance_gateway/core/services/api_service.dart';
 import 'package:attendance_gateway/core/services/secure_storage_service.dart';
 import 'package:attendance_gateway/core/services/device_info_service.dart';
-import 'package:attendance_gateway/features/claim/claim_page.dart';
+import 'package:attendance_gateway/features/home/home_shell.dart';
 
 class StudentAuthPage extends StatefulWidget {
   const StudentAuthPage({super.key});
@@ -72,7 +72,7 @@ class _StudentAuthPageState extends State<StudentAuthPage> {
     try {
       final r = await ApiService.studentRegister(id: _id, name: _nameController.text.trim(), password: _passwordController.text);
       final token = r['access_token'] as String;
-      await _bindAndGo(token, r['student_uuid'] as String, r['roll_no'] as String);
+      await _bindAndGo(token, r['student_uuid'] as String, r['roll_no'] as String, (r['name'] as String?) ?? '');
     } catch (e) {
       setState(() => _error = '$e');
       setState(() => _busy = false);
@@ -102,7 +102,7 @@ class _StudentAuthPageState extends State<StudentAuthPage> {
     try {
       final r = await ApiService.studentLogin(id: _id, password: _passwordController.text);
       final token = r['access_token'] as String;
-      await _bindAndGo(token, r['student_uuid'] as String, r['roll_no'] as String);
+      await _bindAndGo(token, r['student_uuid'] as String, r['roll_no'] as String, (r['name'] as String?) ?? '');
     } catch (e) {
       setState(() => _error = '$e');
       setState(() => _busy = false);
@@ -111,13 +111,15 @@ class _StudentAuthPageState extends State<StudentAuthPage> {
 
   /// Wrap up auth: ensure this device is bound and the HMAC signer is in the
   /// KeyStore, then open the ClaimPage.
-  Future<void> _bindAndGo(String token, String studentUuid, String rollNo) async {
+  Future<void> _bindAndGo(String token, String studentUuid, String rollNo, String name) async {
     setState(() => _step = _Step.binding);
     final deviceIdHash = await DeviceInfoService.getDeviceIdHash();
     final bound = await ApiService.studentBindDevice(accessToken: token, deviceIdHash: deviceIdHash);
 
+    // Persist the full session so the app auto-logs-in on next launch.
     await SecureStorageService.saveStudentUuid(studentUuid);
     await SecureStorageService.saveStudentRollNo(rollNo);
+    await SecureStorageService.saveStudentName(name);
     await SecureStorageService.saveHmacKey(bound['secret_hmac_key'] as String);
     await SecureStorageService.saveDeviceId(deviceIdHash);
     await SecureStorageService.saveBoundDeviceId(deviceIdHash);
@@ -125,7 +127,7 @@ class _StudentAuthPageState extends State<StudentAuthPage> {
 
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const ClaimPage()),
+      MaterialPageRoute(builder: (_) => const HomeShell()),
     );
   }
 

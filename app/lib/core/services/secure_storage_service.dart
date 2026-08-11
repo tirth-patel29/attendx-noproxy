@@ -70,6 +70,22 @@ class SecureStorageService {
   }
 
   // Student access token (JWT from /student/login|register)
+  static Future<void> saveStudentName(String name) async {
+    await _storage.write(key: 'student_name', value: name);
+  }
+
+  static Future<String?> getStudentName() async {
+    return await _storage.read(key: 'student_name');
+  }
+
+  static Future<void> saveStudentDivision(String division) async {
+    await _storage.write(key: 'student_division', value: division);
+  }
+
+  static Future<String?> getStudentDivision() async {
+    return await _storage.read(key: 'student_division');
+  }
+
   static Future<void> saveAccessToken(String token) async {
     await _storage.write(key: 'student_access_token', value: token);
   }

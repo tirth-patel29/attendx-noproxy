@@ -186,6 +186,20 @@ class ApiService {
     }
   }
 
+  /// GET /student/attendance (student JWT) — history + analytics powering
+  /// the History & Vault tabs.
+  static Future<Map<String, dynamic>> getStudentAttendance({required String accessToken}) async {
+    try {
+      final response = await _client.get(
+        AppConstants.studentAttendanceEndpoint,
+        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw ApiException('Could not load attendance: ${e.message}', e.response?.statusCode);
+    }
+  }
+
   // ===== Device Registration / Provisioning =====
 
   /// POST /api/v1/devices/register

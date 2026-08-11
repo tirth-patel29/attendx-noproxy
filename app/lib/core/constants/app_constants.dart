@@ -24,6 +24,7 @@ class AppConstants {
   static const String studentLoginEndpoint = '/api/v1/student/login';
   static const String studentPasswordSetEndpoint = '/api/v1/student/password/set';
   static const String studentBindEndpoint = '/api/v1/student/device/bind';
+  static const String studentAttendanceEndpoint = '/api/v1/student/attendance';
   static const String studentEmailDomain = String.fromEnvironment('STUDENT_EMAIL_DOMAIN', defaultValue: 'charusat.edu.in');
 
   // Metronome (SRS §1 Phase 2: 4-character base62 token every 3s)
