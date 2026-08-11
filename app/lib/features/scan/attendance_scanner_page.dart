@@ -1,36 +1,20 @@
 // lib/features/scan/attendance_scanner_page.dart
-// Gate 3: The Photonic Intercept — SUBLIMINAL MICRO-TWITCH filter-gate.
-//
-// The projector (ClassroomProjector.tsx) alternates two QR payloads:
-//   STATE A (anchor, 2900ms)  -> `ATTN:<session_uuid>`   (no token)
-//   STATE B (flash,   100ms)  -> `ATTN:<session_uuid>:<token>`
-//
-// This scanner requests the OS camera permission up-front (no black-screen-!
-// crash), runs CONTINUOUSLY and evaluates every decoded frame:
-//   - payload is the session anchor (no token) -> IGNORE, keep scanning
-//   - payload carries a token (the 100ms flash) -> FLASH CAUGHT -> stop.
-// Decoding is not throttled so the brief flash frame is never deduped away.
-
+// Gate 3 Photonic Intercept scanner: camera permission, error-safe viewfinder,
+// vertical zoom control (1x/2x/4x), torch, and the filter-gate that hunts the
+// 100ms token flash while ignoring the `ATTN:<session>` anchor frames.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:attendance_gateway/core/constants/app_constants.dart';
 
-/// Result of a successful scan.
 class AttendancePayload {
   final String sessionUuid;
-  /// Empty for the session ANCHOR frame; the minted token for the FLASH frame.
   final String token;
-
   const AttendancePayload({required this.sessionUuid, required this.token});
-
   bool get isFlash => token.isNotEmpty;
 }
 
-/// Parse a projector payload:
-///   `ATTN:<session>`          -> anchor frame (isFlash == false)
-///   `ATTN:<session>:<token>`  -> flash frame (isFlash == true)
 AttendancePayload? parseAttendancePayload(String raw) {
   if (!raw.startsWith(AppConstants.attnPrefix)) return null;
   final rest = raw.substring(AppConstants.attnPrefix.length).trim();
@@ -51,15 +35,19 @@ class AttendanceScannerPage extends StatefulWidget {
 }
 
 class _AttendanceScannerPageState extends State<AttendanceScannerPage> {
+  static const double _maxZoom = 4.0;
+
   final MobileScannerController _controller = MobileScannerController(
     formats: const [BarcodeFormat.qrCode],
     detectionSpeed: DetectionSpeed.normal,
   );
 
   bool _resolved = false;
-  String? _anchorSession;
   bool _requested = false;
-  late PermissionStatus _permission = PermissionStatus.granted; // optimistic
+  bool _torchOn = false;
+  double _zoom = 1.0;
+  String? _anchorSession;
+  late PermissionStatus _permission = PermissionStatus.granted;
 
   @override
   void initState() {
@@ -73,6 +61,28 @@ class _AttendanceScannerPageState extends State<AttendanceScannerPage> {
     final status = await Permission.camera.request();
     if (!mounted) return;
     setState(() => _permission = status);
+  }
+
+  Future<void> _setZoom(double z) async {
+    final clamped = z.clamp(1.0, _maxZoom);
+    setState(() => _zoom = clamped);
+    try { await _controller.setZoomScale(clamped); } catch (_) {}
+  }
+
+  Future<void> _toggleTorch() async {
+    try {
+      await _controller.toggleTorch();
+      if (mounted) setState(() => _torchOn = !_torchOn);
+    } catch (_) {}
+  }
+
+  Future<void> _reScan() async {
+    try { await _controller.start(); } catch (_) {}
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('Scanning is active — hold steady for the flash.'),
+      behavior: SnackBarBehavior.floating,
+    ));
   }
 
   Future<void> _onDetect(BarcodeCapture capture) async {
@@ -100,18 +110,14 @@ class _AttendanceScannerPageState extends State<AttendanceScannerPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Point at the projector')),
+      appBar: AppBar(title: const Text('SCAN QR CODE'), leading: const BackButton()),
       body: _buildBody(),
     );
   }
 
   Widget _buildBody() {
-    if (_requested && !_permission.isGranted) {
-      return _buildPermissionDenied();
-    }
-    if (!_requested) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    if (_requested && !_permission.isGranted) return _buildPermissionDenied();
+    if (!_requested) return const Center(child: CircularProgressIndicator());
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -119,50 +125,76 @@ class _AttendanceScannerPageState extends State<AttendanceScannerPage> {
           controller: _controller,
           onDetect: _onDetect,
           errorBuilder: (context, error, stackTrace) => Container(
-            color: const Color(0xFF0A0F1E),
+            color: const Color(0xFF101321),
             alignment: Alignment.center,
             padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.error_outline, color: Colors.amber, size: 44),
-                const SizedBox(height: 12),
-                const Text('Camera is unavailable', textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 6),
-                Text('$error', textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white54, fontSize: 12)),
-              ],
-            ),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.error_outline, color: Colors.amber, size: 44),
+              const SizedBox(height: 12),
+              const Text('Camera is unavailable', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 6),
+              Text('$error', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+            ]),
           ),
         ),
-        const Center(
-          child: DecoratedBox(
+
+        // Viewfinder frame with corner guides
+        Center(
+          child: Container(
+            width: 250, height: 250,
             decoration: BoxDecoration(
-              border: Border.fromBorderSide(BorderSide(color: Colors.white, width: 3)),
-              borderRadius: BorderRadius.all(Radius.circular(16)),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 1.5),
             ),
-            child: SizedBox(width: 260, height: 260),
+            child: const _CornerGuides(),
           ),
         ),
+        if (_anchorSession != null)
+          const Align(
+            alignment: Alignment.topCenter,
+            child: Padding(
+              padding: EdgeInsets.only(top: 14),
+              child: Chip(
+                label: Text('Flash locked · waiting', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+                backgroundColor: Colors.black45,
+                side: BorderSide.none,
+              ),
+            ),
+          ),
+
+        // Vertical zoom control (right edge)
+        Positioned(right: 10, top: 110, bottom: 130, child: _ZoomSlider(zoom: _zoom, onChanged: _setZoom)),
+
+        // Bottom controls
         Align(
           alignment: Alignment.bottomCenter,
-          child: Padding(
-            padding: const EdgeInsets.all(24),
+          child: Container(
+            width: double.infinity,
+            color: const Color(0xFF101321),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  'Hold steady — the QR flashes very briefly every 3 seconds.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white, fontSize: 15),
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: _toggleTorch,
+                      icon: Icon(_torchOn ? Icons.flash_on : Icons.flash_off, color: Colors.white, size: 26),
+                    ),
+                    const SizedBox(width: 16),
+                    TextButton.icon(
+                      onPressed: _reScan,
+                      style: TextButton.styleFrom(foregroundColor: Colors.white),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Re-scan', style: TextStyle(fontWeight: FontWeight.w700)),
+                    ),
+                  ],
                 ),
-                if (_anchorSession != null)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 6),
-                    child: Text('Session locked · waiting for the flash…',
-                        style: TextStyle(color: Colors.white70, fontSize: 13)),
-                  ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Align QR inside the guides. Hold steady.',
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                ),
               ],
             ),
           ),
@@ -172,33 +204,115 @@ class _AttendanceScannerPageState extends State<AttendanceScannerPage> {
   }
 
   Widget _buildPermissionDenied() {
-    final isPermanentlyDenied = _permission.isPermanentlyDenied;
+    final permanently = _permission.isPermanentlyDenied;
     return Container(
-      color: const Color(0xFF0A0F1E),
+      color: const Color(0xFFF4F5F8),
       alignment: Alignment.center,
       padding: const EdgeInsets.all(28),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.no_photography_outlined, color: Color(0xFF64748B), size: 56),
-          const SizedBox(height: 16),
-          const Text('Camera permission needed',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 8),
-          const Text(
-            'Marking attendance requires the camera to read the projector flash. '
-            'Grant access and try again.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Color(0xFF94A3B8), height: 1.4),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Icon(Icons.no_photography_outlined, color: Color(0xFFB4B8C7), size: 56),
+        const SizedBox(height: 16),
+        const Text('Camera permission needed', style: TextStyle(color: Color(0xFF2B2B5E), fontSize: 18, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8),
+        const Text('Marking attendance requires the camera to read the projector flash.',
+            textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF8A8FA3))),
+        const SizedBox(height: 20),
+        FilledButton.icon(
+          onPressed: permanently ? openAppSettings : _ensurePermission,
+          icon: const Icon(Icons.settings_outlined),
+          label: Text(permanently ? 'Open settings' : 'Grant permission'),
+        ),
+      ]),
+    );
+  }
+}
+
+/// Circular corner alignment guides for the viewfinder.
+class _CornerGuides extends StatelessWidget {
+  const _CornerGuides();
+
+  @override
+  Widget build(BuildContext context) {
+    const c = Color(0xFF2B2B5E);
+    const l = 26.0, t = 4.0;
+    final corner = (Alignment a) => Positioned(
+      width: l, height: l,
+      left: a.x == -1 ? 0 : null, right: a.x == 1 ? 0 : null,
+      top: a.y == -1 ? 0 : null, bottom: a.y == 1 ? 0 : null,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(
+            left: a.x == -1 ? const BorderSide(color: c, width: t) : BorderSide.none,
+            top: a.y == -1 ? const BorderSide(color: c, width: t) : BorderSide.none,
+            right: a.x == 1 ? const BorderSide(color: c, width: t) : BorderSide.none,
+            bottom: a.y == 1 ? const BorderSide(color: c, width: t) : BorderSide.none,
           ),
-          const SizedBox(height: 20),
-          FilledButton.icon(
-            onPressed: isPermanentlyDenied ? openAppSettings : _ensurePermission,
-            icon: const Icon(Icons.settings_outlined),
-            label: Text(isPermanentlyDenied ? 'Open settings' : 'Grant permission'),
-          ),
-        ],
+        ),
       ),
     );
+    return Stack(children: [
+      corner(const Alignment(-1, -1)), corner(const Alignment(1, -1)),
+      corner(const Alignment(-1, 1)), corner(const Alignment(1, 1)),
+    ]);
+  }
+}
+
+/// Draggable vertical zoom rail: 1x (bottom) -> 4x (top).
+class _ZoomSlider extends StatelessWidget {
+  final double zoom;
+  final ValueChanged<double> onChanged;
+  const _ZoomSlider({required this.zoom, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, constraints) {
+      final h = constraints.maxHeight;
+      double yFor(double z) => h * (1 - (z - 1) / (_AttendanceScannerPageState._maxZoom - 1));
+
+      void handle(Offset local) {
+        final dy = local.dy.clamp(0.0, h);
+        final z = _AttendanceScannerPageState._maxZoom - ((_AttendanceScannerPageState._maxZoom - 1) * dy / h);
+        onChanged(z);
+      }
+
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onVerticalDragUpdate: (d) => handle(d.localPosition),
+        onTapDown: (d) => handle(d.localPosition),
+        child: SizedBox(
+          width: 44,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // rail
+              Container(width: 4, height: h, decoration: BoxDecoration(color: Colors.white30, borderRadius: BorderRadius.circular(4))),
+              // handle (thumb)
+              Positioned(
+                top: yFor(zoom) - 12,
+                child: Container(
+                  width: 26, height: 26,
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8),
+                      boxShadow: [BoxShadow(color: Colors.black38, blurRadius: 6)]),
+                  child: const Icon(Icons.drag_indicator, size: 16, color: Color(0xFF2B2B5E)),
+                ),
+              ),
+              // scale marks 4x / 2x / 1x on the left of the rail
+              Positioned(left: 2, top: yFor(4) - 8, child: const _mark('4x')),
+              Positioned(left: 2, top: yFor(2) - 8, child: const _mark('2x')),
+              Positioned(left: 2, top: yFor(1) - 8, child: const _mark('1x')),
+            ],
+          ),
+        ),
+      );
+    });
+  }
+}
+
+class _mark extends StatelessWidget {
+  final String label;
+  const _mark(this.label);
+  @override
+  Widget build(BuildContext context) {
+    return Text(label, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800, shadows: [Shadow(color: Colors.black54, blurRadius: 3)]));
   }
 }

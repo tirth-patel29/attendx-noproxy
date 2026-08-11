@@ -1,9 +1,9 @@
 // lib/features/home/home_shell.dart
-// Root shell: modern 3-tab layout (Home / History / Security Vault).
+// Root shell: two-tab light-mode layout (Home / History). Account & Security
+// is a pushed route reached from the Home header, not a tab.
 import 'package:flutter/material.dart';
 import 'package:attendance_gateway/features/home/dashboard_tab.dart';
 import 'package:attendance_gateway/features/history/history_tab.dart';
-import 'package:attendance_gateway/features/vault/vault_tab.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -15,11 +15,7 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
 
-  final List<Widget> _tabs = const [
-    DashboardTab(),
-    HistoryTab(),
-    VaultTab(),
-  ];
+  final List<Widget> _tabs = const [DashboardTab(), HistoryTab()];
 
   @override
   Widget build(BuildContext context) {
@@ -29,9 +25,8 @@ class _HomeShellState extends State<HomeShell> {
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.space_dashboard_outlined), selectedIcon: Icon(Icons.space_dashboard), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.query_stats_outlined), selectedIcon: Icon(Icons.query_stats), label: 'History'),
-          NavigationDestination(icon: Icon(Icons.shield_outlined), selectedIcon: Icon(Icons.shield), label: 'Security'),
+          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
+          NavigationDestination(icon: Icon(Icons.bar_chart_outlined), selectedIcon: Icon(Icons.bar_chart), label: 'History'),
         ],
       ),
     );

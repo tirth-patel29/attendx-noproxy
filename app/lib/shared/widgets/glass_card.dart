@@ -1,7 +1,7 @@
 // lib/shared/widgets/glass_card.dart
-// Reusable "glassmorphism" surface: translucent fill, hairline border,
-// soft elevation — the shared card language of the app.
+// Light-mode card surface: white fill, hairline gray border, soft shadow.
 import 'package:flutter/material.dart';
+import 'package:attendance_gateway/main.dart';
 
 class GlassCard extends StatelessWidget {
   final Widget child;
@@ -21,19 +21,19 @@ class GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final borderRadius = radius ?? BorderRadius.circular(20);
+    final borderRadius = radius ?? BorderRadius.circular(18);
     final card = AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       padding: padding,
       decoration: BoxDecoration(
-        color: tint ?? Colors.white.withValues(alpha: 0.045),
+        color: tint ?? Colors.white,
         borderRadius: borderRadius,
-        border: Border.all(color: Colors.white.withValues(alpha: 0.09)),
+        border: Border.all(color: const Color(0xFFE7E9F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.35),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
+            color: kPrimary.withValues(alpha: 0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
         ],
       ),

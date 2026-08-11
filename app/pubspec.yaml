@@ -1,6 +1,6 @@
 name: attendance_gateway
 description: Zero-Trust Cryptographic Student Attendance Gateway — Flutter client
-version: 1.1.0+2
+version: 1.2.0+3
 publish_to: 'none'
 
 environment:

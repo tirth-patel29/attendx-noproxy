@@ -1,11 +1,13 @@
 // lib/features/home/dashboard_tab.dart
-// Tab 1 — Home / Mark Attendance.
+// Home — minimal light UI: welcome, health pills, active session, scan, recent.
 import 'package:flutter/material.dart';
+import 'package:attendance_gateway/core/services/api_service.dart';
 import 'package:attendance_gateway/core/services/secure_storage_service.dart';
 import 'package:attendance_gateway/core/services/time_sync_service.dart';
+import 'package:attendance_gateway/features/account/account_settings_page.dart';
 import 'package:attendance_gateway/features/claim/claim_page.dart';
-import 'package:attendance_gateway/shared/widgets/glass_card.dart';
 import 'package:attendance_gateway/main.dart';
+import 'package:attendance_gateway/shared/utils/formatters.dart';
 
 class DashboardTab extends StatefulWidget {
   const DashboardTab({super.key});
@@ -17,12 +19,10 @@ class DashboardTab extends StatefulWidget {
 class _DashboardTabState extends State<DashboardTab> {
   String _name = '';
   String _rollNo = '';
-  String? _division;
-  bool _loaded = false;
-  bool _deviceBound = false;
   bool _clockSynced = false;
-  bool _hasHmac = false;
+  bool _secure = false;
   bool _starting = false;
+  List<dynamic> _recent = const [];
 
   @override
   void initState() {
@@ -33,50 +33,46 @@ class _DashboardTabState extends State<DashboardTab> {
   Future<void> _load() async {
     final name = await SecureStorageService.getStudentName() ?? '';
     final roll = await SecureStorageService.getStudentRollNo() ?? '';
-    final division = await SecureStorageService.getStudentDivision();
     final bound = await SecureStorageService.getBoundDeviceId();
     final hmac = await SecureStorageService.getHmacKey();
     var synced = false;
+    try { synced = TimeSyncService().isTimeSyncFresh(); } catch (_) {}
     try {
-      synced = TimeSyncService().isTimeSyncFresh();
+      final token = await SecureStorageService.getAccessToken();
+      if (token != null && token.isNotEmpty) {
+        final data = await ApiService.getStudentAttendance(accessToken: token);
+        _recent = (data['records'] as List?) ?? const [];
+      }
     } catch (_) {}
     if (!mounted) return;
     setState(() {
       _name = name;
       _rollNo = roll;
-      _division = division;
-      _deviceBound = bound != null && bound.isNotEmpty;
-      _hasHmac = hmac != null && hmac.isNotEmpty;
       _clockSynced = synced;
-      _loaded = true;
+      _secure = (bound != null && bound.isNotEmpty) && (hmac != null && hmac.isNotEmpty);
     });
-  }
-
-  String get _greeting {
-    final h = DateTime.now().hour;
-    if (h < 12) return 'Good morning';
-    if (h < 17) return 'Good afternoon';
-    return 'Good evening';
   }
 
   Future<void> _markAttendance() async {
     setState(() => _starting = true);
-    // The claim flow runs Gate 2 Biometric Flesh Lock + the camera
-    // filter-gate + Gate 4 crypto seal before submitting.
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ClaimPage()));
     if (mounted) setState(() => _starting = false);
   }
 
-  Widget _chip(IconData icon, String label, bool ok) {
-    final color = ok ? kSuccess : const Color(0xFF64748B);
-    return GlassCard(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+  Widget _healthPill(String label, bool ok) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: ok ? kSuccess.withValues(alpha: 0.10) : kSurface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: ok ? kSuccess.withValues(alpha: 0.35) : const Color(0xFFE7E9F0)),
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: color),
+          Icon(Icons.circle, size: 9, color: ok ? kSuccess : const Color(0xFFB4B8C7)),
           const SizedBox(width: 6),
-          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+          Text(label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: ok ? kPrimary : kTextMuted)),
         ],
       ),
     );
@@ -84,140 +80,128 @@ class _DashboardTabState extends State<DashboardTab> {
 
   @override
   Widget build(BuildContext context) {
+    final firstName = _name.isEmpty ? 'there' : _name.split(' ').first;
     return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Stack(
         children: [
-          // Header — greeting + identity
-          Row(
+          ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             children: [
-              Expanded(
+              const SizedBox(height: 4),
+              // Centered avatar + welcome
+              Center(
+                child: Container(
+                  width: 72, height: 72,
+                  decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [kPrimary, kAccentCyan])),
+                  child: const Icon(Icons.person, color: Colors.white, size: 40),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Center(child: Text('Welcome, $firstName!', style: Theme.of(context).textTheme.headlineSmall)),
+              Center(child: Text(_rollNo.isEmpty ? '' : _rollNo, style: Theme.of(context).textTheme.bodySmall)),
+              const SizedBox(height: 16),
+
+              // Health pills
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _healthPill('Sync OK', _clockSynced),
+                  const SizedBox(width: 8),
+                  _healthPill('Secure OK', _secure),
+                  const SizedBox(width: 8),
+                  _healthPill('Lat Fast', true),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Active Session card
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [kPrimary, kAccentCyan]),
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: [BoxShadow(color: kPrimary.withValues(alpha: 0.25), blurRadius: 24, offset: const Offset(0, 12))],
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(_greeting, style: Theme.of(context).textTheme.bodySmall),
-                    const SizedBox(height: 2),
-                    Text(
-                      _name.isEmpty ? 'Student' : _name.split(' ').first,
-                      style: Theme.of(context).textTheme.headlineSmall,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
+                    Row(
                       children: [
-                        _identityChip(Icons.badge_outlined, _rollNo.isEmpty ? '—' : _rollNo),
-                        if (_division != null && _division!.isNotEmpty)
-                          _identityChip(Icons.groups_outlined, _division!),
+                        Icon(Icons.circle, size: 9, color: kSuccess, /* pulsing dot */),
+                        const SizedBox(width: 8),
+                        const Text('Active Session Live', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
                       ],
                     ),
+                    const SizedBox(height: 12),
+                    const Text('CHARUSAT', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 2)),
+                    const SizedBox(height: 4),
+                    Text('Division: CSE-A', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
                   ],
                 ),
               ),
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [kAccent, kAccentCyan]),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: const Icon(Icons.qr_code_scanner, color: Colors.white, size: 28),
-              ),
-            ],
-          ),
-          const SizedBox(height: 22),
+              const SizedBox(height: 18),
 
-          // Hero card — attendance readiness
-          Container(
-            padding: const EdgeInsets.all(22),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF3B1D8F), Color(0xFF0E3A5F)],
-              ),
-              borderRadius: BorderRadius.circular(26),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-              boxShadow: [
-                BoxShadow(color: kAccent.withValues(alpha: 0.35), blurRadius: 32, offset: const Offset(0, 14)),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(color: kSuccess, shape: BoxShape.circle,
-                        boxShadow: [BoxShadow(color: kSuccess, blurRadius: 10, spreadRadius: 2)]),
-                    ),
-                    const SizedBox(width: 8),
-                    Text('Attendance Ready', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white.withValues(alpha: 0.95))),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Text('A lecture session is live for your division' + ( _loaded && !_deviceBound ? ' — sign in to bind this device first' : ''),
-                    style: TextStyle(fontSize: 12.5, color: Colors.white.withValues(alpha: 0.75), height: 1.4)),
-                const SizedBox(height: 18),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFF0E3A5F),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    onPressed: _starting ? null : _markAttendance,
-                    icon: _starting
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.fingerprint),
-                    label: Text('Mark Attendance — Fingerprint', style: const TextStyle(fontWeight: FontWeight.w800)),
+              // Scan button
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 17),
+                    backgroundColor: kPrimary,
+                    foregroundColor: Colors.white,
+                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                   ),
+                  onPressed: _starting ? null : _markAttendance,
+                  icon: _starting
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.qr_code_scanner),
+                  label: const Text('Scan for Attendance'),
                 ),
-              ],
+              ),
+              const SizedBox(height: 22),
+
+              // Recent records
+              Text('Recent Records', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 10),
+              if (_recent.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(color: kSurface, borderRadius: BorderRadius.circular(16)),
+                  child: Text('No records yet — scan a live session to get started.', style: Theme.of(context).textTheme.bodySmall),
+                )
+              else
+                ..._recent.take(4).map((r) {
+                  final title = (r['course_title'] as String?) ?? (r['course_code'] as String? ?? 'Lecture');
+                  final when = fmtDateTimeShort((r['server_logged_time'] as String?) ?? (r['session_date'] as String?));
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(color: kSurface, borderRadius: BorderRadius.circular(14)),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36, height: 36,
+                          decoration: BoxDecoration(color: kSuccess.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+                          child: const Icon(Icons.check, color: kSuccess, size: 18),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, color: kPrimary))),
+                        Text(when, style: const TextStyle(fontSize: 12.5, color: kTextMuted)),
+                      ],
+                    ),
+                  );
+                }).toList(),
+            ],
+          ),
+          // Settings gear -> Account & Security
+          Positioned(
+            top: 0,
+            right: 4,
+            child: IconButton(
+              icon: const Icon(Icons.settings_outlined, color: kPrimary),
+              onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AccountSettingsPage())),
             ),
           ),
-          const SizedBox(height: 22),
-
-          // System status
-          Text('System status', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _chip(Icons.lock_outline, _deviceBound ? 'Device bound' : 'Not bound', _deviceBound),
-              const Spacer(),
-              _chip(Icons.schedule, _clockSynced ? 'Clock synced' : 'Syncing…', _clockSynced),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              _chip(Icons.verified_user_outlined, _hasHmac ? 'HMAC signer ready' : 'HMAC missing', _hasHmac),
-              const Spacer(),
-              _chip(Icons.hdr_strong, 'Latency ≤ 250ms', true),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _identityChip(IconData icon, String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: const Color(0xFF94A3B8)),
-          const SizedBox(width: 5),
-          Text(text, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFCBD5E1))),
         ],
       ),
     );
