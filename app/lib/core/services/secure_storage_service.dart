@@ -8,7 +8,6 @@ class SecureStorageService {
   static const _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(
       encryptedSharedPreferences: true,
-      prefName: 'attendance_gateway_secure_prefs',
     ),
     iOptions: IOSOptions(
       accessibility: KeychainAccessibility.first_unlock_this_device,

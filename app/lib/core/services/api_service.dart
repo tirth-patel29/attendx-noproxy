@@ -243,7 +243,7 @@ class ApiService {
   static Future<Map<String, dynamic>> getChallenge(String sessionUuid) async {
     try {
       final response = await _client.post(
-        '$challengeEndpoint/$sessionUuid/challenge',
+        '${AppConstants.challengeEndpoint}/$sessionUuid/challenge',
       );
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {

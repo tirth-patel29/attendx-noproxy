@@ -1,7 +1,7 @@
 // lib/features/gates/gate2_biometric_lock.dart
-/// Gate 2: Biometric Flesh Lock
-/// OS-level thumbprint/FaceID before camera opens
-/// Prevents proxy devices (someone else using your phone)
+// Gate 2: Biometric Flesh Lock
+// OS-level thumbprint/FaceID before camera opens
+// Prevents proxy devices (someone else using your phone)
 
 import 'package:local_auth/local_auth.dart';
 import 'package:flutter/foundation.dart';

@@ -33,13 +33,6 @@ class AttendanceGatewayApp extends StatelessWidget {
         colorSchemeSeed: const Color(0xFF1E3A8A), // Deep blue
         brightness: Brightness.light,
         fontFamily: 'Inter',
-        cardTheme: CardThemeData(
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),

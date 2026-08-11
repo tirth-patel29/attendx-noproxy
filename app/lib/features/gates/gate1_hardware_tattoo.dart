@@ -56,7 +56,7 @@ class Gate1HardwareTattoo {
 
       if (result['registered'] == true) {
         // Store locally
-        await SecureStorageService.saveBoundDeviceId(result['bound_device_id']);
+        await SecureStorageService.saveBoundDeviceId((result['bound_device_id'] ?? '').toString());
         return true;
       }
       return false;

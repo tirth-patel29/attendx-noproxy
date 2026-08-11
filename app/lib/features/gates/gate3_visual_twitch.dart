@@ -3,6 +3,7 @@
 // 3-second rotating QR token via WebSocket/polling
 // Defeats static photos (WhatsApp photo attack)
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:attendance_gateway/core/constants/app_constants.dart';
 import 'package:attendance_gateway/core/services/api_service.dart';

@@ -41,6 +41,7 @@ class DeviceInfoService {
 
   /// Get a display name for the device
   static Future<String> getDeviceDisplayName() async {
+    final deviceInfo = DeviceInfoPlugin();
     try {
       if (defaultTargetPlatform == TargetPlatform.android) {
         final androidInfo = await deviceInfo.androidInfo;

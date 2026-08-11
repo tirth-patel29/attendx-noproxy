@@ -72,7 +72,7 @@ class _StudentAuthPageState extends State<StudentAuthPage> {
     try {
       final r = await ApiService.studentRegister(id: _id, name: _nameController.text.trim(), password: _passwordController.text);
       final token = r['access_token'] as String;
-      await _bindAndGo(token, r['student_uuid'], r['roll_no']);
+      await _bindAndGo(token, r['student_uuid'] as String, r['roll_no'] as String);
     } catch (e) {
       setState(() => _error = '$e');
       setState(() => _busy = false);
@@ -102,7 +102,7 @@ class _StudentAuthPageState extends State<StudentAuthPage> {
     try {
       final r = await ApiService.studentLogin(id: _id, password: _passwordController.text);
       final token = r['access_token'] as String;
-      await _bindAndGo(token, r['student_uuid'], r['roll_no']);
+      await _bindAndGo(token, r['student_uuid'] as String, r['roll_no'] as String);
     } catch (e) {
       setState(() => _error = '$e');
       setState(() => _busy = false);

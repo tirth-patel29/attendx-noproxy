@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:attendance_gateway/core/constants/app_constants.dart';
 import 'package:attendance_gateway/core/services/secure_storage_service.dart';
 import 'package:attendance_gateway/features/precheck/precheck_orchestrator.dart';
+import 'package:attendance_gateway/features/auth/student_auth_page.dart';
 import 'package:attendance_gateway/features/scan/attendance_scanner_page.dart';
 import 'package:attendance_gateway/shared/utils/extensions.dart';
 
@@ -369,48 +370,6 @@ class _ClaimPageState extends ConsumerState<ClaimPage> {
         ),
       ),
       dense: true,
-    );
-  }
-
-  void _showSettingsDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Settings'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.delete_outline),
-              title: const Text('Reset Device Provisioning'),
-              subtitle: const Text('Unbind this device from your account'),
-              onTap: () async {
-                Navigator.pop(context);
-                await SecureStorageService.clearAll();
-                setState(() => _studentUuid = null);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Device provisioning reset')),
-                  );
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.sync),
-              title: const Text('Force Time Sync'),
-              onTap: () async {
-                Navigator.pop(context);
-                await TimeSyncService().syncTime();
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Time sync initiated')),
-                  );
-                }
-              },
-            ),
-          ],
-        ),
-      ),
     );
   }
 

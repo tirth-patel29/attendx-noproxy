@@ -1,15 +1,15 @@
 // lib/features/scan/attendance_scanner_page.dart
-/// Gate 3: The Photonic Intercept — SUBLIMINAL MICRO-TWITCH filter-gate.
+// Gate 3: The Photonic Intercept - SUBLIMINAL MICRO-TWITCH filter-gate.
 ///
-/// The projector (ClassroomProjector.tsx) alternates two QR payloads:
-///   STATE A (anchor, 2900ms)  -> `ATTN:<session_uuid>`   (no token)
-///   STATE B (flash,   100ms)  -> `ATTN:<session_uuid>:<token>`
+// The projector (ClassroomProjector.tsx) alternates two QR payloads:
+//   STATE A (anchor, 2900ms)  -> `ATTN:<session_uuid>`   (no token)
+//   STATE B (flash,   100ms)  -> `ATTN:<session_uuid>:<token>`
 ///
-/// This scanner runs CONTINUOUSLY and evaluates every decoded frame:
-///   - payload is the session anchor (no token) -> IGNORE, keep scanning
-///   - payload carries a token (the 100ms flash) -> FLASH CAUGHT -> stop.
-/// Decoding is not throttled so the brief flash frame (3-6 camera frames) is
-/// never deduplicated away.
+// This scanner runs CONTINUOUSLY and evaluates every decoded frame:
+//   - payload is the session anchor (no token) -> IGNORE, keep scanning
+//   - payload carries a token (the 100ms flash) -> FLASH CAUGHT -> stop.
+// Decoding is not throttled so the brief flash frame (3-6 camera frames) is
+// never deduplicated away.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

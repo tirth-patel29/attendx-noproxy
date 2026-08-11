@@ -8,6 +8,7 @@ import 'package:attendance_gateway/features/gates/gate1_hardware_tattoo.dart';
 import 'package:attendance_gateway/features/gates/gate2_biometric_lock.dart';
 import 'package:attendance_gateway/features/gates/gate4_crypto_timestamp.dart';
 import 'package:attendance_gateway/core/services/api_service.dart';
+import 'package:attendance_gateway/core/services/time_sync_service.dart';
 import 'package:attendance_gateway/core/services/device_info_service.dart';
 import 'package:attendance_gateway/core/constants/app_constants.dart';
 
