@@ -1,5 +1,9 @@
 // lib/features/scan/attendance_scanner_page.dart
-// Gate 3 Photonic Intercept scanner — proper lifecycle for mobile_scanner 5.x
+// Gate 3 Photonic Intercept scanner — proper lifecycle for mobile_scanner 5.x,
+// hardened to wait out a FULL metronome window (3s cycle) so the token flash
+// is never missed: anchors are discarded, the window is enforced, and a timeout
+// surfaces a user-friendly "no flash" state that auto-recovers.
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -34,6 +38,11 @@ class AttendanceScannerPage extends StatefulWidget {
 
 class _AttendanceScannerPageState extends State<AttendanceScannerPage> {
   static const double _maxZoom = 4.0;
+  // The server mints a new token every metronomeIntervalMs (3000ms). We wait out
+  // one full cycle (+ margin) after locking a session so the brief flash cannot
+  // be missed, then surface a "no flash" state instead of scanning forever.
+  static const Duration _huntWindow =
+      Duration(milliseconds: AppConstants.metronomeIntervalMs + 1200);
 
   late final MobileScannerController _controller;
 
@@ -43,6 +52,8 @@ class _AttendanceScannerPageState extends State<AttendanceScannerPage> {
   bool _torchOn = false;
   double _zoom = 1.0;
   String? _anchorSession;
+  Timer? _huntTimer;
+  bool _noFlash = false;
 
   @override
   void initState() {
@@ -94,6 +105,11 @@ class _AttendanceScannerPageState extends State<AttendanceScannerPage> {
   }
 
   Future<void> _reScan() async {
+    _huntTimer?.cancel();
+    setState(() {
+      _anchorSession = null;
+      _noFlash = false;
+    });
     try { await _controller.start(); }
     catch (e) {
       await _controller.stop();
@@ -106,24 +122,64 @@ class _AttendanceScannerPageState extends State<AttendanceScannerPage> {
     ));
   }
 
+  /// Lock a session and wait out one full metronome window for the token flash.
+  ///
+  /// Anchors (`ATTN:<session>` with no token) are discarded — they only tell us
+  /// which session we are pointed at. The deadline is NOT refreshed by further
+  /// anchors: if a whole window elapses without a token, we surface `_noFlash`
+  /// (user keeps holding steady; the next anchor auto-re-arms the window).
+  void _armHuntWindow(String sessionUuid) {
+    if (_resolved) return;
+    // Already hunting this session with a live window -> keep waiting.
+    if (_anchorSession == sessionUuid && !_noFlash && _huntTimer?.isActive == true) {
+      return;
+    }
+    _huntTimer?.cancel();
+    setState(() {
+      _anchorSession = sessionUuid;
+      _noFlash = false;
+    });
+    _huntTimer = Timer(_huntWindow, () {
+      if (!mounted) return;
+      setState(() => _noFlash = true);
+    });
+  }
+
+  Future<void> _resolve(AttendancePayload payload) async {
+    _resolved = true;
+    _huntTimer?.cancel();
+    setState(() => _noFlash = false);
+    HapticFeedback.mediumImpact();
+    await _controller.stop();
+    if (mounted) Navigator.of(context).pop(payload);
+  }
+
   Future<void> _onDetect(BarcodeCapture capture) async {
     if (_resolved) return;
     final raw = capture.barcodes.isNotEmpty ? capture.barcodes.first.rawValue : null;
     if (raw == null) return;
     final payload = parseAttendancePayload(raw);
     if (payload == null) return;
+
     if (!payload.isFlash) {
-      _anchorSession ??= payload.sessionUuid;
+      // Anchor frame — discard (just re-arm the hunt window).
+      _armHuntWindow(payload.sessionUuid);
       return;
     }
-    _resolved = true;
-    HapticFeedback.mediumImpact();
-    await _controller.stop();
-    if (mounted) Navigator.of(context).pop(payload);
+
+    // Flash frame with a live 4-char token. Only accept it for the session we
+    // locked; a cross-session flash re-arms the hunt on the new session.
+    if (_anchorSession != null && payload.sessionUuid != _anchorSession) {
+      _armHuntWindow(payload.sessionUuid);
+      return;
+    }
+
+    await _resolve(payload);
   }
 
   @override
   void dispose() {
+    _huntTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -178,14 +234,51 @@ class _AttendanceScannerPageState extends State<AttendanceScannerPage> {
           ),
         ),
         if (_anchorSession != null)
-          const Align(
+          Align(
             alignment: Alignment.topCenter,
             child: Padding(
-              padding: EdgeInsets.only(top: 14),
-              child: Chip(
-                label: Text('Flash locked', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
-                backgroundColor: Colors.black45,
-                side: BorderSide.none,
+              padding: const EdgeInsets.only(top: 14),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _noFlash ? Icons.visibility_off_outlined : Icons.radar,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _noFlash ? 'No flash in this window' : 'Flash hunting…',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
+                        ),
+                      ],
+                    ),
+                    if (_noFlash) ...[
+                      const SizedBox(height: 2),
+                      const Text('Keep holding steady — watching for the next token',
+                          style: TextStyle(fontSize: 10, color: Colors.white70)),
+                    ] else ...[
+                      const SizedBox(height: 6),
+                      SizedBox(
+                        width: 120,
+                        child: LinearProgressIndicator(
+                          minHeight: 3,
+                          backgroundColor: Colors.white24,
+                          valueColor: const AlwaysStoppedAnimation(Colors.white),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
           ),

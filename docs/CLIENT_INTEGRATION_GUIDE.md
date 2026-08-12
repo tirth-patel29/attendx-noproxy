@@ -186,6 +186,14 @@ token." The whole point of Gate 4 is that the HMAC is over the *exact* token the
 witnessed. If you re-fetch, you may sign a *different* token than the LCD showed, and the
 server's HMAC check fails. Captured → sealed → submitted, in one pass.
 
+**Reference client behavior (already hardened):**
+The reference Flutter scanner enforces exactly this window. Once it locks onto a session
+(the first anchor frame), it waits out **one full metronome cycle** (3 s + margin, ~4.2 s)
+and refuses to refresh that deadline on subsequent anchors. If the token flash is captured
+within the window it submits immediately; if a whole window elapses with no flash it shows
+a **"No flash in this window — keep holding steady"** state (it does not silently scan
+forever). The next anchor frame auto-re-arms the window, so it self-recovers.
+
 ### Don't let the client UI cheat
 
 - Do **not** implement a "refresh token button" — that defeats Gate 3.
