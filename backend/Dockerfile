@@ -35,6 +35,8 @@ RUN npm install --omit=dev && \
 # Copy compiled output + assets
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/package.json ./package.json
+# OpenAPI spec for the Swagger UI (/docs)
+COPY --from=build /app/openapi.json ./openapi.json
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
