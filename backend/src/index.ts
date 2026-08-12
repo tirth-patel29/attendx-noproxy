@@ -54,31 +54,11 @@ app.get('/health', async (_req, res) => {
 
 // ---------------------------------------------------------------------------
 // API docs — Swagger UI at /docs, spec at /openapi.json.
-// Protected by HTTP Basic auth using the configured admin credentials, so the
-// documentation surface is password-protected like the admin console.
+// Public (read-only) so any consumer can read the reference and build a client.
+// The API-key *console* stays locked behind the admin JWT login.
 // ---------------------------------------------------------------------------
 import fs from 'fs';
 import path from 'path';
-
-function docsBasicAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith('Basic ')) {
-    res.setHeader('WWW-Authenticate', 'Basic realm="API docs"');
-    return res.status(401).json({ error: 'auth required' });
-  }
-  try {
-    const cred = Buffer.from(auth.slice(6), 'base64').toString('utf8');
-    const sep = cred.indexOf(':');
-    const user = cred.slice(0, sep);
-    const pass = cred.slice(sep + 1);
-    if (user === config.admin.email && pass === config.admin.password) {
-      return next();
-    }
-  } catch (err) {
-    /* fallthrough to 401 */
-  }
-  return res.status(401).json({ error: 'invalid credentials' });
-}
 
 const SWAGGER_HTML = `<!DOCTYPE html>
 <html lang="en">
@@ -108,7 +88,7 @@ window.onload = function () {
 </body>
 </html>`;
 
-app.get('/openapi.json', docsBasicAuth, (_req, res) => {
+app.get('/openapi.json', (_req, res) => {
   try {
     const spec = fs.readFileSync(path.join(process.cwd(), 'openapi.json'), 'utf8');
     res.type('application/json').send(spec);
@@ -117,7 +97,7 @@ app.get('/openapi.json', docsBasicAuth, (_req, res) => {
   }
 });
 
-app.get('/docs', docsBasicAuth, (_req, res) => {
+app.get('/docs', (_req, res) => {
   res.type('text/html').send(SWAGGER_HTML);
 });
 
