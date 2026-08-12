@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:attendance_gateway/core/services/api_service.dart';
 import 'package:attendance_gateway/core/services/secure_storage_service.dart';
 import 'package:attendance_gateway/core/services/time_sync_service.dart';
-import 'package:attendance_gateway/features/account/account_settings_page.dart';
+import 'package:attendance_gateway/features/profile/profile_page.dart';
 import 'package:attendance_gateway/features/claim/claim_page.dart';
 import 'package:attendance_gateway/main.dart';
 import 'package:attendance_gateway/shared/utils/formatters.dart';
@@ -199,7 +199,7 @@ class _DashboardTabState extends State<DashboardTab> {
             right: 4,
             child: IconButton(
               icon: const Icon(Icons.settings_outlined, color: kPrimary),
-              onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AccountSettingsPage())),
+              onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProfilePage())),
             ),
           ),
         ],
