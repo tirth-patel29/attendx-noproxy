@@ -52,7 +52,7 @@ class _HistoryTabState extends State<HistoryTab> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           children: [
-            const Text('ATTENDANCE OVERVIEW', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20, color: kPrimary, letterSpacing: 0.5)),
+            Text('ATTENDANCE OVERVIEW', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20, color: kPrimary, letterSpacing: 0.5)),
             const SizedBox(height: 20),
             if (_loading)
               const Padding(padding: EdgeInsets.only(top: 80), child: Center(child: CircularProgressIndicator(color: kPrimary)))
@@ -71,9 +71,9 @@ class _HistoryTabState extends State<HistoryTab> {
       const SizedBox(height: 50),
       const Icon(Icons.cloud_off, size: 46, color: Color(0xFFB4B8C7)),
       const SizedBox(height: 12),
-      Text(_error ?? 'Something went wrong', textAlign: TextAlign.center, style: const TextStyle(color: kTextMuted)),
+      Text(_error ?? 'Something went wrong', textAlign: TextAlign.center, style: const TextStyle(color: kTextSecondary)),
       const SizedBox(height: 16),
-      FilledButton(onPressed: _fetch, child: const Text('Retry')),
+      FilledButton(onPressed: _fetch, child: Text('Retry')),
     ]);
   }
 
@@ -108,7 +108,7 @@ class _HistoryTabState extends State<HistoryTab> {
                 children: [
                   Text('${percent.toStringAsFixed(1)}%',
                       style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: kPrimary)),
-                  const Text('Overall Attendance', style: TextStyle(fontSize: 12, color: kTextMuted)),
+                  Text('Overall Attendance', style: TextStyle(fontSize: 12, color: kTextSecondary)),
                 ],
               ),
             ],
@@ -128,7 +128,7 @@ class _HistoryTabState extends State<HistoryTab> {
       const SizedBox(height: 24),
 
       // Subject breakdown
-      const Text('Subjects', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: kPrimary)),
+      Text('Subjects', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: kPrimary)),
       const SizedBox(height: 12),
       if (perCourse.isEmpty)
         GlassCard(child: Text('No data yet.', style: Theme.of(context).textTheme.bodySmall))
@@ -169,7 +169,7 @@ class _HistoryTabState extends State<HistoryTab> {
       const SizedBox(height: 24),
 
       // Activity log
-      const Text('Activity Log', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: kPrimary)),
+      Text('Activity Log', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: kPrimary)),
       const SizedBox(height: 12),
       if (records.isEmpty)
         GlassCard(child: Text('No records yet.', style: Theme.of(context).textTheme.bodySmall))
@@ -189,11 +189,11 @@ class _HistoryTabState extends State<HistoryTab> {
                   child: const Icon(Icons.verified_outlined, color: kSuccess, size: 19),
                 ),
                 title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, color: kPrimary, fontSize: 13.5)),
-                subtitle: Text('$when  ·  Δ ${delta}ms', style: const TextStyle(fontSize: 11.5, color: kTextMuted)),
+                subtitle: Text('$when  ·  Δ ${delta}ms', style: const TextStyle(fontSize: 11.5, color: kTextSecondary)),
                 trailing: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(color: kSuccess.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
-                  child: const Text('VERIFIED', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, color: kSuccess)),
+                  child: Text('VERIFIED', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, color: kSuccess)),
                 ),
               );
             }).toList(),
@@ -210,7 +210,7 @@ class _HistoryTabState extends State<HistoryTab> {
           Icon(icon, color: color, size: 20),
           const SizedBox(height: 8),
           Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: kPrimary)),
-          Text(label, style: const TextStyle(fontSize: 12.5, color: kTextMuted)),
+          Text(label, style: const TextStyle(fontSize: 12.5, color: kTextSecondary)),
         ],
       ),
     );

@@ -71,8 +71,8 @@ class _DashboardTabState extends State<DashboardTab> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.circle, size: 9, color: ok ? kSuccess : const Color(0xFFB4B8C7)),
-          const SizedBox(width: 6),
-          Text(label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: ok ? kPrimary : kTextMuted)),
+          SizedBox(width: 6),
+          Text(label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: ok ? kPrimary : kTextSecondary)),
         ],
       ),
     );
@@ -87,38 +87,38 @@ class _DashboardTabState extends State<DashboardTab> {
           ListView(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             children: [
-              const SizedBox(height: 4),
+              SizedBox(height: 4),
               // Centered avatar + welcome
               Center(
                 child: Container(
                   width: 72, height: 72,
-                  decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [kPrimary, kAccentCyan])),
-                  child: const Icon(Icons.person, color: Colors.white, size: 40),
+                  decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [kPrimary, kPrimaryLight])),
+                  child: Icon(Icons.person, color: Colors.white, size: 40),
                 ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               Center(child: Text('Welcome, $firstName!', style: Theme.of(context).textTheme.headlineSmall)),
               Center(child: Text(_rollNo.isEmpty ? '' : _rollNo, style: Theme.of(context).textTheme.bodySmall)),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
 
               // Health pills
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   _healthPill('Sync OK', _clockSynced),
-                  const SizedBox(width: 8),
+                  SizedBox(width: 8),
                   _healthPill('Secure OK', _secure),
-                  const SizedBox(width: 8),
+                  SizedBox(width: 8),
                   _healthPill('Lat Fast', true),
                 ],
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: 20),
 
               // Active Session card
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [kPrimary, kAccentCyan]),
+                  gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [kPrimary, kPrimaryLight]),
                   borderRadius: BorderRadius.circular(22),
                   boxShadow: [BoxShadow(color: kPrimary.withValues(alpha: 0.25), blurRadius: 24, offset: const Offset(0, 12))],
                 ),
@@ -128,18 +128,18 @@ class _DashboardTabState extends State<DashboardTab> {
                     Row(
                       children: [
                         Icon(Icons.circle, size: 9, color: kSuccess, /* pulsing dot */),
-                        const SizedBox(width: 8),
-                        const Text('Active Session Live', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
+                        SizedBox(width: 8),
+                        Text('Active Session Live', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    const Text('CHARUSAT', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 2)),
-                    const SizedBox(height: 4),
+                    SizedBox(height: 12),
+                    Text('CHARUSAT', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 2)),
+                    SizedBox(height: 4),
                     Text('Division: CSE-A', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
                   ],
                 ),
               ),
-              const SizedBox(height: 18),
+              SizedBox(height: 18),
 
               // Scan button
               SizedBox(
@@ -153,16 +153,16 @@ class _DashboardTabState extends State<DashboardTab> {
                   ),
                   onPressed: _starting ? null : _markAttendance,
                   icon: _starting
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Icon(Icons.qr_code_scanner),
-                  label: const Text('Scan for Attendance'),
+                      ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : Icon(Icons.qr_code_scanner),
+                  label: Text('Scan for Attendance'),
                 ),
               ),
-              const SizedBox(height: 22),
+              SizedBox(height: 22),
 
               // Recent records
               Text('Recent Records', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 10),
+              SizedBox(height: 10),
               if (_recent.isEmpty)
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -182,11 +182,11 @@ class _DashboardTabState extends State<DashboardTab> {
                         Container(
                           width: 36, height: 36,
                           decoration: BoxDecoration(color: kSuccess.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
-                          child: const Icon(Icons.check, color: kSuccess, size: 18),
+                          child: Icon(Icons.check, color: kSuccess, size: 18),
                         ),
-                        const SizedBox(width: 12),
+                        SizedBox(width: 12),
                         Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, color: kPrimary))),
-                        Text(when, style: const TextStyle(fontSize: 12.5, color: kTextMuted)),
+                        Text(when, style: const TextStyle(fontSize: 12.5, color: kTextSecondary)),
                       ],
                     ),
                   );
@@ -198,7 +198,7 @@ class _DashboardTabState extends State<DashboardTab> {
             top: 0,
             right: 4,
             child: IconButton(
-              icon: const Icon(Icons.settings_outlined, color: kPrimary),
+              icon: Icon(Icons.settings_outlined, color: kPrimary),
               onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProfilePage())),
             ),
           ),

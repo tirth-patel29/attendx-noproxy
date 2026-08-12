@@ -56,7 +56,7 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
+      appBar: AppBar(title: Text('Profile')),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: kPrimary))
           : ListView(
@@ -67,12 +67,12 @@ class _ProfilePageState extends State<ProfilePage> {
                     width: 80, height: 80,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: const LinearGradient(colors: [kPrimary, kAccentCyan]),
+                      gradient: const LinearGradient(colors: [kPrimary, kPrimaryLight]),
                     ),
-                    child: const Icon(Icons.person, color: Colors.white, size: 40),
+                    child: Icon(Icons.person, color: Colors.white, size: 40),
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 Center(
                   child: Text(
                     _name.isEmpty ? 'Student' : _name,
@@ -82,32 +82,32 @@ class _ProfilePageState extends State<ProfilePage> {
                 Center(
                   child: Text(
                     _rollNo.isEmpty ? '—' : _rollNo,
-                    style: const TextStyle(fontSize: 15, color: kTextMuted),
+                    style: const TextStyle(fontSize: 15, color: kTextSecondary),
                   ),
                 ),
-                const SizedBox(height: 28),
+                SizedBox(height: 28),
 
-                const Text('Student Details', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: kPrimary)),
-                const SizedBox(height: 12),
+                Text('Student Details', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: kPrimary)),
+                SizedBox(height: 12),
 
                 _infoCard('Student ID', _rollNo.isEmpty ? '—' : _rollNo),
                 _infoCard('University Email', _email),
                 _infoCard('Course', _division.isEmpty ? '—' : _division),
 
-                const SizedBox(height: 32),
+                SizedBox(height: 32),
                 _actionCard(Icons.bar_chart_outlined, 'Attendance History', () {
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const HistoryTab()),
                   );
                 }),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
 
                 // Soft divider
                 Container(height: 1, color: const Color(0xFFE7E9F0)),
 
-                const SizedBox(height: 16),
-                const Center(child: Text('Secure Attendance Gateway', style: TextStyle(fontSize: 12, color: kTextMuted))),
-                const SizedBox(height: 24),
+                SizedBox(height: 16),
+                const Center(child: Text('Secure Attendance Gateway', style: TextStyle(fontSize: 12, color: kTextSecondary))),
+                SizedBox(height: 24),
               ],
             ),
     );
@@ -124,7 +124,7 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
       child: Row(
         children: [
-          Expanded(child: Text(label, style: const TextStyle(color: kTextMuted, fontSize: 13))),
+          Expanded(child: Text(label, style: const TextStyle(color: kTextSecondary, fontSize: 13))),
           Text(value, style: const TextStyle(fontWeight: FontWeight.w700, color: kPrimary)),
         ],
       ),
@@ -142,7 +142,7 @@ class _ProfilePageState extends State<ProfilePage> {
       child: ListTile(
         leading: Icon(icon, color: kPrimary),
         title: Text(label, style: const TextStyle(fontWeight: FontWeight.w700, color: kPrimary)),
-        trailing: const Icon(Icons.chevron_right, color: kTextMuted),
+        trailing: Icon(Icons.chevron_right, color: kTextSecondary),
         onTap: onTap,
       ),
     );

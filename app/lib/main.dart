@@ -1,5 +1,5 @@
 // lib/main.dart
-// Attendance Gateway — light-mode, professional UI + auto-login gate.
+// Attendance Gateway — Premium Material 3 Dark Theme + Auto-login Gate
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:attendance_gateway/core/services/api_service.dart';
@@ -8,15 +8,20 @@ import 'package:attendance_gateway/core/services/time_sync_service.dart';
 import 'package:attendance_gateway/features/auth/student_auth_page.dart';
 import 'package:attendance_gateway/features/home/home_shell.dart';
 
-// ---- light, professional palette ------------------------------------------
-const kBg = Color(0xFFFFFFFF);      // pure white
-const kSurface = Color(0xFFF4F5F8); // cool light gray card surface
-const kPrimary = Color(0xFF2B2B5E); // deep indigo (buttons + typography)
-const kAccent = Color(0xFF2B2B5E);
-const kAccentCyan = Color(0xFF5B67D6); // soft indigo accent
-const kSuccess = Color(0xFF2ECC71); // status green
-const kDanger = Color(0xFFE74C3C);
-const kTextMuted = Color(0xFF8A8FA3);
+// Premium Dark Theme Palette
+const kPrimary = Color(0xFF6366F1); // Indigo-500
+const kPrimaryDark = Color(0xFF4F46E5); // Indigo-600
+const kPrimaryLight = Color(0xFF818CF8); // Indigo-400
+const kSecondary = Color(0xFF10B981); // Emerald-500
+const kBackground = Color(0xFF0F172A); // Slate-900
+const kSurface = Color(0xFF1E293B); // Slate-800
+const kSurfaceLight = Color(0xFF334155); // Slate-700
+const kSurfaceDark = Color(0xFF0F172A); // Slate-900
+const kTextPrimary = Color(0xFFF8FAFC); // Slate-50
+const kTextSecondary = Color(0xFF94A3B8); // Slate-400
+const kSuccess = Color(0xFF10B981); // Emerald-500
+const kDanger = Color(0xFFEF4444); // Red-500
+const kWarning = Color(0xFFF59E0B); // Amber-500
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,7 +39,7 @@ class AttendanceGatewayApp extends StatelessWidget {
       title: 'Attendance Gateway',
       debugShowCheckedModeBanner: false,
       theme: _buildTheme(),
-      themeMode: ThemeMode.light,
+      themeMode: ThemeMode.dark,
       home: const BootGate(),
     );
   }
@@ -44,42 +49,42 @@ ThemeData _buildTheme() {
   return ThemeData(
     useMaterial3: true,
     fontFamily: 'Inter',
-    scaffoldBackgroundColor: kBg,
+    scaffoldBackgroundColor: kBackground,
     colorScheme: ColorScheme.fromSeed(
       seedColor: kPrimary,
       primary: kPrimary,
-      secondary: kAccentCyan,
-      onPrimary: Colors.white,
+      secondary: kSecondary,
       surface: kSurface,
+      brightness: Brightness.dark,
+      error: kDanger,
     ),
     appBarTheme: const AppBarTheme(
-      backgroundColor: kBg,
+      backgroundColor: kSurface,
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: true,
-      foregroundColor: kPrimary,
-      titleTextStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: kPrimary, letterSpacing: 0.5),
+      foregroundColor: kTextPrimary,
+      titleTextStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: kTextPrimary),
     ),
     cardTheme: CardThemeData(
-      color: Colors.white,
-      elevation: 0,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: const BorderSide(color: Color(0xFFE7E9F0))),
+      color: kSurface,
+      elevation: 2,
+      margin: const EdgeInsets.all(12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: kBg,
+      fillColor: kSurfaceLight,
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-      hintStyle: const TextStyle(color: kTextMuted),
-      labelStyle: const TextStyle(color: kTextMuted),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+      hintStyle: const TextStyle(color: kTextSecondary),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFFE0E3EC)),
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: kSurfaceDark, width: 1),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: kPrimary, width: 1.6),
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: kPrimary, width: 2),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
@@ -87,35 +92,54 @@ ThemeData _buildTheme() {
         backgroundColor: kPrimary,
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        elevation: 0,
       ),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: Colors.white,
-      indicatorColor: kPrimary.withValues(alpha: 0.08),
+      backgroundColor: kSurface,
+      indicatorColor: kPrimary.withValues(alpha: 0.15),
       surfaceTintColor: Colors.transparent,
-      height: 64,
+      height: 68,
       labelTextStyle: WidgetStatePropertyAll(
-        const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kPrimary),
+        const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
       ),
       iconTheme: WidgetStateProperty.resolveWith((states) {
         final sel = states.contains(WidgetState.selected);
-        return IconThemeData(color: sel ? kPrimary : const Color(0xFFB4B8C7), size: 25);
+        return IconThemeData(color: sel ? kPrimary : kTextSecondary, size: 26);
       }),
     ),
     textTheme: const TextTheme(
-      headlineSmall: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: kPrimary),
-      titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: kPrimary),
-      titleSmall: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kPrimary),
-      bodyMedium: TextStyle(fontSize: 14, color: Color(0xFF3A3F58)),
-      bodySmall: TextStyle(fontSize: 12, color: Color(0xFF9AA0B4)),
+      headlineLarge: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: kTextPrimary, letterSpacing: -0.5),
+      headlineMedium: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: kTextPrimary, letterSpacing: -0.3),
+      headlineSmall: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: kTextPrimary),
+      titleLarge: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: kTextPrimary),
+      titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: kTextPrimary),
+      titleSmall: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: kTextPrimary),
+      bodyLarge: TextStyle(fontSize: 16, color: kTextSecondary),
+      bodyMedium: TextStyle(fontSize: 14, color: kTextSecondary),
+      bodySmall: TextStyle(fontSize: 12, color: kTextSecondary),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: kPrimary,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        elevation: 0,
+      ),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: kSurfaceDark,
+      contentTextStyle: const TextStyle(color: kTextPrimary),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
   );
 }
 
-/// Auto-login splash: bound session exists -> calibrate network clock (Cristian)
-/// and jump to the Home shell; otherwise sign-in.
 class BootGate extends StatefulWidget {
   const BootGate({super.key});
 
@@ -153,17 +177,27 @@ class _BootGateState extends State<BootGate> {
   @override
   Widget build(BuildContext context) {
     if (_checking) {
-      return const Scaffold(
-        backgroundColor: kBg,
+      return Scaffold(
+        backgroundColor: kBackground,
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.shield_outlined, size: 72, color: kPrimary),
-              SizedBox(height: 16),
-              Text('Attendance Gateway', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: kPrimary, letterSpacing: 0.5)),
-              SizedBox(height: 24),
-              SizedBox(width: 28, height: 28, child: CircularProgressIndicator(strokeWidth: 3, color: kPrimary)),
+              Container(
+                width: 96, height: 96,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(colors: [kPrimary, kSecondary]),
+                  boxShadow: [BoxShadow(color: kPrimary.withValues(alpha: 0.4), blurRadius: 30)],
+                ),
+                child: const Icon(Icons.shield, size: 52, color: Colors.white),
+              ),
+              const SizedBox(height: 24),
+              const Text('Attendance Gateway', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: kTextPrimary, letterSpacing: 0.5)),
+              const SizedBox(height: 16),
+              const Text('Verifying...', style: TextStyle(fontSize: 14, color: kTextSecondary)),
+              const SizedBox(height: 32),
+              SizedBox(width: 32, height: 32, child: CircularProgressIndicator(strokeWidth: 3, color: kPrimary)),
             ],
           ),
         ),
