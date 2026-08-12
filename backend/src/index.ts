@@ -60,6 +60,19 @@ app.get('/health', async (_req, res) => {
 import fs from 'fs';
 import path from 'path';
 
+// Self-host Swagger UI assets (CSP 'self' friendly — no CDN dependency).
+app.use('/swagger-ui', express.static(path.join(process.cwd(), 'node_modules', 'swagger-ui-dist')));
+
+// helmet's default CSP (script-src 'self') would block the docs page's inline
+// bootstrap. Relax it for /docs only — all its assets are same-origin now.
+app.use('/docs', (_req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'",
+  );
+  next();
+});
+
 const SWAGGER_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -67,12 +80,11 @@ const SWAGGER_HTML = `<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>Attendance Gateway API</title>
-<link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
-<style>html{box-sizing:border-box;overflow:auto}*,*:before,*:after{box-sizing:inherit}body{margin:0;background:#fafafa}</style>
+<link rel="stylesheet" href="/swagger-ui/swagger-ui.css">
 </head>
 <body>
 <div id="swagger-ui"></div>
-<script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+<script src="/swagger-ui/swagger-ui-bundle.js"></script>
 <script>
 window.onload = function () {
   window.ui = SwaggerUIBundle({
