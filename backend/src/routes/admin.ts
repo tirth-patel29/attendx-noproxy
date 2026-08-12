@@ -25,6 +25,7 @@ import { z } from 'zod';
 import { query } from '../utils/db';
 import { config } from '../config';
 import { generateHmacKey } from '../utils/crypto';
+import { generateApiKey } from '../utils/apiKey';
 
 const JWT_SECRET = config.jwtSecret || 'dev-secret-change-in-production-min-32-chars-long';
 
@@ -723,6 +724,63 @@ adminRouter.delete('/assignments/:id', async (req: Request, res: Response, next:
     if (r.rows.length === 0) return res.status(404).json({ error: 'Assignment not found' });
     await audit((req as any).admin.sub, 'ASSIGNMENT_DELETE', { assignment_id: req.params.id });
     res.json({ message: 'Assignment deleted' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// API Keys console — mint shared client keys (transport gate for the APK)
+//   GET  /api/v1/admin/api-keys            -> list (never the raw key)
+//   POST /api/v1/admin/api-keys            -> mint {label} (raw shown once)
+//   POST /api/v1/admin/api-keys/:uuid/revoke
+// ---------------------------------------------------------------------------
+adminRouter.get('/api-keys', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const r = await query(
+      `SELECT key_uuid, label, prefix, status, created_at, last_used_at
+       FROM api_keys ORDER BY created_at DESC`
+    );
+    res.json({ keys: r.rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.post('/api-keys', async (req: Request, res: Response, next: NextFunction) => {
+  const parsed = z.object({ label: z.string().min(1).max(64) }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message || 'Invalid label' });
+  try {
+    const { raw, hash, prefix } = generateApiKey();
+    const actor = (req as any).admin?.sub || 'admin';
+    const ins = await query(
+      `INSERT INTO api_keys (key_hash, prefix, label, created_by) VALUES ($1,$2,$3,$4)
+       RETURNING key_uuid, created_at`,
+      [hash, prefix, parsed.data.label, actor]
+    );
+    await audit(actor, 'API_KEY_CREATE', { label: parsed.data.label, key_uuid: ins.rows[0].key_uuid, prefix });
+    res.status(201).json({
+      key_uuid: ins.rows[0].key_uuid,
+      label: parsed.data.label,
+      prefix,
+      api_key: raw,                                    // shown exactly once
+      created_at: ins.rows[0].created_at,
+      note: 'Store this key now — it cannot be retrieved again.',
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.post('/api-keys/:uuid/revoke', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const r = await query(
+      `UPDATE api_keys SET status = 'revoked' WHERE key_uuid = $1 RETURNING key_uuid`,
+      [req.params.uuid]
+    );
+    if (r.rows.length === 0) return res.status(404).json({ error: 'Key not found' });
+    await audit((req as any).admin?.sub || 'admin', 'API_KEY_REVOKE', { key_uuid: req.params.uuid });
+    res.json({ ok: true });
   } catch (err) {
     next(err);
   }

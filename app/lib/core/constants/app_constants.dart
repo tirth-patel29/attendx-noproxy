@@ -27,6 +27,11 @@ class AppConstants {
   static const String studentAttendanceEndpoint = '/api/v1/student/attendance';
   static const String studentEmailDomain = String.fromEnvironment('STUDENT_EMAIL_DOMAIN', defaultValue: 'charusat.edu.in');
 
+  // Shared client API key (transport gate). Bake in per build:
+  //   flutter build apk --dart-define=API_KEY=ag_xxxxxxxx...
+  // Sent as the `X-Api-Key` header on every request.
+  static const String clientApiKey = String.fromEnvironment('API_KEY', defaultValue: '');
+
   // Metronome (SRS §1 Phase 2: 4-character base62 token every 3s)
   static const int metronomeIntervalMs = 3000;
   static const int tokenLength = 4;

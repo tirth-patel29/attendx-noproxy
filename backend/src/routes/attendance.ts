@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { judgeService } from '../services/judge';
 import { metronomeService } from '../services/metronome';
 import { query } from '../utils/db';
+import { requireApiKey } from '../utils/apiKey';
 import { config } from '../config';
 import { z } from 'zod';
 
@@ -421,7 +422,7 @@ router.get('/students/:studentUuid/attendance', async (req: Request, res: Respon
  * POST /api/v1/claim-attendance
  * Main 4-gate attendance claim endpoint
  */
-router.post('/claim-attendance', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/claim-attendance', requireApiKey, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parseResult = claimAttendanceSchema.safeParse(req.body);
     if (!parseResult.success) {
@@ -457,7 +458,7 @@ router.post('/claim-attendance', async (req: Request, res: Response, next: NextF
  * the hardware tattoo (Gate 1). 401 wrong secret / student not found,
  * 409 device already bound to a different student (admin must reset-device).
  */
-router.post('/provision', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/provision', requireApiKey, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parseResult = provisionSchema.safeParse(req.body);
     if (!parseResult.success) {
@@ -515,7 +516,7 @@ router.post('/provision', async (req: Request, res: Response, next: NextFunction
  * POST /api/v1/devices/register
  * Register a device to a student (Gate 1 binding)
  */
-router.post('/devices/register', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/devices/register', requireApiKey, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parseResult = deviceRegisterSchema.safeParse(req.body);
     if (!parseResult.success) {

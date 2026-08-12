@@ -23,9 +23,11 @@ echo "▶ flutter pub get"
 flutter pub get
 
 API_BASE_URL="${API_BASE_URL:-https://api.atmyhome.tech}"
+API_KEY="${API_KEY:-}"
+if [ -n "$API_KEY" ]; then API_KEY_DEFINE="--dart-define=API_KEY=$API_KEY"; else API_KEY_DEFINE=""; fi
 
-echo "▶ flutter build apk --release (API=$API_BASE_URL)"
-flutter build apk --release --dart-define=API_BASE_URL="$API_BASE_URL"
+echo "▶ flutter build apk --release (API=$API_BASE_URL, key=${API_KEY:+(embedded)})"
+flutter build apk --release --dart-define=API_BASE_URL="$API_BASE_URL" $API_KEY_DEFINE
 
 APK="build/app/outputs/flutter-apk/app-release.apk"
 [ -f "$APK" ] || { echo "❌ artifact missing: $APK"; exit 1; }

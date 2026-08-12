@@ -3,16 +3,22 @@
 
 Usage: python3 scripts/live_flow_test.py "<admin-password>" [base-url]
 """
-import json, urllib.request, urllib.error, time, hmac, hashlib, sys, uuid
+import json, urllib.request, urllib.error, time, hmac, hashlib, sys, uuid, os
 
 BASE = sys.argv[2] if len(sys.argv) > 2 else "https://api.atmyhome.tech"
 P = sys.argv[1] if len(sys.argv) > 1 else "Admin@123"
+# Shared client API key (transport gate). Pass via API_KEY env; the client APK
+# embeds this key at build time (--dart-define=API_KEY=...).
+API_KEY = os.environ.get("API_KEY", "")
 
 def call(method, path, body=None, headers=None):
+    hdrs = dict(headers or {})
+    if API_KEY:
+        hdrs.setdefault("X-Api-Key", API_KEY)
     req = urllib.request.Request(BASE + path, method=method)
     req.add_header("Content-Type", "application/json")
     req.add_header("User-Agent", "Mozilla/5.0 (attendance-flow-test)")
-    for k, v in (headers or {}).items():
+    for k, v in hdrs.items():
         req.add_header(k, v)
     data = json.dumps(body).encode() if body is not None else None
     try:

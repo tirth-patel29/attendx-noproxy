@@ -20,6 +20,7 @@ class ApiService {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        if (AppConstants.clientApiKey.isNotEmpty) 'X-Api-Key': AppConstants.clientApiKey,
       },
     ));
     return _dio!;

@@ -8,6 +8,7 @@ import { config } from './config';
 import { pool, checkDbHealth } from './utils/db';
 import { metronomeService } from './services/metronome';
 import { ensureDefaultAdmin } from './services/bootstrap';
+import { requireApiKey } from './utils/apiKey';
 import attendanceRoutes from './routes/attendance';
 import authRoutes from './routes/auth';
 import studentRoutes from './routes/student';
@@ -54,7 +55,9 @@ app.get('/health', async (_req, res) => {
 // API routes
 app.use('/api/v1', attendanceRoutes);
 app.use('/api/v1/auth', authRoutes);
-app.use('/api/v1/student', studentRoutes);
+// Student client (the APK) is gated by a shared client API key
+// (X-Api-Key header). Per-user auth inside /student still applies on top.
+app.use('/api/v1/student', requireApiKey, studentRoutes);
 
 // Admin console
 //   POST /api/v1/admin/login   -> public (admin auth)
