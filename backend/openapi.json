@@ -3,7 +3,13 @@
   "info": {
     "title": "Attendance Gateway API",
     "version": "1.4.0",
-    "description": "Zero-Trust Cryptographic Attendance Gateway.\n\n**Authentication**\n- Most client endpoints accept a shared client API key: header `X-Api-Key: ag_...` (mint one from the Admin console → API Keys).\n- Role-protected endpoints (professor/admin) use a JWT: `Authorization: Bearer <token>` from `/api/v1/admin/login` or `/api/v1/auth/login`.\n\nThe global security shows `ApiKey OR bearer`; operations that are truly public (health, admin login) override it with `[]`."
+    "description": "Zero-Trust Cryptographic Attendance Gateway.\n\n**Authentication**\n- Most client endpoints accept a shared client API key: header `X-Api-Key: ag_...` (mint one from the Admin console → API Keys).\n- Role-protected endpoints (professor/admin) use a JWT: `Authorization: Bearer <token>` from `/api/v1/admin/login` or `/api/v1/auth/login`.\n\nThe global security shows `ApiKey OR bearer`; operations that are truly public (health, admin login) override it with `[]`.
+
+**Building a client?** Read the authoritative integration contract first — the QR / 3-second metronome protocol, biometric (Gate 2) ordering, timestamp sealing, and the 250 ms window:
+
+**Client Integration Guide:** https://git.atmyhome.tech/het/attendance-gateway/src/branch/main/docs/CLIENT_INTEGRATION_GUIDE.md
+
+**To get an API key:** sign in to the Admin console (https://admin.atmyhome.tech) → **API Keys** → Generate Key."
   },
   "servers": [{ "url": "https://api.atmyhome.tech" }],
   "tags": [
