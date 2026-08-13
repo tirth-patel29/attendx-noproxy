@@ -26,6 +26,7 @@ import { query } from '../utils/db';
 import { config } from '../config';
 import { generateHmacKey } from '../utils/crypto';
 import { generateApiKey } from '../utils/apiKey';
+import { sendError } from '../utils/apiError';
 
 const JWT_SECRET = config.jwtSecret || 'dev-secret-change-in-production-min-32-chars-long';
 
@@ -35,7 +36,7 @@ const JWT_SECRET = config.jwtSecret || 'dev-secret-change-in-production-min-32-c
 export function requireAdmin(req: Request, res: Response, next: NextFunction) {
   const auth = req.headers.authorization;
   if (!auth?.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'No token provided' });
+    return sendError(res, 401, 'ERR_AUTH_MISSING', 'Missing or invalid JWT/API Key.');
   }
   try {
     const decoded = jwt.verify(auth.slice(7), JWT_SECRET) as {
@@ -45,12 +46,12 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
       role: string;
     };
     if (decoded.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
+      return sendError(res, 403, 'ERR_FORBIDDEN', 'Admin access required.');
     }
     (req as any).admin = decoded;
     next();
   } catch (err) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    return sendError(res, 401, 'ERR_AUTH_MISSING', 'Invalid or expired token.');
   }
 }
 

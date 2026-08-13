@@ -3,90 +3,1054 @@
   "info": {
     "title": "Attendance Gateway API",
     "version": "1.4.0",
-    "description": "Zero-Trust Cryptographic Attendance Gateway.\n\n**Authentication**\n- Most client endpoints accept a shared client API key: header `X-Api-Key: ag_...` (mint one from the Admin console → API Keys).\n- Role-protected endpoints (professor/admin) use a JWT: `Authorization: Bearer <token>` from `/api/v1/admin/login` or `/api/v1/auth/login`.\n\nThe global security shows `ApiKey OR bearer`; operations that are truly public (health, admin login) override it with `[]`.
-
-**Building a client?** Read the authoritative integration contract first — the QR / 3-second metronome protocol, biometric (Gate 2) ordering, timestamp sealing, and the 250 ms window:
-
-**Client Integration Guide:** https://git.atmyhome.tech/het/attendance-gateway/src/branch/main/docs/CLIENT_INTEGRATION_GUIDE.md
-
-**To get an API key:** sign in to the Admin console (https://admin.atmyhome.tech) → **API Keys** → Generate Key."
+    "description": "Zero-Trust Cryptographic Attendance Gateway.\n\n**Authentication**\n- Most client endpoints accept a shared client API key: header `X-Api-Key: ag_...` (mint from the Admin console → API Keys).\n- Role-protected endpoints (professor/admin) use a JWT: `Authorization: Bearer <token>` from `/api/v1/admin/login` or `/api/v1/auth/login`.\n- Global security: `ApiKey OR bearer`; public operations (health, admin login) override with `[]`.\n\n**Building a client?** See the **Client Integration Guide** (QR / 3-second metronome protocol, biometric Gate 2 ordering, timestamp sealing, 250ms window): https://git.atmyhome.tech/het/attendance-gateway/src/branch/main/docs/CLIENT_INTEGRATION_GUIDE.md\n\n**Error payloads:** every 4xx/5xx returns the envelope `{success:false,error:{code,message,latency_ms?,details?}}`. Full code table + client UI actions: **Error Dictionary** — https://git.atmyhome.tech/het/attendance-gateway/src/branch/main/docs/ERROR_DICTIONARY.md (schema: `ErrorEnvelope`).\n\n**To get an API key:** sign in to the Admin console (https://admin.atmyhome.tech) → **API Keys** → Generate Key."
   },
-  "servers": [{ "url": "https://api.atmyhome.tech" }],
-  "tags": [
-    { "name": "Health" },
-    { "name": "Student" },
-    { "name": "Attendance / Claim" },
-    { "name": "Sessions / Professor" },
-    { "name": "Auth" },
-    { "name": "Admin" },
-    { "name": "Docs" }
+  "servers": [
+    {
+      "url": "https://api.atmyhome.tech"
+    }
   ],
-  "security": [{ "ApiKey": [] }, { "bearerAuth": [] }],
+  "tags": [
+    {
+      "name": "Health"
+    },
+    {
+      "name": "Student"
+    },
+    {
+      "name": "Attendance / Claim"
+    },
+    {
+      "name": "Sessions / Professor"
+    },
+    {
+      "name": "Auth"
+    },
+    {
+      "name": "Admin"
+    },
+    {
+      "name": "Docs"
+    }
+  ],
+  "security": [
+    {
+      "ApiKey": []
+    },
+    {
+      "bearerAuth": []
+    }
+  ],
   "components": {
     "securitySchemes": {
-      "ApiKey": { "type": "apiKey", "in": "header", "name": "X-Api-Key", "description": "Shared client API key (mint from the Admin console)." },
-      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+      "ApiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Api-Key",
+        "description": "Shared client API key (mint from the Admin console)."
+      },
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
     },
     "responses": {
-      "401": { "description": "Unauthorized / invalid API key or token" },
-      "403": { "description": "Forbidden (wrong role)" },
-      "404": { "description": "Not found" }
+      "401": {
+        "description": "Unauthorized / invalid API key or token",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            },
+            "example": {
+              "success": false,
+              "error": {
+                "code": "ERR_AUTH_MISSING",
+                "message": "Missing or invalid JWT/API Key."
+              }
+            }
+          }
+        }
+      },
+      "403": {
+        "description": "Forbidden (wrong role)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            },
+            "example": {
+              "success": false,
+              "error": {
+                "code": "ERR_FORBIDDEN",
+                "message": "Access required."
+              }
+            }
+          }
+        }
+      },
+      "404": {
+        "description": "Not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            },
+            "example": {
+              "success": false,
+              "error": {
+                "code": "ERR_NOT_FOUND",
+                "message": "Requested resource or session does not exist."
+              }
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "ErrorEnvelope": {
+        "type": "object",
+        "required": [
+          "success",
+          "error"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": false
+          },
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "ERR_HW_MISMATCH",
+                  "ERR_SIG_INVALID",
+                  "ERR_STREAM_DETECTED",
+                  "ERR_TOKEN_EXPIRED",
+                  "ERR_NONCE_USED",
+                  "ERR_NONCE_INVALID",
+                  "ERR_AUTH_MISSING",
+                  "ERR_FORBIDDEN",
+                  "ERR_NOT_FOUND",
+                  "ERR_RATE_LIMIT",
+                  "ERR_BAD_REQUEST",
+                  "ERR_CONFLICT",
+                  "ERR_INTERNAL",
+                  "ERR_UNAVAILABLE",
+                  "ERR_UNKNOWN"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "latency_ms": {
+                "type": "number",
+                "description": "Present only for ERR_STREAM_DETECTED."
+              },
+              "details": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "example": {
+          "success": false,
+          "error": {
+            "code": "ERR_STREAM_DETECTED",
+            "message": "Stream artifact detected",
+            "latency_ms": 310
+          }
+        }
+      }
     }
   },
   "paths": {
     "/health": {
-      "get": { "tags": ["Health"], "security": [], "summary": "Liveness + DB health", "responses": { "200": { "description": "Healthy", "content": { "application/json": { "example": { "status": "healthy", "db": "connected" } } } } } }
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "security": [],
+        "summary": "Liveness + DB health",
+        "responses": {
+          "200": {
+            "description": "Healthy",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "healthy",
+                  "db": "connected"
+                }
+              }
+            }
+          }
+        }
+      }
     },
-    "/docs": { "get": { "tags": ["Docs"], "security": [], "summary": "Swagger UI (Basic-auth with admin credentials)" } },
-
+    "/docs": {
+      "get": {
+        "tags": [
+          "Docs"
+        ],
+        "security": [],
+        "summary": "Swagger UI (Basic-auth with admin credentials)"
+      }
+    },
     "/api/v1/time-sync": {
-      "get": { "tags": ["Attendance / Claim"], "summary": "Server epoch time for Cristian's Algorithm (network-time calibration)", "responses": { "200": { "description": "epoch ms", "content": { "application/json": { "example": { "server_time_ms": 1720000000000 } } } } } }
+      "get": {
+        "tags": [
+          "Attendance / Claim"
+        ],
+        "summary": "Server epoch time for Cristian's Algorithm (network-time calibration)",
+        "responses": {
+          "200": {
+            "description": "epoch ms",
+            "content": {
+              "application/json": {
+                "example": {
+                  "server_time_ms": 1720000000000
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "/api/v1/claim-attendance": {
-      "post": { "tags": ["Attendance / Claim"], "summary": "Submit an attendance claim (Gate 1-4 pipeline; HMAC-signed, ≤250ms TTL enforced)", "requestBody": { "required": true, "content": { "application/json": { "example": { "session_uuid": "uuid", "student_uuid": "uuid", "token_val": "Ab3d", "client_claimed_time": 1720000000123, "device_id_hash": "sha256-hex", "nonce": "hex", "signature": "hmac-hex" } } } }, "responses": { "200": { "description": "PRESENT", "content": { "application/json": { "example": { "status": "PRESENT", "verification_delta_ms": 87, "ledger_uuid": "uuid" } } } }, "403": { "$ref": "#/components/responses/403" } } }
+      "post": {
+        "tags": [
+          "Attendance / Claim"
+        ],
+        "summary": "Submit an attendance claim (Gate 1-4 pipeline; HMAC-signed, ≤250ms TTL enforced)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": {
+                "session_uuid": "uuid",
+                "student_uuid": "uuid",
+                "token_val": "Ab3d",
+                "client_claimed_time": 1720000000123,
+                "device_id_hash": "sha256-hex",
+                "nonce": "hex",
+                "signature": "hmac-hex"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "PRESENT",
+            "content": {
+              "application/json": {
+                "example": {
+                  "status": "PRESENT",
+                  "verification_delta_ms": 87,
+                  "ledger_uuid": "uuid"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Hardware mismatch (Gate 1)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "ERR_HW_MISMATCH",
+                    "message": "Unregistered hardware. Your account is bound to a different physical device."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Forged/corrupted HMAC signature (Gate 4)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "ERR_SIG_INVALID",
+                    "message": "Cryptographic rejection. The HMAC signature was forged or corrupted."
+                  }
+                }
+              }
+            }
+          },
+          "406": {
+            "description": "Visual token expired/invalid (Gate 3)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "ERR_TOKEN_EXPIRED",
+                    "message": "The scanned visual token is expired or invalid."
+                  }
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Proxy stream detected / time drift (Gate 4)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "ERR_STREAM_DETECTED",
+                    "message": "Proxy Stream Detected. Photonic intercept lag exceeded the 250ms threshold.",
+                    "latency_ms": 310
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Anti-replay: nonce consumed (Gate 4)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "ERR_NONCE_USED",
+                    "message": "Anti-replay protection triggered. Nonce already consumed."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "/api/v1/provision": {
-      "post": { "tags": ["Attendance / Claim"], "summary": "[legacy] Provision a student", "responses": { "200": { "description": "ok" } } }
+      "post": {
+        "tags": [
+          "Attendance / Claim"
+        ],
+        "summary": "[legacy] Provision a student",
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
+      }
     },
     "/api/v1/devices/register": {
-      "post": { "tags": ["Attendance / Claim"], "summary": "Register/bind a hardware device identity", "responses": { "200": { "description": "device registered" } } }
+      "post": {
+        "tags": [
+          "Attendance / Claim"
+        ],
+        "summary": "Register/bind a hardware device identity",
+        "responses": {
+          "200": {
+            "description": "device registered"
+          }
+        }
+      }
     },
-
-    "/api/v1/student/status": { "post": { "tags": ["Student"], "summary": "Check registration / provisioning state for a roll ID", "responses": { "200": { "description": "state" } } } },
-    "/api/v1/student/register": { "post": { "tags": ["Student"], "summary": "Self-register a student with college identity", "responses": { "201": { "description": "created" } } } },
-    "/api/v1/student/password/set": { "post": { "tags": ["Student"], "summary": "Set password (after admin forgot-password clear)", "responses": { "200": { "description": "ok" } } } },
-    "/api/v1/student/login": { "post": { "tags": ["Student"], "summary": "Student login → student JWT", "responses": { "200": { "description": "access_token" } } } },
-    "/api/v1/student/device/bind": { "post": { "tags": ["Student"], "summary": "Bind this hardware device to the student (HMAC minted)", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "bound" } } } },
-    "/api/v1/student/attendance": { "get": { "tags": ["Student"], "summary": "Student attendance history + analytics", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "records + summary" } } } },
-
-    "/api/v1/auth/login": { "post": { "tags": ["Auth"], "summary": "Professor login → professor JWT", "responses": { "200": { "description": "access_token" } } } },
-    "/api/v1/auth/refresh": { "post": { "tags": ["Auth"], "summary": "Refresh JWT", "responses": { "200": { "description": "new token" } } } },
-    "/api/v1/auth/me": { "get": { "tags": ["Auth"], "summary": "Current professor profile", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "profile" } } } },
-    "/api/v1/auth/logout": { "post": { "tags": ["Auth"], "summary": "Logout", "responses": { "200": { "description": "ok" } } } },
-
-    "/api/v1/sessions": { "get": { "tags": ["Sessions / Professor"], "summary": "List sessions for professor (JWT-locked)", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "sessions" } } } },
-    "/api/v1/sessions/start": { "post": { "tags": ["Sessions / Professor"], "summary": "Start a session (mints live 4-char token metronome)", "security": [{ "bearerAuth": [] }], "requestBody": { "required": true, "content": { "application/json": { "example": { "course_code": "CS101" } } } }, "responses": { "201": { "description": "session started" } } } },
-    "/api/v1/sessions/{sessionUuid}": { "get": { "tags": ["Sessions / Professor"], "summary": "Session detail", "security": [{ "bearerAuth": [] }], "parameters": [ { "name": "sessionUuid", "in": "path", "required": true, "schema": { "type": "string" } } ], "responses": { "200": { "description": "session" } } } },
-    "/api/v1/sessions/{sessionUuid}/stop": { "post": { "tags": ["Sessions / Professor"], "summary": "Stop a session", "security": [{ "bearerAuth": [] }], "parameters": [ { "name": "sessionUuid", "in": "path", "required": true, "schema": { "type": "string" } } ], "responses": { "200": { "description": "stopped" } } } },
-    "/api/v1/sessions/{sessionUuid}/tokens": { "get": { "tags": ["Sessions / Professor"], "summary": "Current token + schedule (APK fallback poll)", "parameters": [ { "name": "sessionUuid", "in": "path", "required": true, "schema": { "type": "string" } } ], "responses": { "200": { "description": "token" } } } },
-    "/api/v1/sessions/{sessionUuid}/challenge": { "get": { "tags": ["Attendance / Claim"], "summary": "Issues a server nonce for the claim (anti-replay)", "parameters": [ { "name": "sessionUuid", "in": "path", "required": true, "schema": { "type": "string" } } ], "responses": { "200": { "description": "nonce" } } } },
-    "/api/v1/sessions/{sessionUuid}/attendance": { "get": { "tags": ["Sessions / Professor"], "summary": "Roster attendance for a session", "security": [{ "bearerAuth": [] }], "parameters": [ { "name": "sessionUuid", "in": "path", "required": true, "schema": { "type": "string" } } ], "responses": { "200": { "description": "roster" } } } },
-    "/api/v1/professor/timetable": { "get": { "tags": ["Sessions / Professor"], "summary": "Today's timetable for logged-in professor", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "timetable" } } } },
-    "/api/v1/professor/summary": { "get": { "tags": ["Sessions / Professor"], "summary": "Attendance summary for logged-in professor", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "summary" } } } },
-    "/api/v1/students/{studentUuid}/attendance": { "get": { "tags": ["Sessions / Professor"], "summary": "A student's attendance ledger", "parameters": [ { "name": "studentUuid", "in": "path", "required": true, "schema": { "type": "string" } } ], "responses": { "200": { "description": "ledger" } } } },
-
-    "/api/v1/admin/login": { "post": { "tags": ["Admin"], "security": [], "summary": "Admin login → admin JWT (public)", "requestBody": { "required": true, "content": { "application/json": { "example": { "email": "admin@...", "password": "..." } } } }, "responses": { "200": { "description": "access_token + refresh_token" } } } },
-    "/api/v1/admin/login/refresh": { "post": { "tags": ["Admin"], "security": [], "summary": "Refresh admin JWT", "responses": { "200": { "description": "new token" } } } },
-    "/api/v1/admin/stats": { "get": { "tags": ["Admin"], "security": [{ "bearerAuth": [] }], "summary": "Dashboard stats", "responses": { "200": { "description": "stats" } } } },
-    "/api/v1/admin/teachers": { "get": { "tags": ["Admin"], "security": [{ "bearerAuth": [] }], "summary": "List teachers", "responses": { "200": { "description": "teachers" } } }, "post": { "tags": ["Admin"], "security": [{ "bearerAuth": [] }], "summary": "Create a teacher", "responses": { "201": { "description": "created" } } } },
-    "/api/v1/admin/students": { "get": { "tags": ["Admin"], "security": [{ "bearerAuth": [] }], "summary": "List students", "responses": { "200": { "description": "students" } } }, "post": { "tags": ["Admin"], "security": [{ "bearerAuth": [] }], "summary": "Create a student", "responses": { "201": { "description": "created" } } } },
-    "/api/v1/admin/divisions": { "get": { "tags": ["Admin"], "security": [{ "bearerAuth": [] }], "summary": "List divisions", "responses": { "200": { "description": "divisions" } } }, "post": { "tags": ["Admin"], "security": [{ "bearerAuth": [] }], "summary": "Create division", "responses": { "201": { "description": "created" } } } },
-    "/api/v1/admin/courses": { "get": { "tags": ["Admin"], "security": [{ "bearerAuth": [] }], "summary": "List courses", "responses": { "200": { "description": "courses" } } }, "post": { "tags": ["Admin"], "security": [{ "bearerAuth": [] }], "summary": "Create course", "responses": { "201": { "description": "created" } } } },
-    "/api/v1/admin/assignments": { "get": { "tags": ["Admin"], "security": [{ "bearerAuth": [] }], "summary": "List timetable assignments", "responses": { "200": { "description": "assignments" } } }, "post": { "tags": ["Admin"], "security": [{ "bearerAuth": [] }], "summary": "Create assignment", "responses": { "201": { "description": "created" } } } },
+    "/api/v1/student/status": {
+      "post": {
+        "tags": [
+          "Student"
+        ],
+        "summary": "Check registration / provisioning state for a roll ID",
+        "responses": {
+          "200": {
+            "description": "state"
+          }
+        }
+      }
+    },
+    "/api/v1/student/register": {
+      "post": {
+        "tags": [
+          "Student"
+        ],
+        "summary": "Self-register a student with college identity",
+        "responses": {
+          "201": {
+            "description": "created"
+          }
+        }
+      }
+    },
+    "/api/v1/student/password/set": {
+      "post": {
+        "tags": [
+          "Student"
+        ],
+        "summary": "Set password (after admin forgot-password clear)",
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
+      }
+    },
+    "/api/v1/student/login": {
+      "post": {
+        "tags": [
+          "Student"
+        ],
+        "summary": "Student login → student JWT",
+        "responses": {
+          "200": {
+            "description": "access_token"
+          }
+        }
+      }
+    },
+    "/api/v1/student/device/bind": {
+      "post": {
+        "tags": [
+          "Student"
+        ],
+        "summary": "Bind this hardware device to the student (HMAC minted)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "bound"
+          }
+        }
+      }
+    },
+    "/api/v1/student/attendance": {
+      "get": {
+        "tags": [
+          "Student"
+        ],
+        "summary": "Student attendance history + analytics",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "records + summary"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Professor login → professor JWT",
+        "responses": {
+          "200": {
+            "description": "access_token"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Refresh JWT",
+        "responses": {
+          "200": {
+            "description": "new token"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Current professor profile",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "profile"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Logout",
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
+      }
+    },
+    "/api/v1/sessions": {
+      "get": {
+        "tags": [
+          "Sessions / Professor"
+        ],
+        "summary": "List sessions for professor (JWT-locked)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "sessions"
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/start": {
+      "post": {
+        "tags": [
+          "Sessions / Professor"
+        ],
+        "summary": "Start a session (mints live 4-char token metronome)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": {
+                "course_code": "CS101"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "session started"
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{sessionUuid}": {
+      "get": {
+        "tags": [
+          "Sessions / Professor"
+        ],
+        "summary": "Session detail",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sessionUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "session"
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{sessionUuid}/stop": {
+      "post": {
+        "tags": [
+          "Sessions / Professor"
+        ],
+        "summary": "Stop a session",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sessionUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "stopped"
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{sessionUuid}/tokens": {
+      "get": {
+        "tags": [
+          "Sessions / Professor"
+        ],
+        "summary": "Current token + schedule (APK fallback poll)",
+        "parameters": [
+          {
+            "name": "sessionUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "token"
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{sessionUuid}/challenge": {
+      "get": {
+        "tags": [
+          "Attendance / Claim"
+        ],
+        "summary": "Issues a server nonce for the claim (anti-replay)",
+        "parameters": [
+          {
+            "name": "sessionUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "nonce"
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{sessionUuid}/attendance": {
+      "get": {
+        "tags": [
+          "Sessions / Professor"
+        ],
+        "summary": "Roster attendance for a session",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sessionUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "roster"
+          }
+        }
+      }
+    },
+    "/api/v1/professor/timetable": {
+      "get": {
+        "tags": [
+          "Sessions / Professor"
+        ],
+        "summary": "Today's timetable for logged-in professor",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "timetable"
+          }
+        }
+      }
+    },
+    "/api/v1/professor/summary": {
+      "get": {
+        "tags": [
+          "Sessions / Professor"
+        ],
+        "summary": "Attendance summary for logged-in professor",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "summary"
+          }
+        }
+      }
+    },
+    "/api/v1/students/{studentUuid}/attendance": {
+      "get": {
+        "tags": [
+          "Sessions / Professor"
+        ],
+        "summary": "A student's attendance ledger",
+        "parameters": [
+          {
+            "name": "studentUuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ledger"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/login": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "security": [],
+        "summary": "Admin login → admin JWT (public)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": {
+                "email": "admin@...",
+                "password": "..."
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "access_token + refresh_token"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/login/refresh": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "security": [],
+        "summary": "Refresh admin JWT",
+        "responses": {
+          "200": {
+            "description": "new token"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/stats": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Dashboard stats",
+        "responses": {
+          "200": {
+            "description": "stats"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/teachers": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List teachers",
+        "responses": {
+          "200": {
+            "description": "teachers"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create a teacher",
+        "responses": {
+          "201": {
+            "description": "created"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/students": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List students",
+        "responses": {
+          "200": {
+            "description": "students"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create a student",
+        "responses": {
+          "201": {
+            "description": "created"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/divisions": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List divisions",
+        "responses": {
+          "200": {
+            "description": "divisions"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create division",
+        "responses": {
+          "201": {
+            "description": "created"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/courses": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List courses",
+        "responses": {
+          "200": {
+            "description": "courses"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create course",
+        "responses": {
+          "201": {
+            "description": "created"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/assignments": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List timetable assignments",
+        "responses": {
+          "200": {
+            "description": "assignments"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create assignment",
+        "responses": {
+          "201": {
+            "description": "created"
+          }
+        }
+      }
+    },
     "/api/v1/admin/api-keys": {
-      "get": { "tags": ["Admin"], "security": [{ "bearerAuth": [] }], "summary": "List API keys (masked — never the raw key)", "responses": { "200": { "description": "keys (prefix + status)" } } },
-      "post": { "tags": ["Admin"], "security": [{ "bearerAuth": [] }], "summary": "Mint a new client API key (raw shown once)", "requestBody": { "required": true, "content": { "application/json": { "example": { "label": "student-apk" } } } }, "responses": { "201": { "description": "api_key (shown once)" } } }
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List API keys (masked — never the raw key)",
+        "responses": {
+          "200": {
+            "description": "keys (prefix + status)"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Mint a new client API key (raw shown once)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": {
+                "label": "student-apk"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "api_key (shown once)"
+          }
+        }
+      }
     },
-    "/api/v1/admin/api-keys/{uuid}/revoke": { "post": { "tags": ["Admin"], "security": [{ "bearerAuth": [] }], "summary": "Revoke an API key", "parameters": [ { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } } ], "responses": { "200": { "description": "revoked" } } } }
+    "/api/v1/admin/api-keys/{uuid}/revoke": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Revoke an API key",
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "revoked"
+          }
+        }
+      }
+    }
   }
 }

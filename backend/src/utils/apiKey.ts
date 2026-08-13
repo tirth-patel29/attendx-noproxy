@@ -14,6 +14,7 @@
 import { createHash, randomBytes } from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { query } from './db';
+import { sendError } from './apiError';
 
 const RAW_PREFIX = 'ag';
 const RAW_BYTES = 24;
@@ -49,10 +50,7 @@ export async function requireApiKey(
     }
 
     if (!raw) {
-      res.status(401).json({
-        error: 'missing_api_key',
-        message: 'An API key is required. Set the X-Api-Key header.',
-      });
+      sendError(res, 401, 'ERR_AUTH_MISSING', 'An API key is required. Set the X-Api-Key header.');
       return;
     }
 
@@ -64,7 +62,7 @@ export async function requireApiKey(
       [hash],
     );
     if (!r.rows.length) {
-      res.status(401).json({ error: 'invalid_api_key' });
+      sendError(res, 401, 'ERR_AUTH_MISSING', 'Invalid API key.');
       return;
     }
 

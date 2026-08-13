@@ -4,6 +4,7 @@ import { judgeService } from '../services/judge';
 import { metronomeService } from '../services/metronome';
 import { query } from '../utils/db';
 import { requireApiKey } from '../utils/apiKey';
+import { sendError } from '../utils/apiError';
 import { config } from '../config';
 import { z } from 'zod';
 
@@ -17,16 +18,16 @@ const router = Router();
  */
 export function requireProfessor(req: Request, res: Response, next: NextFunction) {
   const auth = req.headers.authorization;
-  if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'No token provided' });
+  if (!auth?.startsWith('Bearer ')) return sendError(res, 401, 'ERR_AUTH_MISSING', 'Missing or invalid JWT/API Key.');
   try {
     const decoded = jwt.verify(auth.slice(7), config.jwtSecret || 'dev-secret-change-in-production-min-32-chars-long') as {
       sub: string; email: string; name: string; role: string;
     };
-    if (decoded.role !== 'professor') return res.status(403).json({ error: 'Professor access required' });
+    if (decoded.role !== 'professor') return sendError(res, 403, 'ERR_FORBIDDEN', 'Professor access required.');
     (req as any).professor = decoded;
     next();
   } catch {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    return sendError(res, 401, 'ERR_AUTH_MISSING', 'Invalid or expired token.');
   }
 }
 
@@ -434,17 +435,30 @@ router.post('/claim-attendance', requireApiKey, async (req: Request, res: Respon
     const payload = parseResult.data;
     const result = await judgeService.processClaim(payload);
 
-    const statusMap: Record<string, number> = {
-      // SRS §6 state machine HTTP codes
-      PRESENT: 200,
-      HARDWARE_MISMATCH: 403,
-      STREAM_DETECTED: 412,   // "Stream Artifact Detected (310ms)" / "Visual Token Expired"
-      FORGED_RESPONSE: 401,   // "Security Exception: Forged Signature"
-      EXPIRED_TOKEN: 412,     // "Visual Token Expired"
-      INVALID_CLAIM: 404,
-    };
+    // PRESENT is a success (200) — not an error envelope.
+    if (result.status === 'PRESENT') {
+      res.json(result);
+      return;
+    }
 
-    res.status(statusMap[result.status] || 400).json(result);
+    // Any other outcome is a standardized error envelope carrying the semantic
+    // zero-trust code (see docs/ERROR_DICTIONARY.md).
+    const statusMap: Record<string, number> = {
+      ERR_HW_MISMATCH: 403,        // Gate 1 — unregistered hardware
+      ERR_SIG_INVALID: 401,        // Gate 4 — forged/corrupted HMAC
+      ERR_STREAM_DETECTED: 412,    // Gate 4 — photonic intercept lag > 250ms
+      ERR_TOKEN_EXPIRED: 406,      // Gate 3 — visual token expired/invalid
+      ERR_NONCE_USED: 400,         // Gate 4 — nonce replayed
+      ERR_NONCE_INVALID: 400,      // Gate 4 — nonce invalid/expired
+      ERR_NOT_FOUND: 404,          // Gate 1 — unknown student
+    };
+    const code = result.code ?? 'ERR_UNKNOWN';
+    const status = statusMap[code] ?? 400;
+    if (result.code === 'ERR_STREAM_DETECTED' && result.verification_delta_ms !== undefined) {
+      sendError(res, status, code, result.message, { latencyMs: result.verification_delta_ms });
+    } else {
+      sendError(res, status, code, result.message);
+    }
   } catch (err) {
     next(err);
   }

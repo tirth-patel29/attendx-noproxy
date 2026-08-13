@@ -10,6 +10,8 @@ import { metronomeService } from './services/metronome';
 import { tokenCache } from './services/tokenCache';
 import { ensureDefaultAdmin } from './services/bootstrap';
 import { requireApiKey } from './utils/apiKey';
+import { ApiError, sendError, inferErrorCode, normalizeErrorBody } from './utils/apiError';
+import { rateLimit } from './utils/rateLimit';
 import attendanceRoutes from './routes/attendance';
 import authRoutes from './routes/auth';
 import studentRoutes from './routes/student';
@@ -42,6 +44,24 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '1mb' }));
 app.use(morgan(config.logLevel === 'debug' ? 'dev' : 'combined'));
+
+// ---------------------------------------------------------------------------
+// Standardized error envelope — SAFETY NET.
+// Wraps res.json so that EVERY non-2xx response is normalized into:
+//   { success:false, error:{ code, message, latency_ms?, details? } }
+// Handlers that already send an enveloped body pass through untouched;
+// anything else gets its code inferred from the HTTP status.
+// ---------------------------------------------------------------------------
+app.use((_req, res, next) => {
+  const originalJson = res.json.bind(res);
+  res.json = ((body: unknown) => {
+    if (res.statusCode >= 400) {
+      return originalJson(normalizeErrorBody(body, res.statusCode));
+    }
+    return originalJson(body);
+  }) as typeof res.json;
+  next();
+});
 
 // Health check (no auth)
 app.get('/health', async (_req, res) => {
@@ -115,6 +135,7 @@ app.get('/docs', (_req, res) => {
 });
 
 // API routes
+app.use('/api/v1', rateLimit()); // broad abuse guard -> 429 ERR_RATE_LIMIT
 app.use('/api/v1', attendanceRoutes);
 app.use('/api/v1/auth', authRoutes);
 // Student client (the APK) is gated by a shared client API key
@@ -154,18 +175,32 @@ io.on('connection', (socket: Socket) => {
   });
 });
 
-// Error handling middleware
+// Error handling middleware — always returns the standardized envelope.
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('Unhandled error:', err);
-  res.status(500).json({
-    error: 'Internal server error',
-    message: config.nodeEnv === 'development' ? err.message : undefined,
+
+  // Explicit thrown ApiError carries status + semantic code.
+  if (err instanceof ApiError) {
+    sendError(res, err.status, err.code, err.message, {
+      details: err.details,
+      latencyMs: err.latencyMs,
+    });
+    return;
+  }
+
+  const anyErr = err as any;
+  const status = typeof anyErr?.statusCode === 'number' ? anyErr.statusCode : 500;
+  const safe = status >= 400 && status < 600 ? status : 500;
+  sendError(res, safe, inferErrorCode(safe), 'Internal server error', {
+    ...(config.nodeEnv === 'development' && err.message
+      ? { details: { dev_message: err.message } }
+      : {}),
   });
 });
 
-// 404 handler
+// 404 handler — standardized envelope
 app.use((_req, res) => {
-  res.status(404).json({ error: 'Not found' });
+  sendError(res, 404, 'ERR_NOT_FOUND', 'Requested resource or session does not exist.');
 });
 
 // Graceful shutdown

@@ -15,6 +15,8 @@ export interface AttendanceClaimPayload {
 
 export interface AttendanceResult {
   status: 'PRESENT' | 'HARDWARE_MISMATCH' | 'STREAM_DETECTED' | 'FORGED_RESPONSE' | 'EXPIRED_TOKEN' | 'INVALID_CLAIM';
+  /** Standardized zero-trust error code (see docs/ERROR_DICTIONARY.md). */
+  code?: string;
   message: string;
   verification_delta_ms?: number;
   ledger_uuid?: string;
@@ -60,7 +62,7 @@ export class JudgeService {
     );
 
     if (studentRes.rows.length === 0) {
-      return { status: 'INVALID_CLAIM', message: 'Student not found' };
+      return { status: 'INVALID_CLAIM', code: 'ERR_NOT_FOUND', message: 'Student not found' };
     }
 
     const student = studentRes.rows[0];
@@ -73,7 +75,7 @@ export class JudgeService {
         expected: student.bound_device_id,
         received: payload.device_id_hash,
       });
-      return { status: 'HARDWARE_MISMATCH', message: 'Device not registered to this student' };
+      return { status: 'HARDWARE_MISMATCH', code: 'ERR_HW_MISMATCH', message: 'Device not registered to this student' };
     }
 
     // ===== GATE 4: HMAC wax seal (verified before touching token state) =====
@@ -92,7 +94,7 @@ export class JudgeService {
         result: 'FORGED_RESPONSE',
         reason: 'hmac_invalid',
       });
-      return { status: 'FORGED_RESPONSE', message: 'Invalid cryptographic signature' };
+      return { status: 'FORGED_RESPONSE', code: 'ERR_SIG_INVALID', message: 'Invalid cryptographic signature' };
     }
 
     // ===== GATE 3: Visual Micro-Twitch (3s rotating token) =====
@@ -112,7 +114,7 @@ export class JudgeService {
           result: 'EXPIRED_TOKEN',
           token: payload.token_val,
         });
-        return { status: 'EXPIRED_TOKEN', message: 'Token expired, re-scan the projector' };
+        return { status: 'EXPIRED_TOKEN', code: 'ERR_TOKEN_EXPIRED', message: 'Token expired, re-scan the projector' };
       }
       // Exists but expired
       await this.logAudit('CLAIM_ATTEMPT', payload.student_uuid, payload.session_uuid, {
@@ -121,7 +123,7 @@ export class JudgeService {
         reason: 'expired',
         token: payload.token_val,
       });
-      return { status: 'EXPIRED_TOKEN', message: 'Token expired, re-scan the projector' };
+      return { status: 'EXPIRED_TOKEN', code: 'ERR_TOKEN_EXPIRED', message: 'Token expired, re-scan the projector' };
     }
 
     // ===== GATE 4: The 250ms Stream Kill-Window (SRS §3 Proof 2) =====
@@ -138,6 +140,7 @@ export class JudgeService {
       });
       return {
         status: 'STREAM_DETECTED',
+        code: 'ERR_STREAM_DETECTED',
         message: `Stream artifact detected (${verificationDeltaMs}ms > ${config.judge.maxLatencyMs}ms window)`,
         verification_delta_ms: verificationDeltaMs,
       };
@@ -169,6 +172,7 @@ export class JudgeService {
       });
       return {
         status: 'FORGED_RESPONSE',
+        code: reused ? 'ERR_NONCE_USED' : 'ERR_NONCE_INVALID',
         message: reused ? 'Challenge nonce already used (replay)' : 'Invalid or expired challenge nonce',
       };
     }

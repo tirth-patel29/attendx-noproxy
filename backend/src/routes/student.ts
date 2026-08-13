@@ -26,6 +26,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { query } from '../utils/db';
+import { sendError } from '../utils/apiError';
 import { config } from '../config';
 import { generateHmacKey } from '../utils/crypto';
 
@@ -54,16 +55,16 @@ function signStudent(student: { student_uuid: string; roll_no: string; email: st
 
 export function requireStudent(req: Request, res: Response, next: NextFunction) {
   const auth = req.headers.authorization;
-  if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'No token provided' });
+  if (!auth?.startsWith('Bearer ')) return sendError(res, 401, 'ERR_AUTH_MISSING', 'Missing or invalid JWT/API Key.');
   try {
     const decoded = jwt.verify(auth.slice(7), JWT_SECRET) as {
       sub: string; roll_no: string; email: string; name: string; role: string;
     };
-    if (decoded.role !== 'student') return res.status(403).json({ error: 'Student access required' });
+    if (decoded.role !== 'student') return sendError(res, 403, 'ERR_FORBIDDEN', 'Student access required.');
     (req as any).student = decoded;
     next();
   } catch {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    return sendError(res, 401, 'ERR_AUTH_MISSING', 'Invalid or expired token.');
   }
 }
 
