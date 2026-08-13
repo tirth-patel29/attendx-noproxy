@@ -95,8 +95,10 @@ export class JudgeService {
       return { status: 'FORGED_RESPONSE', message: 'Invalid cryptographic signature' };
     }
 
-    // ===== GATE 3: Visual Micro-Twitch (3s rotating token, non-destructive) =====
-    const token = await metronomeService.verifyToken(payload.session_uuid, payload.token_val);
+    // ===== GATE 3: Visual Micro-Twitch (3s rotating token) =====
+    // In-memory cache first (DB fallback on miss) — the hot path avoids a
+    // per-claim Postgres read under the class herd.
+    const token = await metronomeService.verifyTokenCached(payload.session_uuid, payload.token_val);
 
     if (!token) {
       const tokenCheck = await query(
@@ -141,36 +143,35 @@ export class JudgeService {
       };
     }
 
-    // Verify nonce (from crypto_challenges) - single use
+    // Verify nonce (from crypto_challenges) — single-use, atomic. One UPDATE
+    // claims & marks the nonce used in a single statement (no TOCTOU), which is
+    // also the replay guard: a second claim on the same nonce matches no row.
     const nonceRes = await query(
-      `SELECT challenge_uuid, used FROM crypto_challenges
-       WHERE session_uuid = $1 AND challenge_nonce = $2 AND expires_at_epoch > $3`,
-      [payload.session_uuid, payload.nonce, Date.now()]
+      `UPDATE crypto_challenges
+       SET used = TRUE, used_at_epoch = $1
+       WHERE session_uuid = $2 AND challenge_nonce = $3
+         AND used = FALSE AND expires_at_epoch > $4
+       RETURNING challenge_uuid`,
+      [Date.now(), payload.session_uuid, payload.nonce, Date.now()]
     );
 
     if (nonceRes.rows.length === 0) {
+      // Determine a friendly reason: reused (already used) vs expired/unknown.
+      const exists = await query(
+        `SELECT used FROM crypto_challenges WHERE session_uuid = $1 AND challenge_nonce = $2`,
+        [payload.session_uuid, payload.nonce]
+      );
+      const reused = exists.rows.length > 0 && exists.rows[0].used === true;
       await this.logAudit('CLAIM_ATTEMPT', payload.student_uuid, payload.session_uuid, {
         gate: 4,
         result: 'FORGED_RESPONSE',
-        reason: 'invalid_or_expired_nonce',
+        reason: reused ? 'nonce_reused' : 'invalid_or_expired_nonce',
       });
-      return { status: 'FORGED_RESPONSE', message: 'Invalid or expired challenge nonce' };
+      return {
+        status: 'FORGED_RESPONSE',
+        message: reused ? 'Challenge nonce already used (replay)' : 'Invalid or expired challenge nonce',
+      };
     }
-
-    if (nonceRes.rows[0].used) {
-      await this.logAudit('CLAIM_ATTEMPT', payload.student_uuid, payload.session_uuid, {
-        gate: 4,
-        result: 'FORGED_RESPONSE',
-        reason: 'nonce_reused',
-      });
-      return { status: 'FORGED_RESPONSE', message: 'Challenge nonce already used (replay)' };
-    }
-
-    // Mark nonce as used (single-use, replay protection)
-    await query(
-      `UPDATE crypto_challenges SET used = TRUE, used_at_epoch = $1 WHERE challenge_uuid = $2`,
-      [Date.now(), nonceRes.rows[0].challenge_uuid]
-    );
 
     // ===== ALL GATES PASSED =====
     // Commit to the master ledger. The UNIQUE(session_uuid, student_uuid)

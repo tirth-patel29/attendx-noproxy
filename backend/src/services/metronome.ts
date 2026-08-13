@@ -1,6 +1,7 @@
 import { config } from '../config';
 import { query, transaction } from '../utils/db';
 import { generateToken } from '../utils/crypto';
+import { tokenCache } from './tokenCache';
 
 export interface TokenRecord {
   token_uuid: string;
@@ -107,6 +108,13 @@ export class MetronomeService {
 
       if (res.rows.length > 0) {
         tokens.push(res.rows[0]);
+        // Mirror into the in-memory token cache (hot-path verification).
+        tokenCache.set({
+          session_uuid: sessionUuid,
+          token_val: res.rows[0].token_val,
+          created_at_epoch: res.rows[0].created_at_epoch,
+          expires_at_epoch: res.rows[0].expires_at_epoch,
+        });
         // Broadcast to connected clients
         if (this.io) {
           this.io.to(`session:${sessionUuid}`).emit('token:new', {
@@ -148,6 +156,17 @@ export class MetronomeService {
   }
 
   /**
+   * Verify a token is live using the in-memory cache first, falling back to
+   * Postgres only on a cache miss. The DB is the source of truth: a cold cache
+   * never rejects a valid token (it re-reads and re-warms instead).
+   */
+  async verifyTokenCached(sessionUuid: string, tokenVal: string): Promise<TokenRecord | null> {
+    const cached = tokenCache.get(sessionUuid, tokenVal);
+    if (cached) return cached as TokenRecord;
+    return this.verifyToken(sessionUuid, tokenVal);
+  }
+
+  /**
    * Verify a token is live (exists + not yet expired) WITHOUT consuming it.
    *
    * Per SRS §1 Phase 3/5 the token is SHARED: the entire class scans the same
@@ -165,6 +184,14 @@ export class MetronomeService {
        WHERE session_uuid = $1 AND token_val = $2 AND expires_at_epoch > $3`,
       [sessionUuid, tokenVal, now]
     );
+    if (res.rows[0]) {
+      tokenCache.set({
+        session_uuid: sessionUuid,
+        token_val: res.rows[0].token_val,
+        created_at_epoch: res.rows[0].created_at_epoch,
+        expires_at_epoch: res.rows[0].expires_at_epoch,
+      });
+    }
     return res.rows[0] ?? null;
   }
 

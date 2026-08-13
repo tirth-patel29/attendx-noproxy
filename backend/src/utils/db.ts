@@ -11,6 +11,9 @@ export const pool = new Pool({
   max: config.db.max,
   idleTimeoutMillis: config.db.idleTimeoutMillis,
   connectionTimeoutMillis: config.db.connectionTimeoutMillis,
+  // Hard guards against DB lockups: no single query may run for >4s nor hold a
+  // row lock >2s (blocks the classic "one slow claim pins the table" failure).
+  options: '-c statement_timeout=4000 -c lock_timeout=2000',
 });
 
 pool.on('error', (err) => {

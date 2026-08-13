@@ -7,6 +7,7 @@ import morgan from 'morgan';
 import { config } from './config';
 import { pool, checkDbHealth } from './utils/db';
 import { metronomeService } from './services/metronome';
+import { tokenCache } from './services/tokenCache';
 import { ensureDefaultAdmin } from './services/bootstrap';
 import { requireApiKey } from './utils/apiKey';
 import attendanceRoutes from './routes/attendance';
@@ -228,6 +229,20 @@ async function startServer() {
         await metronomeService.startSession(row.session_uuid);
       }
       console.log(`Auto-started metronomes for ${activeSessions.rows.length} active sessions`);
+
+      // Warm the in-memory token cache so the very first claims of a restored
+      // session hit memory instead of cold Postgres reads.
+      try {
+        const activeTokens = await pool.query(
+          `SELECT session_uuid, token_val, created_at_epoch, expires_at_epoch
+           FROM active_tokens WHERE expires_at_epoch > $1`,
+          [Date.now()]
+        );
+        tokenCache.hydrate(activeTokens.rows);
+        console.log(`Hydrated token cache with ${activeTokens.rows.length} live tokens`);
+      } catch (cacheErr) {
+        console.warn('Could not hydrate token cache:', cacheErr);
+      }
     } catch (err) {
       console.warn('Could not auto-start metronomes:', err);
     }

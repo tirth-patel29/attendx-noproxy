@@ -102,18 +102,17 @@ async function shapeSession(row: any) {
 
 /**
  * GET /api/v1/time-sync
- * Server epoch time for Cristian's Algorithm clock synchronization
+ * Server epoch time for Cristian's Algorithm clock synchronization.
+ * Micro-optimized fast path: pure in-memory epoch — no DB, no heavy middleware.
+ * `Cache-Control: no-store` keeps every calibration fresh for drift accuracy.
  */
-router.get('/time-sync', async (_req: Request, res: Response, next: NextFunction) => {
-  try {
-    const serverEpoch = Date.now();
-    res.json({
-      server_epoch: serverEpoch,
-      server_iso: new Date(serverEpoch).toISOString(),
-    });
-  } catch (err) {
-    next(err);
-  }
+router.get('/time-sync', async (_req: Request, res: Response) => {
+  const serverEpoch = Date.now();
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({
+    server_epoch: serverEpoch,
+    server_iso: new Date(serverEpoch).toISOString(),
+  });
 });
 
 /**

@@ -26,7 +26,10 @@ export const config = {
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || '',
     ssl: process.env.DB_SSL === 'true',
-    max: 20,
+    // Connection pool: sized for high-concurrency claim herds. Each claim now
+    // runs ~2 fast statements (atomic nonce UPDATE + ledger INSERT) plus one
+    // PK-indexed student read; keep healthy headroom above peak contention.
+    max: 30,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
   },
