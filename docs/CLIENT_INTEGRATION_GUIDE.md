@@ -1,310 +1,339 @@
 # Attendance Gateway — Client Integration Guide
 
-> This is the contract for **anyone building a client** (e.g. the student Flutter APK)
-> that talks to `https://api.atmyhome.tech`. Read it fully before writing code.
-> The security-critical rules are marked **⛔ MUST**.
+> The authoritative contract for **anyone building a client** (e.g. the student Flutter
+> APK) that talks to `https://api.atmyhome.tech`. Read the whole document before writing
+> code. **⛔ MUST** rules are security-critical.
+
+Version-guarded to match the **juke-box release** of the backend. Build the APK yourself
+from this guide + the public OpenAPI at `api.atmyhome.tech/docs`.
 
 ---
 
-## 1. What a client is
+## 0. The security model (read this first)
 
-A client is an app a student runs on a phone. It:
+Every phone is treated as hostile. The client is only ever a *claim generator* — the
+**server-side judge is the single source of truth**. Nothing you harden on the client can
+*invent* a PRESENT; it can only present a claim the judge accepts. So the real guarantees
+are server-side:
 
-1. authenticates the student,
-2. binds that student to this specific device,
-3. reads a live QR from the classroom projector,
-4. cryptographically seals the claim, and
-5. submits it within a 250 ms window.
+- the **per-device `secret_hmac_key`** (minted at bind, only on your device) is required to
+  produce a valid HMAC;
+- the claim must use a **server-issued, single-use nonce**;
+- the **token** you present must have been live at the moment you claim you saw it
+  (membership) and the timestamp must be fresh (no replays / forged times).
 
-The only way the backend marks a student **PRESENT** is if the claim passes all **4 gates**:
+Client hardening (C++ FFI black box, `--obfuscate`, secure storage, biometric-at-boot) is
+**layered deterrence** — it makes a modder's job much harder, it does **not** make the APK
+"mathematically unremovable." If you need that, the real answer is OS attestation
+(Play Integrity), documented but out of scope here.
+
+### The four gates
 
 | Gate | What proves it | Where it runs |
 |---|---|---|
-| **G1 Hardware Tattoo** | `device_id_hash` matches the device bound to the student | client + server |
-| **G2 Biometric Flesh Lock** | OS-level fingerprint / FaceID reject (`local_auth`) | **client only** (a boolean) |
-| **G3 Visual Micro-Twitch** | the QR token you scanned is a live, unexpired server token | client + server |
-| **G4 Crypto Time-Stamp** | HMAC-SHA256 seal + `claim_time − token_birth ∈ [0, 250] ms` | client + server |
-
-The backend treats every device as hostile. G2 is the only "is a human holding the phone"
-check — hence the order matters (see §4).
+| **G1 Hardware Tattoo** | `device_id_hash` (SHA-256 of hardware UUID) matches the bound device | client + server |
+| **G2 Biometric Flesh Lock** | OS fingerprint / FaceID (`local_auth`) — the only "human" check | **client only** (boolean) |
+| **G3 Visual Micro-Twitch** | you scanned a token that was live at your claimed instant | client + server |
+| **G4 Crypto Time-Stamp** | HMAC-SHA256 seal over a fresh, server-anchored timestamp | client (**inside C++ FFI**) + server |
 
 ---
 
-## 2. API key — required on every request
+## 1. API key — required on every request
 
-A client must present a **shared API key** minted from the Admin console
-(`admin.atmyhome.tech → API Keys`). The backend verifies it on the client surface;
-**without it every client call is rejected `401 missing_api_key`**.
-
-**⛔ MUST:** send it on **every** request:
+A client must present a shared **API key** minted from the Admin console
+(`admin.atmyhome.tech → API Keys`). Sent on **every** request; without it → `401 ERR_AUTH_MISSING`.
 
 ```
 X-Api-Key: ag_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-- It is a **licensing / throttle gate, NOT identity.** Anyone who can read the binary
-  can extract it. Real identity is the per-student JWT (§3). If it leaks, revoke it in the
-  console and mint a new one, then rebuild the client.
-- Do **not** build it as a per-user credential. It is one shared key for the whole client app.
-
-Embedded at build time in the reference Flutter client:
-
-```bash
-flutter build apk --release \
-  --dart-define=API_BASE_URL=https://api.atmyhome.tech \
-  --dart-define=API_KEY=ag_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-```
+- It is a **licensing / throttle gate, not identity.** Anyone who can read the binary can
+  extract it. Revoke + rotate if it leaks.
+- Embed at build time: `--dart-define=API_KEY=ag_...` (see §0 of the pipeline).
+- Build URL too: `--dart-define=API_BASE_URL=https://api.atmyhome.tech`.
 
 ---
 
-## 3. Student identity & provisioning (SRS self-registration)
+## 2. THE CHRONOLOGICAL CLIENT FLOW
 
-There is **one authoritative identity per device**, stored in the OS KeyStore/Keychain:
-
-| Stored value | Meaning |
-|---|---|
-| `access_token` | student JWT from `/api/v1/student/login` |
-| `student_uuid` | the student's primary key |
-| `roll_no` | e.g. `24DCE091` |
-| `secret_hmac_key` | the Gate-4 signing key, **minted by the server at device bind** |
-| `device_id_hash` | `SHA-256(hardware UUID)` — the Gate-1 tattoo |
-| `bound_device_id` | the server-recorded `device_id_hash` for this student |
-
-Flow (all under `X-Api-Key`, in this order):
-
-1. `POST /api/v1/student/status` — check whether the roll is registered / bound.
-2. `POST /api/v1/student/register` — self-register with college identity.
-3. `POST /api/v1/student/login` — get the **student JWT** (`Authorization: Bearer`).
-4. `POST /api/v1/student/device/bind` — send `device_id_hash`; the server returns a
-   fresh `secret_hmac_key`. Store it **only in the secure keychain** and keep it secret.
-5. `POST /api/v1/student/password/set` — set/reset the password (e.g. after admin
-   forgot-password clears it).
-
-**⛔ MUST:** `device_id_hash` is `SHA-256` of a **hardware-stable UUID** generated once and
-kept in the KeyStore (never `randomUUID()` on every launch — it must survive reinstalls as
-the binding). The `secret_hmac_key` is used to sign every claim (§6) and must never leave
-the device.
-
----
-
-## 4. Biometric (Gate 2) — when to do it
-
-Gate 2 is the **Biometric Flesh Lock**: `local_auth` / `localAuthentication` returns a
-boolean whether the OS verified the student's fingerprint or FaceID.
-
-**Recommended placement — at app boot, BEFORE initializing anything else:**
+This is the exact sequence a correct client follows, from first launch to a PRESENT.
 
 ```
-1. Unlock the secure keychain (load access_token, student_uuid, secret_hmac_key, device_id_hash)
-2. ⛔ Gate 2 — prompt for Biometric (fingerprint / FaceID). If it fails → block the session.
-3. Only then: initialize network (time sync, Rest client, socket).
-4. Only then: auto-login / navigate to Home.
+ ╔═══════════════════════════ THE CLIENT FLOW ═══════════════════════════╗
+ ║                                                                        ║
+ ║  [1] HARDWARE IDENTITY  (once)                                         ║
+ ║      hardware UUID -> KeyStore -> SHA-256 -> device_id_hash              ║
+ ║      provision OR login OR bind (server mints secret_hmac_key)          ║
+ ║                                                                        ║
+ ║  [2] BOOT: BIOMETRIC + AUTO-LOGIN (every launch)                       ║
+ ║      keychain unlock -> Gate-2 biometric prompt -> auto-login           ║
+ ║      (a device that reaches the scanner has proven flesh)              ║
+ ║                                                                        ║
+ ║  [3] MIN-RTT TIME SYNC  (background + before every scan)               ║
+ ║      take N /time-sync samples, keep the lowest-RTT drift              ║
+ ║                                                                        ║
+ ║  [4] USER HITS "MARK ATTENDANCE" -> SCANNER                            ║
+ ║      Gate-3 subliminal-flash loop: ignore anchors, catch the flash     ║
+ ║      (wait out one full 3s window in case of a miss)                   ║
+ ║                                                                        ║
+ ║  [5] GATE-4 SEALING (inside C++ FFI)                                   ║
+ ║      fetch challenge (nonce + server_time_ms)                          ║
+ ║      C++lib: compute True Time + HMAC over canonical string -> {t,sig} ║
+ ║      Dart POSTs /claim-attendance                                      ║
+ ║                                                                        ║
+ ║  [6] HANDLE THE RESPONSE                                               ║
+ ║      200 PRESENT -> success | error.code ERR_* -> recovery action      ║
+ ╚═══════════════════════════════════════════════════════════════════════╝
 ```
 
-Rationale:
-- It is the **only flesh check** in the whole system; run it as the earliest human gate.
-- An unattended phone (mount, screen-share, bot) cannot auto-attend — the app dead-ends
-  at the prompt unless a real finger/face unlocks it.
-- Signing the claim without ever proving flesh is a **forgery vector** (the judge can't tell
-  a human from a scripted signer for G2 — that is the client's job).
+### STEP 1 — Hardware identity & provisioning (once per device)
 
-> If you also want a per-attendance prompt (defense-in-depth), the reference client re-runs
-> Gate 2 during the claim pre-check. Both are valid; the **boot-time prompt is mandatory**.
+**⛔ MUST:** `device_id_hash` is `SHA-256` of a **hardware-stable UUID generated once** and
+held in the OS KeyStore/Keychain (Android Keystore / iOS Keychain). It must **survive
+reinstalls** as the binding — never `randomUUID()` on every launch.
 
----
+1. Meaning once: generate `uuid4()`, store in `flutter_secure_storage`
+   (`AppConstants.storageDeviceId`), compute `device_id_hash = sha256hex(uuid)`.
+2. Provisioning (under `X-Api-Key`):
+   - `POST /api/v1/student/status` `{id: roll}` → registered / bound?
+   - `POST /api/v1/student/register` `{id, name, password}` → `201` (student JWT in `access_token`).
+   - `POST /api/v1/student/login` → `access_token` (for existing students).
+   - `POST /api/v1/student/device/bind` (`Authorization: Bearer <jwt>`, body `{device_id_hash}`)
+     → returns the **`secret_hmac_key` (64 hex)**. Store ONLY in secure storage; it leaves
+     the device only into the C++ sealing lib.
+   - `POST /api/v1/student/password/set` when the server reports `has_password: false`.
 
-## 5. Network time — Cristian's Algorithm (Gate 4 prerequisite)
+Persist the session (KeyStore): `access_token`, `student_uuid`, `roll_no`, `secret_hmac_key`,
+`device_id_hash`.
 
-The client signs a timestamp in the **server's** clock domain. You must estimate true server
-time before any claim.
+### STEP 2 — Boot: Gate-2 biometric + auto-login
 
-1. `GET /api/v1/time-sync` → `{ "server_time_ms": 1720000000000 }`.
-2. Measure request send/receive (`RTT`), estimate
-   `server_now = server_time_ms + RTT/2`.
-3. Keep a **drift offset** (`server_now − local_now`) and re-sync periodically (≈ every 5 min)
-   and always before a claim.
-
-**Recommended (Layer-2 — the robust path):** anchor the timestamp to the **server's own
-clock from the challenge round-trip** (see §7.1): `client_claimed_time = challenge.server_time_ms + elapsed_since_request`.
-This is immune to device-clock drift and to high/jittery RTT from a proxied/tunnelled backend.
-
-**⛔ MUST (if you use the drift path):** the timestamp you sign must be a **fresh min-RTT
-Cristian estimate** taken at the moment of signing — never a single noisy sample or a stale
-wall-clock read. A wrong or stale clock is how a client gets rejected (or flagged
-`STREAM_DETECTED`).
-
----
-
-## 6. The QR / metronome protocol (Gate 3) — the 3-second window
-
-This is the part you asked about explicitly, so read closely.
-
-### The projector's output ("dumb terminal")
-
-The class projector shows a rotating QR. Its payload is always:
+**Recommended placement — mandatory, at boot, BEFORE any network init:**
 
 ```
-ATTN:<session_uuid>[:<token>]
+1. unlock secure keychain (load credentials)
+2. ⛔ GATE-2 biometric prompt (local_auth). Fail -> block the session.
+3. only then: start network (time sync, Rest client, socket)
+4. if a valid session exists -> auto-login to Home; else -> sign-in
 ```
 
-- **Session (anchor frame)** — `ATTN:<session_uuid>` with **no** token. This is shown most
-  of the time and simply identifies the session.
-- **Token (flash frame)** — `ATTN:<session_uuid>:<token>` where `<token>` is **exactly 4
-  chars** from the base62 alphabet `A–Z a–z 0–9`. The projector flashes this token briefly
-  inside each cycle, then returns to the anchor.
+Rationale: Gate 2 is the **only flesh check** in the system. An unattended / mounted /
+automated phone dead-ends at the prompt. Also re-prompt per attendance is fine
+(defense-in-depth) but the boot prompt is mandatory.
 
-### The cadence
+### STEP 3 — Min-RTT time sync (Gate-4 prerequisite)
 
-- The server's metronome mints a **new token every 3000 ms** per session.
-- Each token is **valid for 5000 ms** (`expires_at_epoch = created + 5000`).
-- The token is **shared** — the whole class scans the same rotating token; it is NOT
-  consumed by a single claim (one student's packet must not lock out 69 others).
+`GET /api/v1/time-sync` → `{ server_epoch }`. **Do not trust a single sample** — on a
+proxied/tunnelled backend a one-off sample is asymmetric and jittery. The reference client:
 
-**⛔ MUST — parse the whole 3-second window / ~90 frames:**
+- takes **N ≥ 3** samples,
+- keeps the sample with the **smallest RTT** (least queueing ⇒ truest half-trip),
+- keeps a **drift offset** `driftOff = server_epoch + rtt/2 − t1`,
+- re-syncs continuously (≈ every 5 min) and **always before a scan**.
 
-At ~30 fps a 3 s cycle is ~90 camera frames. The token frame may only occupy a handful of
-frames. Therefore:
+The drift is used for the UI "clock synced" indicator and as a fallback; the authoritative
+timestamp comes from the challenge (STEP 5).
 
-1. **Never stop at the first QR** — the first QR you see is usually the anchor
-   (`ATTN:<session>`, no token). Discard it (record the session if empty).
-2. **Keep decoding continuously for the full window** so the flash is not missed. The
-   reference scanner keeps a running loop and only "resolves" when it decodes a payload
-   WITH a token whose `token.length ∈ [1..4]` (the base62 flash).
-3. Treat any payload that has **no token** as an anchor update; treat the **first payload
-   with a token** as the flash to submit.
+### STEP 4 — The subliminal-flash camera loop (Gate 3)
 
-Reference reader logic (conceptual):
+The projector rotates: an **anchor** `ATTN:<session_uuid>` (no token, shown most of the time)
+and a **flash** `ATTN:<session_uuid>:<token>` (token = 4-char base62, shown briefly each
+3 s cycle). The token is **shared** by the whole class (not consumed per claim).
 
+**⛔ MUST — parse the full 3 s window (~90 frames @30fps):**
+- Ignore anchors (record the session).
+- Keep decoding the whole window so the brief flash is not missed.
+- Capture the **first payload with a token**; submit that exact token.
+- **Never re-fetch a token from the server** — sign the one the lens saw (a re-fetch breaks
+  the HMAC).
+- If a whole window elapses with no flash, surface "No flash in this window — keep holding
+  steady" and keep scanning (the next anchor auto-re-arms the window).
+
+Reference reader (conceptual):
 ```text
 loop:
   raw = decode_frame()
-  if raw starts with "ATTN:" and session_uuid is a 36-char UUID:
+  if raw starts with "ATTN:" and session is a 36-char uuid:
      (session, token) = split(raw)
-     if token is empty:  -> this is the anchor; remember session_uuid; keep scanning
-     else if token length in 1..4 (base62):  -> THIS IS THE FLASH
-           capture token; feed Gate 4; submit; break out of loop   [case-sensitive]
+     if token empty:            -> anchor; remember session; keep scanning
+     else if 1..4 chars (base62): -> FLASH; feed Gate 4; submit; exit
 ```
 
-**⛔ MUST — sign the token you SAW, never a re-fetched one:**
-After the scanner captures a token, do **not** go back to the server to fetch "the current
-token." The whole point of Gate 4 is that the HMAC is over the *exact* token the lens
-witnessed. If you re-fetch, you may sign a *different* token than the LCD showed, and the
-server's HMAC check fails. Captured → sealed → submitted, in one pass.
+**Anti-stream note:** the projector may render the flash in **isoluminant chroma** (see
+`docs/PROJECTOR_ISOLUMINANCE.md`) so that a 4:2:0 video stream crushes the boundaries.
+Your local camera decodes it via raw chroma; your scanner logic is unchanged — just decode
+normally and treat a token ≥ 1 char as valid flash. If isolation breaks against some
+cameras, keep the anchor B/W and only the token frame isoluminant.
 
-**Reference client behavior (already hardened):**
-The reference Flutter scanner enforces exactly this window. Once it locks onto a session
-(the first anchor frame), it waits out **one full metronome cycle** (3 s + margin, ~4.2 s)
-and refuses to refresh that deadline on subsequent anchors. If the token flash is captured
-within the window it submits immediately; if a whole window elapses with no flash it shows
-a **"No flash in this window — keep holding steady"** state (it does not silently scan
-forever). The next anchor frame auto-re-arms the window, so it self-recovers.
+### STEP 5 — Gate-4 cryptographic sealing (C++ FFI black box)
 
-### Don't let the client UI cheat
+Two sub-steps:
 
-- Do **not** implement a "refresh token button" — that defeats Gate 3.
-- The scanner must ignore duplicated frames and **prevent double-submit** (see §8).
+**(a) Authoritative timestamp + nonce (over HTTP, Dart side):**
+```
+POST /api/v1/sessions/{session_uuid}/challenge
+   -> { "nonce": "...", "server_time_ms": <epoch ms>, "issued_at_epoch": <...>,
+        "expires_at_epoch": <...> }
+```
+Record `tBefore = localNow` before the call, `tAfter` after. Then
+`client_claimed_time = server_time_ms + (tAfter − tBefore)` (Layer-2 anchor — immune to
+device-clock drift and infra RTT).
 
----
-
-## 7. Claiming attendance — exact wire contract
-
-### 7.1 Get a server nonce + authoritative time (Gate 4)
+**(b) Seal inside the native library (do NOT build the canonical string in Dart):**
+Pass the opaque inputs to the C++ FFI function (Appendix A). It computes True Time and the
+HMAC-SHA256 and returns `(client_claimed_time, hmac_hex)`. Dart only forwards these into the
+claim payload.
 
 ```
-GET /api/v1/sessions/{session_uuid}/challenge
-   -> Status 200
-   -> { "nonce": "<challenge_nonce>", "server_time_ms": <epoch ms>,
-        "issued_at_epoch": <epoch ms>, "expires_at_epoch": <epoch ms> }
-```
-
-`server_time_ms` (== `issued_at_epoch`) is the **server's authoritative clock**. Use it to
-anchor your claim timestamp: after receiving the challenge, set
-`client_claimed_time = server_time_ms + (local_ms now − local_ms when the request was sent)`.
-
-**⛔ MUST:** use the **server-issued nonce**. A locally generated nonce is rejected as
-`FORGED_RESPONSE`. The nonce is **single-use** — it is marked used once you submit.
-
-### 7.2 Sign the canonical string (HMAC-SHA256)
-
-The HMAC key is the student's `secret_hmac_key` (§3). Build exactly:
-
-```text
-canonical = "{session_uuid}|{student_uuid}|{token_val}|{client_claimed_time}|{device_id_hash}|{nonce}"
-signature = HMAC_SHA256(secret_hmac_key, canonical)     // hex-encoded lowercase
-```
-
-- `session_uuid` — from the QR anchor/flash.
-- `student_uuid` — the authenticated student.
-- `token_val` — the **4-char flash token** captured in §6.
-- `client_claimed_time` — **ms epoch**, a fresh Cristian estimate taken at signing time (§5).
-- `device_id_hash` — SHA-256 of the hardware UUID (§3).
-- `nonce` — from §7.1.
-
-### 7.3 Submit
-
-```
-POST /api/v1/claim-attendance
-X-Api-Key: ag_...
-Authorization: Bearer <student JWT>
-Content-Type: application/json
-
+POST /api/v1/claim-attendance        (X-Api-Key + Authorization: Bearer <student JWT>)
 {
-  "session_uuid":      "<uuid>",
-  "student_uuid":      "<uuid>",
-  "token_val":         "Ab3d",
-  "client_claimed_time": 1720000000123,
-  "device_id_hash":    "<sha256 hex>",
-  "nonce":             "<hex>",
-  "hmac_signature":    "<hex>"
+  "session_uuid":       "...",
+  "student_uuid":       "...",
+  "token_val":          "Ab3d",
+  "client_claimed_time": <from FFI>,
+  "device_id_hash":     "<sha256 hex>",
+  "nonce":              "<from challenge>",
+  "hmac_signature":     <from FFI>
 }
 ```
 
-### 7.4 The judge gate — token-epoch membership + freshness (latency-agnostic)
+### STEP 6 — Handle the response
 
-The server no longer rejects on an absolute `claimed − birth ≤ 250 ms`. It enforces:
+Success (200) is unenveloped:
+```json
+{ "status":"PRESENT", "message":"Attendance verified", "verification_delta_ms": 42, "ledger_uuid":"..." }
+```
+`"already logged"` is also a 200 success (idempotent) — don't show it as an error; lock the
+button for ~1 s to prevent double-submit.
 
-- **Freshness:** `now − claimed ≤ maxAckDelayMs` (server now vs your claimed time; default 8 s)
-  and `claimed ≤ now + clockToleranceMs` (no forged future timestamps).
-- **Membership:** the submitted token must have been **live at your claimed instant**:
-  `token.birth − clockTolerance ≤ claimed < token.birth + validity + clockTolerance`
-  (defaults: `clockToleranceMs` 400, `tokenValidityWindowMs` 5000).
+Every failure is the standardized envelope — **branch on `error.code`** (see
+`docs/ERROR_DICTIONARY.md`):
 
-A physically present student always passes — this window is immune to infra RTT; it only
-rejects stale/forged timestamps and tokens that were NOT current at the claimed moment
-(static photos and old-token replays). Because tokens rotate every 3 s, a relay can only
-ever be ~one token stale, so streaming/photo attacks stay bounded.
-
----
-
-## 8. Response codes a client must handle
-
-| HTTP | `status` field | Meaning / client action |
+| code | HTTP | client UI |
 |---|---|---|
-| 200 | `PRESENT` | Success. `message` is `"Attendance verified"` or `"Attendance already logged"` (idempotent/dedup). |
-| 401 | `missing_api_key` / `invalid_api_key` | Client key wrong/missing. Fix the build-time key. |
-| 401 | (JWT) | Student token expired → re-login. |
-| 403 | `FORGED_RESPONSE` | HMAC or nonce invalid. Re-scan (your seal was wrong). |
-| 403/412 | `STREAM_DETECTED` | Replay/live-relay or your clock drifted. Re-sync time, re-scan. |
-| 403/412 | `EXPIRED_TOKEN` | Token rotated (you were too slow or watched a static photo). Re-scan the live flash. |
-| 403/412 | `HARDWARE_MISMATCH` | This device isn't bound to this student. Re-bind / admin device reset. |
-| 404 | `INVALID_CLAIM` | Student or session not found. |
-
-**⛔ MUST — idempotency:** a single claim may legitimately return `PRESENT` with message
-`"Attendance already logged"`. Treat that as **success**, not an error, and **prevent
-double-submitting** in the UI (lock the "Mark Attendance" flow while a claim is in flight
-and for ~1 s after).
+| `ERR_HW_MISMATCH` | 403 | Route user to Admin Desk for a device reset / re-bind. No auto-retry. |
+| `ERR_SIG_INVALID` | 401 | "Security verification failed." Re-scan once; if persistent, force re-login. |
+| `ERR_STREAM_DETECTED` | 412 | "Attendance window closed / streaming detected." Re-scan; point at the LCD. |
+| `ERR_TOKEN_EXPIRED` | 406 | "Token expired — re-scan the live projector now." |
+| `ERR_NONCE_USED` | 400 | Silently fetch a fresh nonce + resubmit once. |
+| `ERR_NONCE_INVALID` | 400 | Fetch a fresh nonce + retry. |
+| `ERR_AUTH_MISSING` | 401 | Re-login; ensure `X-Api-Key` is embedded. |
+| `ERR_RATE_LIMIT` | 429 | Back off per `Retry-After`. |
 
 ---
 
-## 9. Security responsibilities (client-side checklist)
+## Appendix A — C++ FFI sealing pipeline (Step 1 of the brief)
 
-- ✅ Send `X-Api-Key` on **every** request.
-- ✅ Gate 2 biometric at **boot, before network init**.
-- ✅ Store `secret_hmac_key` + `device_id_hash` in the **secure keychain only**.
-- ✅ Sign the **exact scanned token**, never a re-fetched one.
-- ✅ Use a **fresh Cristian`timestamp** at signing time.
+Goal: move Gate-4 (True-Time + HMAC-SHA256) out of Dart into an obfuscation-friendly native
+library, so decompilers can't trivially read or skip the seal.
+
+### A.1 Layout
+```
+app/
+  android/app/src/main/cpp/
+    CMakeLists.txt
+    ffi_gate.cc
+    ffi_gate.h
+  lib/core/crypto/ffi_gate.dart     # dart:ffi bindings (only API surface in Dart)
+```
+Build the native lib as a **static** library and let Flutter bundle it (recommended on
+Android) or as a shared `.so` you open with `DynamicLibrary.open('libffi_gate.so')`.
+
+### A.2 CMakeLists.txt (Android)
+```cmake
+cmake_minimum_required(VERSION 3.10)
+project(ffi_gate)
+
+add_library(ffi_gate SHARED ffi_gate.cc)
+target_compile_features(ffi_gate PUBLIC cxx_std_17)
+# AES/crypto is your own; for HMAC-SHA256 you may vendor a compact implementation
+# (e.g. a single-file SHA-256) to avoid pulling OpenSSL into the APK.
+
+# Keep symbols obfuscated where possible; ship with -O2 -fvisibility=hidden
+target_compile_options(ffi_gate PRIVATE -O2 -fvisibility=hidden -fno-stack-protector)
+```
+Reference the build from `app/android/app/build.gradle.kts`:
+```kotlin
+android {
+  externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt") } }
+}
+```
+
+### A.3 The C ABI (what Dart calls)
+The function returns a single heap buffer (so Dart can't inspect intermediate HMAC state).
+Keep the canonical string construction **inside** the library so Dart never forms it.
+
+```c
+// ffi_gate.h
+typedef struct {
+  const char* session_uuid;
+  const char* student_uuid;
+  const char* token_val;
+  const char* device_id_hash;
+  const char* nonce;
+  const char* secret_hmac_key;   // hex key, read from KeyStore by Dart, passed in
+  double      drift_offset_ms;   // from min-RTT sync (or 0 when server-anchored)
+  int64_t     server_now_ms;     // server_time_ms from the challenge (authoritative)
+} Gate4Input;
+
+typedef struct {
+  int64_t client_claimed_time_ms; // True Time the server should compare
+  char    hmac_hex[65];           // hex lowercase HMAC-SHA256
+} Gate4Output;
+
+// Allocates the output; caller frees with ffi_gate_free_output().
+Gate4Output* ffi_gate_seal(const Gate4Input* in);
+void         ffi_gate_free_output(Gate4Output* out);
+```
+
+### A.4 True-Time semantics inside C
+Prefer the **server-anchored** path (robust on a high-latency backend):
+```c
+int64_t now_local_ms(void);                       // std::chrono::system_clock
+int64_t claim = in->server_now_ms + (now_local_ms() - /* captured just before challenge */);
+```
+Fallback (no challenge time): `claim = now_local_ms() + (int64_t)in->drift_offset_ms;`
+
+### A.5 The canonical string + HMAC (inside the library only)
+```text
+canonical = "{session_uuid}|{student_uuid}|{token_val}|{client_claimed_time}|{device_id_hash}|{nonce}"
+signature = HMAC_SHA256(hexDecode(secret_hmac_key), canonical)   // lowercase hex
+```
+No Dart code ever constructs this string; Dart only forwards the six opaque inputs and reads
+`{client_claimed_time, hmac_hex}` back.
+
+### A.6 Dart side (minimal, obfuscated-safe)
+```dart
+final lib = DynamicLibrary.open('libffi_gate.so');
+final seal = lib.lookupFunction<Pointer<Gate4Output> Function(Pointer<Gate4Input>),
+                                Pointer<Gate4Output> Function(Pointer<Gate4Input>)>('ffi_gate_seal');
+// Allocate Gate4Input, fill pointers, call seal, read output, free.
+```
+
+### A.7 Build & strengthen
+- `flutter build apk --release --obfuscate --split-debug-info=build/symbols \
+  --dart-define=API_BASE_URL=... --dart-define=API_KEY=...`
+- Strip debug symbols from the `.so` (`-g0` / `strip`), keep `--split-debug-info` locally.
+- **Honest scope:** this is layered deterrence. The `.so` is extractable and a Frida hook at
+  the FFI boundary can still read inputs/outputs, and the `secret_hmac_key` crosses that
+  boundary each call. It makes naive decompile + "skip the biometric/HMAC" patches much
+  harder and deters casual modders. It does **not** provide the mathematical guarantee a
+  student cannot forge — that is the server's job (nonce + per-device secret + token
+  membership). For true anti-modding against adversaries, add **Play Integrity / SafetyNet
+  attestation** (out of scope here).
+
+---
+
+## Appendix B — Security responsibilities (client checklist)
+
+- ✅ `X-Api-Key` on **every** request.
+- ✅ Gate-2 biometric at **boot, before network init**.
+- ✅ `secret_hmac_key` + `device_id_hash` in the **secure keychain only**; pass the key into
+  C++ at seal time, never persist it in Dart.
+- ✅ Anchor `client_claimed_time` to `challenge.server_time_ms + elapsed` (robust to RTT/clock).
+- ✅ Keep the Gate-3 loop running the **full 3 s window**; sign the **exact scanned token**.
 - ✅ Use only the **server-issued nonce**, once.
-- ✅ Parse the **full 3 s window** so the flash is never missed.
-- ✅ Never print stack traces, HMAC, UUIDs, nonces, or KeyStore info to the student UI.
-- ❌ No manual "token refresh" — that bypasses Gate 3.
-- ❌ Never expose cryptographic internals in the UI (keep the UX simple).
+- ✅ Branch on `error.code`; map every failure to a message + recovery action.
+- ✅ Re-decode the flash normally even if the projector is isoluminant (§4).
+- ❌ Never show stack traces / HMAC / UUIDs / nonces / KeyStore internals in the UI.
+- ❌ No manual "token refresh" button (bypasses Gate 3).
