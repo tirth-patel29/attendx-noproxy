@@ -116,7 +116,14 @@ time.sleep(1.5)
 tok = None
 for _ in range(10):
     st, tk = call("GET", f"/api/v1/sessions/{SESS2}/tokens")
-    if st == 200 and tk.get("tokens"): tok = tk["tokens"][-1]; break
+    if st == 200 and tk.get("tokens"):
+        nowm = int(time.time() * 1000)
+        # Pick the OLDEST currently-LIVE token. The metronome pre-mints "lookahead"
+        # tokens with FUTURE birth times (tokens[-1] is one of those); only a live
+        # token (created <= now < expires) is what a physical lens can actually see.
+        live = [t for t in tk["tokens"] if int(t["created_at_epoch"]) <= nowm < int(t["expires_at_epoch"])]
+        tok = (live or tk["tokens"])[0]
+        break
     time.sleep(0.8)
 check("session mints 4-char token", tok and len(tok["token_val"]) == 4)
 T0 = int(tok["created_at_epoch"])
@@ -130,18 +137,53 @@ def claim(time_ms, device, nonce=None, tokv=None, sig=None):
                  "client_claimed_time": time_ms, "device_id_hash": device, "nonce": n, "hmac_signature": s})
 
 st, chal = call("POST", f"/api/v1/sessions/{SESS2}/challenge")
-check("challenge issued", st == 200 and len(chal.get("nonce", "")) == 32)
+check("challenge issued + server_time_ms", st == 200 and len(chal.get("nonce", "")) == 32 and "server_time_ms" in chal)
 st, r = claim(T0 + 5, DEV, nonce=chal["nonce"])
 check("honest claim -> PRESENT", st == 200 and r.get("status") == "PRESENT", f"{st} {r.get('status')}")
 st, chal = call("POST", f"/api/v1/sessions/{SESS2}/challenge")
 st, r = claim(T0 + 8, DEV, nonce=chal["nonce"])
 check("duplicate -> already logged", st == 200 and "already" in r.get("message", ""))
+
+# ---- Layer-3 latency-agnostic gate (replaces the absolute 250ms window) ----
+# A realistic capture->claim delta of ~1.5s (proxied infra + tunnel) now PASSES:
+# the token was current at the claimed instant and the timestamp is fresh.
 st, chal = call("POST", f"/api/v1/sessions/{SESS2}/challenge")
-st, r = claim(T0 + 500, DEV, nonce=chal["nonce"])
-check("+500ms -> ERR_STREAM_DETECTED 412", st == 412 and r.get("error", {}).get("code") == "ERR_STREAM_DETECTED")
+st, r = claim(T0 + 1500, DEV, nonce=chal["nonce"])
+check("1.5s capture delta within token window -> PRESENT", st == 200 and r.get("status") == "PRESENT",
+      f"{st} {r.get('error', {}).get('code')}")
+
+# Refresh a live token so the judge-state tests run on a fresh, valid token
+# (the previous one may have rotated past its 5s validity, which would mask
+# whether the freshness/membership checks are what fire).
+for _ in range(8):
+    st, tk = call("GET", f"/api/v1/sessions/{SESS2}/tokens")
+    if st == 200 and tk.get("tokens"):
+        nwm = int(time.time() * 1000)
+        live = [t for t in tk["tokens"] if int(t["created_at_epoch"]) <= nwm < int(t["expires_at_epoch"])]
+        if live:
+            tok = live[0]
+            T0 = int(tok["created_at_epoch"])
+            break
+    time.sleep(0.8)
+
+now_ms = int(time.time() * 1000)
+# Stale (30s old) timestamp -> freshness reject
 st, chal = call("POST", f"/api/v1/sessions/{SESS2}/challenge")
-st, r = claim(T0 - 300, DEV, nonce=chal["nonce"])
-check("negative latency -> ERR_STREAM_DETECTED 412", st == 412 and r.get("error", {}).get("code") == "ERR_STREAM_DETECTED")
+st, r = claim(now_ms - 30000, DEV, nonce=chal["nonce"])
+check("stale timestamp (30s) -> ERR_STREAM_DETECTED", st == 412 and r.get("error", {}).get("code") == "ERR_STREAM_DETECTED")
+# Future (60s ahead) timestamp -> freshness reject
+st, chal = call("POST", f"/api/v1/sessions/{SESS2}/challenge")
+st, r = claim(now_ms + 60000, DEV, nonce=chal["nonce"])
+check("future timestamp -> ERR_STREAM_DETECTED", st == 412 and r.get("error", {}).get("code") == "ERR_STREAM_DETECTED")
+# Claimed well before the token was minted -> membership reject (not current)
+st, chal = call("POST", f"/api/v1/sessions/{SESS2}/challenge")
+st, r = claim(T0 - 1500, DEV, nonce=chal["nonce"])
+check("claimed before minting -> ERR_TOKEN_EXPIRED", st == 406 and r.get("error", {}).get("code") == "ERR_TOKEN_EXPIRED")
+# Unknown token -> rejected
+st, chal = call("POST", f"/api/v1/sessions/{SESS2}/challenge")
+st, r = claim(T0 + 10, DEV, nonce=chal["nonce"], tokv="!!!!")
+check("unknown token -> ERR_TOKEN_EXPIRED", st == 406 and r.get("error", {}).get("code") == "ERR_TOKEN_EXPIRED")
+# Forged HMAC -> ERR_SIG_INVALID
 st, chal = call("POST", f"/api/v1/sessions/{SESS2}/challenge")
 st, r = claim(T0 + 10, DEV, nonce=chal["nonce"], sig="0" * 64)
 check("forged HMAC -> ERR_SIG_INVALID 401", st == 401 and r.get("error", {}).get("code") == "ERR_SIG_INVALID")

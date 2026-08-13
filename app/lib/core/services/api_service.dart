@@ -306,7 +306,7 @@ class ApiService {
     required String deviceIdHash,
     String? nonce,
   }) async {
-    // Ensure time is synced
+    // Ensure time is synced (min-RTT Cristian estimate kept in the background).
     if (!_timeSync.isTimeSyncFresh()) {
       await _timeSync.syncTime();
     }
@@ -317,14 +317,25 @@ class ApiService {
       throw ApiException('HMAC key not found. Please provision device first.');
     }
 
-    // Get current estimated server time (client claimed time)
-    final clientClaimedTime = _timeSync.getEstimatedServerTimeMs();
-
-    // Get server-issued challenge nonce (SRS §6). The server persists it to
-    // crypto_challenges with single-use semantics; a locally generated nonce
-    // would be rejected by the judge as invalid_or_expired_nonce.
+    // LAYER-2 — anchor the claimed timestamp to the SERVER's clock, not a
+    // client drift estimate. The challenge round-trip is issued immediately
+    // before signing, so:
+    //   client_claimed_time = challenge.server_time_ms + local_elapsed
+    // is immune to device-clock drift AND to the high/jittery RTT added by the
+    // on-demand proxy + reverse proxy + cloudflared chain — the server's own
+    // "now" is the reference, taken one hop before the HMAC is computed.
+    final tBefore = DateTime.now().millisecondsSinceEpoch;
     final challenge = await getChallenge(sessionUuid);
+    final tAfter = DateTime.now().millisecondsSinceEpoch;
     final challengeNonce = (challenge['nonce'] as String?) ?? CryptoService.generateNonce();
+
+    final rawServer = challenge['server_time_ms'] ?? challenge['issued_at_epoch'];
+    final serverNowMs = rawServer is num
+        ? rawServer.toInt()
+        : (rawServer is String ? int.tryParse(rawServer) : null);
+    final clientClaimedTime = serverNowMs != null
+        ? serverNowMs + (tAfter - tBefore)
+        : _timeSync.getEstimatedServerTimeMs();
 
     // Get device ID hash
     final deviceId = await SecureStorageService.getDeviceId();

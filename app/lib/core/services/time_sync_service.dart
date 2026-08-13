@@ -35,50 +35,53 @@ class TimeSyncService {
     if (_isSyncing) return false;
     _isSyncing = true;
 
-    for (int attempt = 0; attempt < retries; attempt++) {
+    // LAYER-1 — robust min-RTT calibration. A SINGLE Cristian's sample through
+    // an on-demand wake-up proxy + reverse proxy + cloudflared tunnel is
+    // asymmetric and jittery (cold-start spikes, queuing), so `rtt/2` on any one
+    // sample can be badly wrong. We take several samples and keep the one with
+    // the SMALLEST RTT — that is the least-queued, closest-to-true half-trip —
+    // which collapses clock error to well under the judge's tolerance even on a
+    // noisy path.
+    int? bestRtt;
+    int bestDrift = 0;
+    final attempts = retries >= 3 ? retries : 3;
+    for (int attempt = 0; attempt < attempts; attempt++) {
       try {
         // T0 - Client send time (client epoch ms)
         final t0 = DateTime.now().millisecondsSinceEpoch;
-        
+
         // Make HTTP request to time-sync endpoint
-        // Using a simple HTTP GET since we just need server time
         final response = await _makeTimeSyncRequest();
-        
+
         // T1 - Client receive time
         final t1 = DateTime.now().millisecondsSinceEpoch;
-        
+
         // Parse server time from response
         final serverEpoch = response['server_epoch'] as int;
-        
-        // Cristian's Algorithm (SRS §1 Phase 1 / §3 Proof 1):
-        //   RTT = T1 - T0
-        //   serverTimeAtReceive ≈ serverEpoch + RTT/2   (response one-way trip)
-        //   driftOffset = serverTimeAtReceive - T1      (T1 = client receive time)
-        // NOTE: T1, not T0. Using T0 skews the estimate by a full RTT, which can
-        // push honest students past the 250ms stream-kill window on slow Wi-Fi.
+
         final rtt = t1 - t0;
         final serverTimeAtReceive = serverEpoch + (rtt / 2).round();
         final driftOffset = serverTimeAtReceive - t1;
-        
-        // Store drift offset
-        _driftOffsetMs = driftOffset;
-        _lastSync = DateTime.now();
-        await SecureStorageService.saveDriftOffset(driftOffset);
-        
-        _isSyncing = false;
-        return true;
-      } catch (e) {
-        if (attempt == retries - 1) {
-          _isSyncing = false;
-          return false;
+
+        if (bestRtt == null || rtt < bestRtt) {
+          bestRtt = rtt;
+          bestDrift = driftOffset;
         }
-        // Exponential backoff
-        await Future.delayed(Duration(milliseconds: 200 * (attempt + 1)));
+      } catch (e) {
+        // keep sampling; a transient failure on one try is fine
+      }
+      if (attempt < attempts - 1) {
+        await Future.delayed(Duration(milliseconds: 150 * (attempt + 1)));
       }
     }
-    
+
     _isSyncing = false;
-    return false;
+    if (bestRtt == null) return false;
+
+    _driftOffsetMs = bestDrift;
+    _lastSync = DateTime.now();
+    await SecureStorageService.saveDriftOffset(bestDrift);
+    return true;
   }
 
   /// Make HTTP request to time-sync endpoint

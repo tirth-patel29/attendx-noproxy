@@ -23,7 +23,7 @@ export interface RateLimitOptions {
 
 export function rateLimit(opts: RateLimitOptions = {}) {
   const windowMs = opts.windowMs ?? 60_000;
-  const max = opts.max ?? 600; // 600 req/min/IP -> won't trip a classroom herd
+  const max = opts.max ?? 1200; // req/min/IP — headroom for legit bursts + testing
   const skip = opts.skip;
 
   return function rateLimitMiddleware(req: Request, res: Response, next: NextFunction) {

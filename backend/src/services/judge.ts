@@ -97,51 +97,68 @@ export class JudgeService {
       return { status: 'FORGED_RESPONSE', code: 'ERR_SIG_INVALID', message: 'Invalid cryptographic signature' };
     }
 
-    // ===== GATE 3: Visual Micro-Twitch (3s rotating token) =====
-    // In-memory cache first (DB fallback on miss) — the hot path avoids a
-    // per-claim Postgres read under the class herd.
-    const token = await metronomeService.verifyTokenCached(payload.session_uuid, payload.token_val);
-
-    if (!token) {
-      const tokenCheck = await query(
-        `SELECT * FROM active_tokens WHERE session_uuid = $1 AND token_val = $2`,
-        [payload.session_uuid, payload.token_val]
-      );
-      if (tokenCheck.rows.length === 0) {
-        // Token never existed, already rotated out, expired, or wrong session
-        await this.logAudit('CLAIM_ATTEMPT', payload.student_uuid, payload.session_uuid, {
-          gate: 3,
-          result: 'EXPIRED_TOKEN',
-          token: payload.token_val,
-        });
-        return { status: 'EXPIRED_TOKEN', code: 'ERR_TOKEN_EXPIRED', message: 'Token expired, re-scan the projector' };
-      }
-      // Exists but expired
+    // ===== GATE 3+4: Token-epoch membership + freshness (latency-agnostic) =====
+    // Layer-3 redesign. The absolute `claimed - birth ∈ [0,250]` window is
+    // defeated by the real deployment: a client clock anchored from ONE noisy
+    // Cristian sample through on-demand proxy + reverse proxy + cloudflared
+    // tunnel drifts by more than 250ms, and the captured timestamp is snapshotted
+    // before a subsequent challenge round-trip — so honest claims land negative
+    // or over the window and are rejected. We replace the absolute window with
+    // three tolerant, latency-agnostic rules that preserve the anti-replay /
+    // anti-static-photo guarantees:
+    //
+    //   (a) FRESHNESS  : now - claimed <= maxAckDelayMs, and claimed is not an
+    //                    impossible future (claimed <= now + clockToleranceMs)
+    //   (b) MEMBERSHIP : the submitted token was LIVE at the claimed instant
+    //                    (birth - clockTolerance <= claimed < birth + validity +
+    //                    clockTolerance) — you saw a token that was current then
+    //   (c) IMPOSSIBLE : claimed comfortably before the token was minted is a
+    //                    fabricated timestamp (handled by (b) failing)
+    const now = Date.now();
+    const tokenObj = await metronomeService.findToken(payload.session_uuid, payload.token_val);
+    if (!tokenObj) {
       await this.logAudit('CLAIM_ATTEMPT', payload.student_uuid, payload.session_uuid, {
-        gate: 3,
-        result: 'EXPIRED_TOKEN',
-        reason: 'expired',
-        token: payload.token_val,
+        gate: 3, result: 'EXPIRED_TOKEN', reason: 'unknown_token', token: payload.token_val,
       });
-      return { status: 'EXPIRED_TOKEN', code: 'ERR_TOKEN_EXPIRED', message: 'Token expired, re-scan the projector' };
+      return { status: 'EXPIRED_TOKEN', code: 'ERR_TOKEN_EXPIRED', message: 'Token not found — re-scan the live projector flash.' };
     }
 
-    // ===== GATE 4: The 250ms Stream Kill-Window (SRS §3 Proof 2) =====
-    // delta = TrueObservedTime − TokenBirthTime.
-    // Reject deltas > 250ms (live-stream artifact) AND negative deltas
-    // (impossible: the lens cannot witness a token before the server minted it —
-    // negative delta means the client clock was manipulated).
-    const verificationDeltaMs = payload.client_claimed_time - token.created_at_epoch;
-    if (verificationDeltaMs < 0 || verificationDeltaMs > config.judge.maxLatencyMs) {
+    const birth = Number(tokenObj.created_at_epoch);
+    const birthWindowEnd = tokenObj.expires_at_epoch
+      ? Number(tokenObj.expires_at_epoch)
+      : birth + config.judge.tokenValidityWindowMs;
+    const tol = config.judge.clockToleranceMs;
+    const claimed = payload.client_claimed_time;
+    const verificationDeltaMs = claimed - birth; // informational (for audit + latency_ms)
+
+    // (a) Freshness
+    if (claimed > now + tol || now - claimed > config.judge.maxAckDelayMs) {
       await this.logAudit('CLAIM_ATTEMPT', payload.student_uuid, payload.session_uuid, {
         gate: 4,
         result: 'STREAM_DETECTED',
+        reason: claimed > now + tol ? 'future_timestamp' : 'stale_timestamp',
         delta_ms: verificationDeltaMs,
       });
       return {
         status: 'STREAM_DETECTED',
         code: 'ERR_STREAM_DETECTED',
-        message: `Stream artifact detected (${verificationDeltaMs}ms > ${config.judge.maxLatencyMs}ms window)`,
+        message: 'Attendance window closed or timestamp rejected — re-scan the live projector.',
+        verification_delta_ms: verificationDeltaMs,
+      };
+    }
+
+    // (b)+(c) Membership — was this token current at the claimed instant?
+    if (claimed < birth - tol || claimed >= birthWindowEnd + tol) {
+      await this.logAudit('CLAIM_ATTEMPT', payload.student_uuid, payload.session_uuid, {
+        gate: 3,
+        result: 'EXPIRED_TOKEN',
+        reason: 'token_not_current_at_claimed_time',
+        delta_ms: verificationDeltaMs,
+      });
+      return {
+        status: 'EXPIRED_TOKEN',
+        code: 'ERR_TOKEN_EXPIRED',
+        message: 'The scanned token is no longer current — re-scan the live projector flash.',
         verification_delta_ms: verificationDeltaMs,
       };
     }

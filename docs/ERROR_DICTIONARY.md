@@ -44,7 +44,7 @@ Every failed request (`4xx`/`5xx`) from `https://api.atmyhome.tech` returns the
 
 | Code | HTTP | Trigger | Required client UI action |
 |---|---|---|---|
-| `ERR_STREAM_DETECTED` | **412** | Proxy stream detected. `verification_delta_ms = claimed_time − token_birth` was `< 0` or `> 250ms` (live-relay / screen-share artifact). **Includes `latency_ms`.** | Show "Attendance window closed / streaming detected." Advise pointing the camera at the LCD — do not screen-share. Re-scan. |
+| `ERR_STREAM_DETECTED` | **412** | Timestamp **freshness** rejected: the claimed time is too old/stale (> `maxAckDelayMs`) or impossibly in the future (a relay/replay or a forged/fabricated clock). No longer an absolute `≤250ms` window — see the Layer-3 note below. **Includes `latency_ms`.** | Show "Attendance window closed / streaming detected." Advise pointing the camera at the LCD — do not screen-share. Re-scan. |
 | `ERR_TOKEN_EXPIRED` | **406** | The scanned visual token is expired or invalid (rotated or never existed). | "Token expired — please re-scan the live projector now." Trigger a fresh scan. |
 | `ERR_NONCE_USED` | **400** | Anti-replay triggered. Challenge nonce already consumed. | Auto-fetch a **fresh** nonce and resubmit (once), silently. |
 | `ERR_NONCE_INVALID` | **400** | Challenge nonce invalid or expired (never issued / not for this session / timed out). | Fetch a fresh nonce from `/sessions/{id}/challenge` and retry. |
@@ -73,10 +73,10 @@ HTTP 403
 {"success":false,"error":{"code":"ERR_HW_MISMATCH","message":"Unregistered hardware. Your account is bound to a different physical device."}}
 ```
 
-**Stream / time-drift (Gate 4):**
+**Stream / stale-or-forged timestamp (Gate 4):**
 ```json
 HTTP 412
-{"success":false,"error":{"code":"ERR_STREAM_DETECTED","message":"Stream artifact detected (310ms > 250ms window)","latency_ms":310}}
+{"success":false,"error":{"code":"ERR_STREAM_DETECTED","message":"Attendance window closed or timestamp rejected — re-scan the live projector.","latency_ms":310}}
 ```
 
 **Expired visual token (Gate 3):**
@@ -92,6 +92,24 @@ HTTP 400
 ```
 
 ---
+
+---
+
+## How the 250ms window was redesigned (latency-agnostic)
+
+The strict `claimed − birth ∈ [0,250]` window broke under a multi-hop proxied +
+tunnel backend (on-demand proxy → reverse proxy → cloudflared): a single noisy
+Cristian sample and a snapshot-before-challenge bug pushed honest claimed times
+out of range. The judge now enforces **token-epoch membership + freshness**, which
+are immune to infrastructure RTT:
+
+1. **Freshness** — `now − claimed ≤ maxAckDelayMs` (default 8 s) and `claimed ≤ now + clockToleranceMs`: kills replay / forged / far-old timestamps.
+2. **Membership** — the submitted token must have been **live at the claimed instant**: `birth − clockTolerance ≤ claimed < birth + validity + clockTolerance` (`clockToleranceMs` default 400 ms). A static-photo screenshot or an old/rotated token fails this.
+3. **Anchor** — the client sets `claimed = challenge.server_time_ms + elapsed`, rooting the timestamp in the server's own clock one hop before signing.
+
+A physically present student therefore always passes; replaying an old token or
+stamping a stale/forged time still fails. `JUDGE_CLOCK_TOLERANCE_MS` and
+`JUDGE_MAX_ACK_DELAY_MS` are the documented, deliberate config knobs.
 
 ## Client integration rules
 

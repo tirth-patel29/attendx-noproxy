@@ -156,6 +156,30 @@ export class MetronomeService {
   }
 
   /**
+   * Look up a token by (session, value) REGARDLESS of current expiry, cache-first
+   * with DB fallback. Used by the Layer-3 judge to test whether the token was
+   * LIVE at the *claimed* instant (membership), not just whether it is still
+   * live *now*. Returns the row or null if it never existed / was already purged.
+   */
+  async findToken(sessionUuid: string, tokenVal: string): Promise<TokenRecord | null> {
+    const cached = tokenCache.get(sessionUuid, tokenVal);
+    if (cached) return cached as TokenRecord;
+    const res = await query<TokenRecord>(
+      `SELECT * FROM active_tokens WHERE session_uuid = $1 AND token_val = $2`,
+      [sessionUuid, tokenVal]
+    );
+    if (res.rows[0]) {
+      tokenCache.set({
+        session_uuid: sessionUuid,
+        token_val: res.rows[0].token_val,
+        created_at_epoch: res.rows[0].created_at_epoch,
+        expires_at_epoch: res.rows[0].expires_at_epoch,
+      });
+    }
+    return res.rows[0] ?? null;
+  }
+
+  /**
    * Verify a token is live using the in-memory cache first, falling back to
    * Postgres only on a cache miss. The DB is the source of truth: a cold cache
    * never rejects a valid token (it re-reads and re-warms instead).

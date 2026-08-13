@@ -52,6 +52,17 @@ export const config = {
   judge: {
     maxLatencyMs: parseInt(process.env.JUDGE_MAX_LATENCY_MS || '250', 10),
     tokenValidityWindowMs: parseInt(process.env.JUDGE_TOKEN_VALIDITY_WINDOW_MS || '5000', 10),
+    // Layer-3 (latency-agnostic) gate knobs. The absolute 250ms window is brittle
+    // when the client clock is anchored wrong + multi-hop proxied infra makes
+    // a single noisy Cristian sample drift by >250ms. Instead the judge enforces:
+    //   clockToleranceMs — how far a claimed time may sit from a token's epoch
+    //                      (absorbs clock-estimation error; the physical lens is
+    //                       still required to have seen a token current at that
+    //                       instant — a screenshot/old token fails membership)
+    //   maxAckDelayMs    — freshness ceiling: now - claimed must be <= this, so
+    //                      forged/stale/far-past timestamps are still rejected
+    clockToleranceMs: parseInt(process.env.JUDGE_CLOCK_TOLERANCE_MS || '400', 10),
+    maxAckDelayMs: parseInt(process.env.JUDGE_MAX_ACK_DELAY_MS || '8000', 10),
   },
 
   // CORS — allow list for the Express API and the Socket.IO handshake

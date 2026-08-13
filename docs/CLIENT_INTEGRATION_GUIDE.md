@@ -124,9 +124,14 @@ time before any claim.
 3. Keep a **drift offset** (`server_now − local_now`) and re-sync periodically (≈ every 5 min)
    and always before a claim.
 
-**⛔ MUST:** The timestamp you sign (`client_claimed_time`) must be a **fresh Cristian
-estimate taken at the moment of signing**, not a stale local wall-clock read. A wrong clock
-is how a client gets rejected (or worse, flagged `STREAM_DETECTED`).
+**Recommended (Layer-2 — the robust path):** anchor the timestamp to the **server's own
+clock from the challenge round-trip** (see §7.1): `client_claimed_time = challenge.server_time_ms + elapsed_since_request`.
+This is immune to device-clock drift and to high/jittery RTT from a proxied/tunnelled backend.
+
+**⛔ MUST (if you use the drift path):** the timestamp you sign must be a **fresh min-RTT
+Cristian estimate** taken at the moment of signing — never a single noisy sample or a stale
+wall-clock read. A wrong or stale clock is how a client gets rejected (or flagged
+`STREAM_DETECTED`).
 
 ---
 
@@ -203,13 +208,18 @@ forever). The next anchor frame auto-re-arms the window, so it self-recovers.
 
 ## 7. Claiming attendance — exact wire contract
 
-### 7.1 Get a server nonce (Gate 4, anti-replay)
+### 7.1 Get a server nonce + authoritative time (Gate 4)
 
 ```
 GET /api/v1/sessions/{session_uuid}/challenge
    -> Status 200
-   -> { "nonce": "<challenge_nonce>" }     (hex string)
+   -> { "nonce": "<challenge_nonce>", "server_time_ms": <epoch ms>,
+        "issued_at_epoch": <epoch ms>, "expires_at_epoch": <epoch ms> }
 ```
+
+`server_time_ms` (== `issued_at_epoch`) is the **server's authoritative clock**. Use it to
+anchor your claim timestamp: after receiving the challenge, set
+`client_claimed_time = server_time_ms + (local_ms now − local_ms when the request was sent)`.
 
 **⛔ MUST:** use the **server-issued nonce**. A locally generated nonce is rejected as
 `FORGED_RESPONSE`. The nonce is **single-use** — it is marked used once you submit.
@@ -249,21 +259,20 @@ Content-Type: application/json
 }
 ```
 
-### 7.4 The 250 ms Stream Kill-Window
+### 7.4 The judge gate — token-epoch membership + freshness (latency-agnostic)
 
-The server computes:
+The server no longer rejects on an absolute `claimed − birth ≤ 250 ms`. It enforces:
 
-```text
-delta_ms = client_claimed_time − token.created_at_epoch
-```
+- **Freshness:** `now − claimed ≤ maxAckDelayMs` (server now vs your claimed time; default 8 s)
+  and `claimed ≤ now + clockToleranceMs` (no forged future timestamps).
+- **Membership:** the submitted token must have been **live at your claimed instant**:
+  `token.birth − clockTolerance ≤ claimed < token.birth + validity + clockTolerance`
+  (defaults: `clockToleranceMs` 400, `tokenValidityWindowMs` 5000).
 
-- `0 ≤ delta_ms ≤ 250` → **PRESENT**
-- `delta_ms < 0` → **STREAM_DETECTED** (negative is impossible — forged clock)
-- `delta_ms > 250` → **STREAM_DETECTED** (live-relay artifact)
-
-Because the token is minted server-side every 3000 ms, you have a hard ~250 ms budget after
-the flash to sign + POST. **Optimize the client to minimize this request path** (keep the
-JWT + nonce ready, sign locally, single round-trip, fast/locally-reachable endpoint).
+A physically present student always passes — this window is immune to infra RTT; it only
+rejects stale/forged timestamps and tokens that were NOT current at the claimed moment
+(static photos and old-token replays). Because tokens rotate every 3 s, a relay can only
+ever be ~one token stale, so streaming/photo attacks stay bounded.
 
 ---
 

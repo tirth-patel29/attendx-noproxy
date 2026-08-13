@@ -365,9 +365,12 @@ router.post('/sessions/:sessionUuid/challenge', async (req: Request, res: Respon
     );
 
     const challenge = result.rows[0];
-    // Server returns its own epoch so the client can compute the 250ms window
+    // Server returns its authoritative epoch so the client can anchor its
+    // claimed timestamp to the SERVER clock (Layer-2: kills the noisy-client-
+    // clock + snapshot-before-challenge staleness bug).
     res.json({
       session_uuid: sessionUuid,
+      server_time_ms: now,
       nonce: challenge.challenge_nonce,
       issued_at_epoch: challenge.issued_at_epoch,
       expires_at_epoch: challenge.expires_at_epoch,
