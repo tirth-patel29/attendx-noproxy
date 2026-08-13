@@ -31,7 +31,10 @@ export const config = {
     // PK-indexed student read; keep healthy headroom above peak contention.
     max: 30,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
+    // Generous acquire queue: under a burst the pool waits rather than 500-ing.
+    // (Async bcrypt below means a burst no longer blocks the event loop, so
+    // connections are returned promptly.)
+    connectionTimeoutMillis: 15000,
   },
 
   // Metronome settings (SRS §1 Phase 2: cryptographically random base62 token,

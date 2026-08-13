@@ -65,7 +65,7 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
       return res.status(401).json({ error: 'No password set — ask the admin to provision one' });
     }
 
-    if (!bcrypt.compareSync(password, professor.password_hash)) {
+    if (!(await bcrypt.compare(password, professor.password_hash))) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 

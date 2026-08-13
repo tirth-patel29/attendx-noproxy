@@ -95,7 +95,7 @@ adminPublicRouter.post('/login', async (req: Request, res: Response, next: NextF
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     const admin = r.rows[0];
-    const ok = bcrypt.compareSync(password, admin.password_hash);
+    const ok = await bcrypt.compare(password, admin.password_hash);
     if (!ok) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -209,11 +209,11 @@ adminRouter.post('/change-password', async (req: Request, res: Response, next: N
     const r = await query(`SELECT password_hash FROM admin_users WHERE admin_uuid = $1`, [admin.sub]);
     if (r.rows.length === 0) return res.status(404).json({ error: 'Admin not found' });
 
-    if (!bcrypt.compareSync(current_password, r.rows[0].password_hash)) {
+    if (!(await bcrypt.compare(current_password, r.rows[0].password_hash))) {
       return res.status(401).json({ error: 'Current password is incorrect' });
     }
 
-    const hash = bcrypt.hashSync(new_password, 12);
+    const hash = await bcrypt.hash(new_password, 12);
     await query(`UPDATE admin_users SET password_hash = $1 WHERE admin_uuid = $2`, [hash, admin.sub]);
     await audit(admin.sub, 'ADMIN_PASSWORD_CHANGE', { admin_uuid: admin.sub });
     res.json({ message: 'Password changed' });
@@ -281,7 +281,7 @@ adminRouter.post('/teachers', async (req: Request, res: Response, next: NextFunc
       return res.status(400).json({ error: 'Invalid payload', details: parsed.error.flatten().fieldErrors });
     }
     const { email, name, department, password } = parsed.data;
-    const hash = bcrypt.hashSync(password, 12);
+    const hash = await bcrypt.hash(password, 12);
     const r = await query(
       `INSERT INTO professors (email, name, department, password_hash)
        VALUES ($1, $2, $3, $4) RETURNING prof_uuid`, [email, name, department, hash]
@@ -318,7 +318,7 @@ adminRouter.post('/teachers/:uuid/reset-password', async (req: Request, res: Res
   try {
     const parsed = resetPwSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Password must be 8+ characters' });
-    const hash = bcrypt.hashSync(parsed.data.password, 12);
+    const hash = await bcrypt.hash(parsed.data.password, 12);
     const r = await query(
       `UPDATE professors SET password_hash=$1 WHERE prof_uuid=$2 RETURNING prof_uuid`,
       [hash, req.params.uuid]

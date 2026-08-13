@@ -31,7 +31,7 @@ export async function ensureDefaultAdmin(): Promise<void> {
     return;
   }
 
-  const hash = bcrypt.hashSync(password, 12);
+  const hash = await bcrypt.hash(password, 12);
 
   const existing = await query(
     `SELECT admin_uuid FROM admin_users WHERE email = $1`,

@@ -112,7 +112,7 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
     const exists = await query(`SELECT roll_no FROM students WHERE roll_no = $1`, [rollNo]);
     if (exists.rows.length > 0) return res.status(409).json({ error: 'This ID is already registered' });
 
-    const hash = bcrypt.hashSync(password, 12);
+    const hash = await bcrypt.hash(password, 12);
     const r = await query(
       `INSERT INTO students (roll_no, email, name, password_hash) VALUES ($1, $2, $3, $4) RETURNING student_uuid, roll_no, email, name`,
       [rollNo, email, name, hash]
@@ -145,7 +145,7 @@ router.post('/password/set', async (req: Request, res: Response, next: NextFunct
       return res.status(409).json({ error: 'Password already set — use login' });
     }
 
-    const hash = bcrypt.hashSync(parsed.data.new_password, 12);
+    const hash = await bcrypt.hash(parsed.data.new_password, 12);
     await query(`UPDATE students SET password_hash = $1, updated_at = NOW() WHERE student_uuid = $2`, [hash, r.rows[0].student_uuid]);
     await query(
       `INSERT INTO audit_logs (event_type, actor_uuid, payload) VALUES ('STUDENT_PASSWORD_SET', $1, $2)`,
@@ -172,7 +172,7 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
     const student = r.rows[0];
     if (!student.password_hash) return res.status(403).json({ error: 'NO_PASSWORD_SET', message: 'Set a password first' });
 
-    if (!bcrypt.compareSync(parsed.data.password, student.password_hash)) {
+    if (!(await bcrypt.compare(parsed.data.password, student.password_hash))) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
