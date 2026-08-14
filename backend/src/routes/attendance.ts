@@ -117,6 +117,35 @@ router.get('/time-sync', async (_req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/v1/latency-ping
+ * Public, DB-touch probe for latency testing. Echoes server epoch and reports the
+ * SERVER-side cost: how long the origin took to handle the request (and a trivial
+ * `SELECT 1` DB round-trip). Add this to network RTT to get the full picture
+ * (Cloudflare + proxies + tunnel + origin + DB), and subtract origin cost to
+ * isolate just the network path.
+ */
+router.get('/latency-ping', async (_req: Request, res: Response) => {
+  const t0 = process.hrtime.bigint();
+  const serverNow = Date.now();
+  let dbUs: number | null = null;
+  try {
+    const td = process.hrtime.bigint();
+    await query('SELECT 1 AS ok');
+    dbUs = Number((process.hrtime.bigint() - td) / 1000n);
+  } catch {
+    /* db unavailable -> report null */
+  }
+  const elapsedUs = Number((process.hrtime.bigint() - t0) / 1000n);
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({
+    server_epoch: serverNow,
+    server_iso: new Date(serverNow).toISOString(),
+    db_echo_us: dbUs,             // server-side DB round-trip cost (microseconds)
+    origin_handled_us: elapsedUs, // server-side handling cost for this request
+  });
+});
+
+/**
  * GET /api/v1/professors
  * List all professors (for the portal's session-create dropdown)
  */
