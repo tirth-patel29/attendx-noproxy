@@ -54,6 +54,33 @@ X-Api-Key: ag_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 ---
 
+
+## 1.5 Measured latency profile (tune against this)
+
+From the reference deployment (`scripts/latency_test.py`, n≈30, public internet):
+
+| Layer | p50 | p95 | worst |
+|---|---|---|---|
+| TCP connect (:443) | ~91 ms | ~95 ms | ~97 ms |
+| Server handling (`/latency-ping`) | ~1.4 ms | ~3–9 ms | — |
+| DB round-trip (`SELECT 1`) | ~1.4 ms | ~3–9 ms | — |
+| **Full gated path** (`/student/status`) | ~370 ms | **~470 ms** | ~1.0–1.1 s |
+
+**Reads:**
+- The server + DB are ~1.4 ms — effectively free. The ~370–470 ms is **entirely the
+  network/tunnel path** (Cloudflare -> cloudflared -> reverse proxies). Your network may
+  differ — measure with `python3 scripts/latency_test.py 40` from your actual location.
+- The claim gate is already **latency-agnostic**: anchored timestamp + membership + a
+  freshness window (`maxAckDelayMs` default **5000**, `clockToleranceMs` default **500**) tuned
+  to fit a ~1.5 s worst-case round-trip while rejecting stale replays. Do NOT re-introduce
+  an absolute 250 ms window — it will fail on this path.
+
+**Why you must anchor to the challenge timestamp (§7.1):**
+On a ~470 ms p95 path, an absolute `claimed - birth ≤ 250 ms` gate is untouchable: the
+round-trip *alone* exceeds the window, so any honest claim fails. By setting
+`client_claimed_time = challenge.server_time_ms + elapsed`, the server compares your claim
+against its OWN clock taken a moment earlier — the network never matters for the timestamp.
+
 ## 2. THE CHRONOLOGICAL CLIENT FLOW
 
 This is the exact sequence a correct client follows, from first launch to a PRESENT.

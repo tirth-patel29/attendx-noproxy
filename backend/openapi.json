@@ -223,6 +223,65 @@
         }
       }
     },
+    "/api/v1/latency-ping": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Deep server-side latency probe (public, DB-touch)",
+        "description": "End-to-end latency probe. Returns the SERVER-side timing breakdown (db_echo_us, origin_handled_us, middleware_us, breakdown) so a client can subtract server cost from total RTT and isolate the network/tunnel path. Use with scripts/latency_test.py to tune JUDGE_CLOCK_TOLERANCE_MS / JUDGE_MAX_ACK_DELAY_MS.",
+        "responses": {
+          "200": {
+            "description": "Server timing breakdown",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "server_epoch": {
+                      "type": "integer"
+                    },
+                    "server_iso": {
+                      "type": "string"
+                    },
+                    "db_echo_us": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "origin_handled_us": {
+                      "type": "integer"
+                    },
+                    "middleware_us": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "breakdown": {
+                      "type": "object"
+                    }
+                  }
+                },
+                "example": {
+                  "server_epoch": 1786685674009,
+                  "server_iso": "2026-08-14T05:34:34.009Z",
+                  "db_echo_us": 934,
+                  "origin_handled_us": 940,
+                  "middleware_us": 6,
+                  "breakdown": {
+                    "db_roundtrip_us": 934,
+                    "app_overhead_us": 6,
+                    "server_total_us": 940
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/claim-attendance": {
       "post": {
         "tags": [

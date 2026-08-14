@@ -52,17 +52,19 @@ export const config = {
   judge: {
     maxLatencyMs: parseInt(process.env.JUDGE_MAX_LATENCY_MS || '250', 10),
     tokenValidityWindowMs: parseInt(process.env.JUDGE_TOKEN_VALIDITY_WINDOW_MS || '5000', 10),
-    // Layer-3 (latency-agnostic) gate knobs. The absolute 250ms window is brittle
-    // when the client clock is anchored wrong + multi-hop proxied infra makes
-    // a single noisy Cristian sample drift by >250ms. Instead the judge enforces:
-    //   clockToleranceMs — how far a claimed time may sit from a token's epoch
-    //                      (absorbs clock-estimation error; the physical lens is
-    //                       still required to have seen a token current at that
-    //                       instant — a screenshot/old token fails membership)
-    //   maxAckDelayMs    — freshness ceiling: now - claimed must be <= this, so
-    //                      forged/stale/far-past timestamps are still rejected
-    clockToleranceMs: parseInt(process.env.JUDGE_CLOCK_TOLERANCE_MS || '400', 10),
-    maxAckDelayMs: parseInt(process.env.JUDGE_MAX_ACK_DELAY_MS || '8000', 10),
+    // Layer-3 (latency-agnostic) gate knobs, tuned to the MEASURED deployment
+    // (scripts/latency_test.py): full gated path p95 ≈ 470 ms (worst observed
+    // ≈ 1.0–1.1 s under Cloudflare jitter), server handling ≈ 1.4 ms, DB ≈ 1.4 ms.
+    //
+    // These defaults are derived from that profile:
+    //   clockToleranceMs = 500 — absorbs residual client-clock/timer jitter on the
+    //                           noisy multi-proxy path without weakening membership.
+    //   maxAckDelayMs    = 5000 — the freshness ceiling: comfortably above the
+    //                           worst real round-trip (≈1–1.5 s) yet tight enough
+    //                           to reject stale screenshots/replays (a claim
+    //                           stamped >5 s ago is never legitimate).
+    clockToleranceMs: parseInt(process.env.JUDGE_CLOCK_TOLERANCE_MS || '500', 10),
+    maxAckDelayMs: parseInt(process.env.JUDGE_MAX_ACK_DELAY_MS || '5000', 10),
   },
 
   // CORS — allow list for the Express API and the Socket.IO handshake

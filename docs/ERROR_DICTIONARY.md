@@ -103,8 +103,8 @@ Cristian sample and a snapshot-before-challenge bug pushed honest claimed times
 out of range. The judge now enforces **token-epoch membership + freshness**, which
 are immune to infrastructure RTT:
 
-1. **Freshness** — `now − claimed ≤ maxAckDelayMs` (default 8 s) and `claimed ≤ now + clockToleranceMs`: kills replay / forged / far-old timestamps.
-2. **Membership** — the submitted token must have been **live at the claimed instant**: `birth − clockTolerance ≤ claimed < birth + validity + clockTolerance` (`clockToleranceMs` default 400 ms). A static-photo screenshot or an old/rotated token fails this.
+1. **Freshness** — `now − claimed ≤ maxAckDelayMs` (default **5 s**, tuned to measured ~470 ms p95 / worst ~1.5 s RTT) and `claimed ≤ now + clockToleranceMs`: kills replay / forged / far-old timestamps.
+2. **Membership** — the submitted token must have been **live at the claimed instant**: `birth − clockTolerance ≤ claimed < birth + validity + clockTolerance` (`clockToleranceMs` default **500 ms**). A static-photo screenshot or an old/rotated token fails this.
 3. **Anchor** — the client sets `claimed = challenge.server_time_ms + elapsed`, rooting the timestamp in the server's own clock one hop before signing.
 
 A physically present student therefore always passes; replaying an old token or

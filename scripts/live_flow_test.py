@@ -155,23 +155,29 @@ check("1.5s capture delta within token window -> PRESENT", st == 200 and r.get("
 # Refresh a live token so the judge-state tests run on a fresh, valid token
 # (the previous one may have rotated past its 5s validity, which would mask
 # whether the freshness/membership checks are what fire).
-for _ in range(8):
-    st, tk = call("GET", f"/api/v1/sessions/{SESS2}/tokens")
-    if st == 200 and tk.get("tokens"):
-        nwm = int(time.time() * 1000)
-        live = [t for t in tk["tokens"] if int(t["created_at_epoch"]) <= nwm < int(t["expires_at_epoch"])]
-        if live:
-            tok = live[0]
-            T0 = int(tok["created_at_epoch"])
-            break
-    time.sleep(0.8)
+def refresh_token():
+    global tok, T0
+    for _ in range(8):
+        st, tk = call("GET", f"/api/v1/sessions/{SESS2}/tokens")
+        if st == 200 and tk.get("tokens"):
+            nwm = int(time.time() * 1000)
+            live = [t for t in tk["tokens"] if int(t["created_at_epoch"]) <= nwm < int(t["expires_at_epoch"])]
+            if live:
+                tok = live[0]
+                T0 = int(tok["created_at_epoch"])
+                return True
+        time.sleep(0.8)
+    return False
 
+refresh_token()
 now_ms = int(time.time() * 1000)
-# Stale (30s old) timestamp -> freshness reject
+# Stale (30s old) timestamp -> freshness reject (token kept fresh so the STREAM branch fires, not EXPIRED)
+refresh_token()
 st, chal = call("POST", f"/api/v1/sessions/{SESS2}/challenge")
 st, r = claim(now_ms - 30000, DEV, nonce=chal["nonce"])
 check("stale timestamp (30s) -> ERR_STREAM_DETECTED", st == 412 and r.get("error", {}).get("code") == "ERR_STREAM_DETECTED")
 # Future (60s ahead) timestamp -> freshness reject
+refresh_token()
 st, chal = call("POST", f"/api/v1/sessions/{SESS2}/challenge")
 st, r = claim(now_ms + 60000, DEV, nonce=chal["nonce"])
 check("future timestamp -> ERR_STREAM_DETECTED", st == 412 and r.get("error", {}).get("code") == "ERR_STREAM_DETECTED")
