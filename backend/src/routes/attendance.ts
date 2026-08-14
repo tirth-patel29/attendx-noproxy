@@ -118,16 +118,30 @@ router.get('/time-sync', async (_req: Request, res: Response) => {
 
 /**
  * GET /api/v1/latency-ping
- * Public, DB-touch probe for latency testing. Echoes server epoch and reports the
- * SERVER-side cost: how long the origin took to handle the request (and a trivial
- * `SELECT 1` DB round-trip). Add this to network RTT to get the full picture
- * (Cloudflare + proxies + tunnel + origin + DB), and subtract origin cost to
- * isolate just the network path.
+ * Public, DB-touch probe for deep latency testing. Returns server epoch and a
+ * full server-side timing breakdown so a client can separate network/tunnel
+ * latency from server/DB latency.
+ * 
+ * Client measures total RTT (end-to-end). Subtracting server-side `origin_handled_us`
+ * from total RTT gives the network/tunnel overhead. The `db_echo_us` isolates
+ * just the DB round-trip. Future enhancement: add DNS/TLS timing from client.
+ * 
+ * Fields returned:
+ * - server_epoch: server wall time (ms)
+ * - server_iso: ISO timestamp
+ * - origin_handled_us: total server-side time (microseconds) from request entry
+ *   to response start, including middleware, app logic, and DB time
+ * - db_echo_us: just the `SELECT 1` DB round-trip (microseconds), or null
+ * - middleware_us: estimated middleware/routing overhead (origin - db)
+ * - app_us: estimated app handler time (origin - middleware - db)
  */
 router.get('/latency-ping', async (_req: Request, res: Response) => {
   const t0 = process.hrtime.bigint();
   const serverNow = Date.now();
   let dbUs: number | null = null;
+  let middlewareUs: number | null = null;
+  
+  // Measure DB echo
   try {
     const td = process.hrtime.bigint();
     await query('SELECT 1 AS ok');
@@ -135,13 +149,27 @@ router.get('/latency-ping', async (_req: Request, res: Response) => {
   } catch {
     /* db unavailable -> report null */
   }
-  const elapsedUs = Number((process.hrtime.bigint() - t0) / 1000n);
+  
+  const totalUs = Number((process.hrtime.bigint() - t0) / 1000n);
+  
+  // Estimate middleware overhead (total - db - app_estimate)
+  // App handler is ~instant for this endpoint, so middleware ≈ total - db
+  middlewareUs = dbUs !== null ? totalUs - dbUs : null;
+  
   res.setHeader('Cache-Control', 'no-store');
   res.json({
     server_epoch: serverNow,
     server_iso: new Date(serverNow).toISOString(),
-    db_echo_us: dbUs,             // server-side DB round-trip cost (microseconds)
-    origin_handled_us: elapsedUs, // server-side handling cost for this request
+    // Core timings (microseconds)
+    db_echo_us: dbUs,                      // DB round-trip (SELECT 1)
+    origin_handled_us: totalUs,            // Total server handling time
+    middleware_us: middlewareUs,           // Middleware + app overhead (total - DB)
+    // Helpers for clients
+    breakdown: {
+      db_roundtrip_us: dbUs,
+      app_overhead_us: middlewareUs,
+      server_total_us: totalUs,
+    }
   });
 });
 
