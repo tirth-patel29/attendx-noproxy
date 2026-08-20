@@ -8,6 +8,7 @@ import Students from './pages/Students';
 import Divisions from './pages/Divisions';
 import Courses from './pages/Courses';
 import Assignments from './pages/Assignments';
+import ApiKeys from './pages/ApiKeys';
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="divisions" element={<Divisions />} />
         <Route path="courses" element={<Courses />} />
         <Route path="timetable" element={<Assignments />} />
+        <Route path="api-keys" element={<ApiKeys />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

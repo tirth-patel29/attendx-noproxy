@@ -18,8 +18,8 @@ const NAV = [
   { to: '/students', label: 'Students', icon: <School /> },
   { to: '/divisions', label: 'Divisions', icon: <AccountTree /> },
   { to: '/courses', label: 'Courses', icon: <ClassIcon /> },
-  { to: '/api-keys', label: 'API Keys', icon: <KeyIcon /> },
   { to: '/timetable', label: 'Timetable', icon: <CalendarMonth /> },
+  { to: '/api-keys', label: 'API Keys', icon: <KeyIcon /> },
 ];
 
 export default function Layout() {

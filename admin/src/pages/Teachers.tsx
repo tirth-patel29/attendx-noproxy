@@ -36,7 +36,7 @@ export default function Teachers() {
       }
       setDialog(null); load();
     } catch (err: any) {
-      setMsg({ type: 'error', text: err?.response?.data?.error ?? 'Save failed' });
+      setMsg({ type: 'error', text: err?.response?.data?.error?.message ?? 'Save failed' });
     }
   };
 
@@ -47,7 +47,7 @@ export default function Teachers() {
       setMsg({ type: 'success', text: 'Password reset' });
       setPwDialog(null); setPw('');
     } catch (err: any) {
-      setMsg({ type: 'error', text: err?.response?.data?.error ?? 'Reset failed' });
+      setMsg({ type: 'error', text: err?.response?.data?.error?.message ?? 'Reset failed' });
     }
   };
 
@@ -58,7 +58,7 @@ export default function Teachers() {
       setMsg({ type: 'success', text: 'Teacher deleted' });
       load();
     } catch (err: any) {
-      setMsg({ type: 'error', text: err?.response?.data?.error ?? 'Delete failed' });
+      setMsg({ type: 'error', text: err?.response?.data?.error?.message ?? 'Delete failed' });
     }
   };
 

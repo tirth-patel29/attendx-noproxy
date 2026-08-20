@@ -26,7 +26,7 @@ export default function NewSessionPage() {
       const session = await portalApi.startSession({ course_code: courseCode.trim(), session_date: sessionDate });
       navigate(`/sessions/${session.data.id}`);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to create session');
+      setError(err.response?.data?.error?.message || 'Failed to create session');
       setSubmitting(false);
     }
   };
@@ -51,14 +51,14 @@ export default function NewSessionPage() {
       <Paper sx={{ p: 4, borderRadius: 3, border: '1px solid rgba(139,163,184,0.15)' }}>
         {/* Who is conducting — locked from the JWT */}
         <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 3 }}>
-          <Avatar sx={{ bgcolor: 'primary.main', color: '#0d1b2a', fontWeight: 800 }}>
+          <Avatar sx={{ bgcolor: 'primary.main', color: '#002e6a', fontWeight: 800 }}>
             {user?.name?.charAt(0)?.toUpperCase() || 'P'}
           </Avatar>
           <Box sx={{ flex: 1 }}>
             <Typography variant="subtitle1" fontWeight={700}>{user?.name}</Typography>
             <Typography variant="caption" color="text.secondary">{user?.email}</Typography>
           </Box>
-          <Chip size="small" icon={<LockIcon />} label="You — from your login" sx={{ color: '#4cc9f0' }} variant="outlined" />
+          <Chip size="small" icon={<LockIcon />} label="You — from your login" sx={{ color: '#4d8eff' }} variant="outlined" />
         </Stack>
 
         <TextField fullWidth label="Course code" placeholder="e.g. CS201" value={courseCode}

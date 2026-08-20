@@ -14,7 +14,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { QRCodeSVG } from 'qrcode.react';
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, alpha } from '@mui/material';
 
 interface ClassroomProjectorProps {
   /** Active course session UUID (36-char) used to join the session's socket room. */
@@ -37,7 +37,7 @@ export default function ClassroomProjector({
   sessionId,
   courseCode,
   socketUrl,
-  size = 280,
+  size = 320,
 }: ClassroomProjectorProps) {
   const [token, setToken] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
@@ -58,19 +58,9 @@ export default function ClassroomProjector({
 
     socket.on('connect', () => {
       setConnected(true);
-      // Subscribe to the session's metronome room so we receive token:new broadcasts.
       if (sessionId) socket.emit('join:session', sessionId);
     });
 
-    /**
-     * SUBLIMINAL MICRO-TWITCH (Gate 3)
-     * On each token:new the projector shows the ephemeral token for exactly
-     * 100ms (STATE B), then reverts to the static session anchor for the rest
-     * of the 3000ms cycle (STATE A). A remote stream sees essentially only the
-     * anchor (the flash is a 3-6 frame anomaly buried under H.264 P/B-frame
-     * prediction + Moiré), so a stream-sniper can never capture the live token;
-     * and even if a frame leaks, the 250ms latency window rejects it.
-     */
     socket.on('token:new', (payload: TokenEvent) => {
       if (!payload?.token_val) return;
       setToken(payload.token_val);
@@ -103,14 +93,29 @@ export default function ClassroomProjector({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: 1.5,
-        px: 4,
-        py: 2.5,
+        gap: 2,
+        px: 5,
+        py: 4,
         borderRadius: 3,
-        // Plain flat white card — deliberately NO CSS background patterns.
-        bgcolor: '#ffffff',
-        border: connected ? '3px solid #1976d2' : '3px solid #e0e0e0',
-        boxShadow: '0 24px 80px rgba(0,0,0,0.45)',
+        // Dark glass projector panel
+        background: 'linear-gradient(135deg, rgba(16, 19, 26, 0.95) 0%, rgba(29, 32, 39, 0.9) 100%)',
+        backdropFilter: 'blur(40px)',
+        border: connected ? `2px solid ${alpha('#4d8eff', 0.4)}` : `2px solid ${alpha('#8c909f', 0.2)}`,
+        boxShadow: `
+          0 24px 80px rgba(0,0,0,0.5),
+          0 0 60px rgba(77, 142, 255, 0.15),
+          inset 0 1px 0 rgba(255,255,255,0.05)
+        `,
+        position: 'relative',
+        overflow: 'hidden',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 0, left: 0, right: 0, height: 2,
+          background: 'linear-gradient(90deg, transparent, #4d8eff, #5de6ff, transparent)',
+          opacity: connected ? 1 : 0,
+          transition: 'opacity 0.3s ease',
+        },
       }}
     >
       {courseCode && (
@@ -124,15 +129,26 @@ export default function ClassroomProjector({
         </Typography>
       )}
 
-      {/* SUBLIMINAL PROJECTOR — STATE A shows the session anchor; only the
-          100ms STATE B flash carries the live token. The phone's filter-gate
-          ignores the anchor and hunts for the token frame. */}
-      <Box sx={{ bgcolor: '#ffffff', p: 1, borderRadius: 2 }}>
+      {/* QR Code Container — Dark glass with subtle glow */}
+      <Box sx={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 2,
+        borderRadius: 2,
+        background: 'rgba(2, 6, 23, 0.8)',
+        border: `1px solid ${alpha('#4d8eff', 0.2)}`,
+        boxShadow: `
+          0 12px 40px rgba(0,0,0,0.4),
+          inset 0 1px 0 rgba(255,255,255,0.03),
+          0 0 40px rgba(77, 142, 255, 0.1)
+        `,
+      }}>
         <QRCodeSVG
           value={qrValue}
           size={size}
-          bgColor="#ffffff"
-          fgColor="#000000"
+          bgColor="#020617"
+          fgColor="#e1e2ec"
           level="M"
           marginSize={2}
         />
@@ -142,12 +158,14 @@ export default function ClassroomProjector({
       <Typography
         display="block"
         sx={{
-          fontFamily: 'monospace',
+          fontFamily: '"JetBrains Mono", "Fira Code", monospace',
           fontWeight: 900,
           letterSpacing: '0.35em',
           textIndent: '0.35em',
-          fontSize: 28,
+          fontSize: { xs: 20, sm: 24, md: 28 },
           lineHeight: 1.2,
+          color: '#e1e2ec',
+          textShadow: '0 0 20px rgba(77, 142, 255, 0.3)',
         }}
       >
         {token ?? '------'}

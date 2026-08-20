@@ -1,32 +1,27 @@
 // src/components/Layout.tsx
+// Premium shell: sidebar navigation (Dashboard / Start Session), profile footer, logout.
 import { useState } from 'react';
-import { useNavigate, useLocation, Outlet } from 'react-router-dom';
+import { useNavigate, useLocation, Outlet, NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useMediaQuery, useTheme } from '@mui/material';
+import { useMediaQuery, useTheme, alpha, Box, Tooltip } from '@mui/material';
 import {
-  AppBar,
-  Toolbar,
-  Typography,
-  IconButton,
-  Box,
-  Drawer,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Avatar,
-  Divider,
-  Tooltip,
+  AppBar, Toolbar, Typography, IconButton, Drawer, List, ListItem,
+  ListItemButton, ListItemIcon, ListItemText, Avatar, Divider, Chip,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
-  Person as PersonIcon,
+  EventNote as EventNoteIcon,
   Logout as LogoutIcon,
+  Shield as ShieldIcon,
 } from '@mui/icons-material';
 
-const drawerWidth = 260;
+const drawerWidth = 280;
+
+const NAV = [
+  { path: '/dashboard', label: 'Dashboard', icon: <DashboardIcon /> },
+  { path: '/sessions/new', label: 'Start Session', icon: <EventNoteIcon /> },
+];
 
 export default function Layout() {
   const theme = useTheme();
@@ -36,58 +31,84 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const handleDrawerToggle = () => {
-    setMobileOpen(!mobileOpen);
-  };
-
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/login', { replace: true });
   };
-
-  const menuItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: <DashboardIcon /> },
-  ];
 
   const drawer = (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+      {/* Brand */}
+      <Box sx={{ p: 2.5, display: 'flex', alignItems: 'center', gap: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
         <Box
           sx={{
-            width: 42, height: 42, borderRadius: 2, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', bgcolor: 'rgba(76,201,240,0.15)', color: 'primary.main',
+            width: 48, height: 48, borderRadius: 3, display: 'flex', alignItems: 'center',
+            justifyContent: 'center',
+            background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+            boxShadow: `0 8px 20px ${alpha(theme.palette.primary.main, 0.35)}`,
           }}
         >
-          <Avatar sx={{ width: 34, height: 34, bgcolor: 'primary.main', color: '#0d1b2a', fontWeight: 800 }}>
-            {user?.name?.charAt(0)?.toUpperCase() || 'P'}
-          </Avatar>
+          <ShieldIcon sx={{ color: '#002e6a' }} fontSize="medium" />
         </Box>
         <Box>
-          <Typography variant="subtitle1" fontWeight={700} lineHeight={1.1}>Teacher Portal</Typography>
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>{user?.name}</Typography>
+          <Typography variant="subtitle1" fontWeight={800} lineHeight={1.1} color="text.primary">
+            Teacher Portal
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Attendance Gateway
+          </Typography>
         </Box>
       </Box>
-      <Divider />
-      <List sx={{ flex: 1, px: 1, pt: 1 }}>
-        {menuItems.map((item) => (
-          <ListItem key={item.path} sx={{ p: 0, mb: 0.5 }}>
-            <ListItemButton
-              selected={location.pathname.startsWith(item.path)}
-              onClick={() => navigate(item.path)}
-              sx={{ borderRadius: 2 }}
-            >
-              <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.label} />
-            </ListItemButton>
-          </ListItem>
-        ))}
+
+      {/* Nav */}
+      <List sx={{ flex: 1, px: 1.5, pt: 1.5 }}>
+        {NAV.map((item) => {
+          const active = location.pathname.startsWith(item.path);
+          return (
+            <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>
+              <ListItemButton
+                component={NavLink}
+                to={item.path}
+                selected={active}
+                sx={{
+                  borderRadius: 2,
+                  '&.Mui-selected': {
+                    bgcolor: `${alpha(theme.palette.primary.main, 0.14)}`,
+                    color: theme.palette.primary.main,
+                    borderLeft: `3px solid ${theme.palette.primary.main}`,
+                  },
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 40, color: active ? theme.palette.primary.main : 'inherit' }}>
+                  {item.icon}
+                </ListItemIcon>
+                <ListItemText primary={item.label} primaryTypographyProps={{ fontWeight: active ? 800 : 600 }} />
+              </ListItemButton>
+            </ListItem>
+          );
+        })}
       </List>
+
+      {/* Profile footer */}
       <Divider />
-      <List sx={{ px: 1, pb: 1 }}>
-        <ListItem sx={{ p: 0 }}>
-          <ListItemButton onClick={handleLogout} sx={{ borderRadius: 2 }}>
-            <ListItemIcon sx={{ minWidth: 36 }}><LogoutIcon /></ListItemIcon>
-            <ListItemText primary="Logout" />
+      <List sx={{ px: 1.5, py: 1 }} dense>
+        <ListItem disablePadding>
+          <ListItemButton sx={{ borderRadius: 2 }}>
+            <Avatar sx={{ width: 38, height: 38, bgcolor: 'primary.main', color: '#002e6a', fontWeight: 800, fontSize: 16 }}>
+              {user?.name?.charAt(0)?.toUpperCase() || 'P'}
+            </Avatar>
+            <ListItemText
+              sx={{ ml: 1 }}
+              primary={user?.name || 'Teacher'}
+              secondaryTypographyProps={{ variant: 'caption', noWrap: true }}
+              secondary={user?.email}
+            />
+          </ListItemButton>
+        </ListItem>
+        <ListItem disablePadding sx={{ mt: 0.5 }}>
+          <ListItemButton onClick={handleLogout} sx={{ borderRadius: 2, color: theme.palette.error.main }}>
+            <ListItemIcon sx={{ minWidth: 40 }}><LogoutIcon fontSize="small" /></ListItemIcon>
+            <ListItemText primary="Sign out" primaryTypographyProps={{ fontWeight: 600 }} />
           </ListItemButton>
         </ListItem>
       </List>
@@ -98,57 +119,63 @@ export default function Layout() {
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
       <AppBar
         position="fixed"
+        elevation={0}
         sx={{
           width: { md: `calc(100% - ${drawerWidth}px)` },
           ml: { md: `${drawerWidth}px` },
-          bgcolor: 'background.default',
+          bgcolor: 'rgba(16, 19, 26, 0.95)',
           color: 'text.primary',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+          borderBottom: `1px solid ${theme.palette.divider}`,
         }}
       >
         <Toolbar>
           {isMobile && (
-            <IconButton
-              color="inherit"
-              edge="start"
-              onClick={handleDrawerToggle}
-              sx={{ mr: 2 }}
-            >
+            <IconButton color="inherit" edge="start" onClick={() => setMobileOpen(true)} sx={{ mr: 2 }}>
               <MenuIcon />
             </IconButton>
           )}
-          <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700 }}>
-            Attendance Gateway
-          </Typography>
-          <Tooltip title="Profile">
-            <IconButton onClick={() => navigate('/profile')}>
-              <PersonIcon />
-            </IconButton>
+          <Box sx={{ flexGrow: 1 }}>
+            <Typography variant="subtitle1" fontWeight={800}>{user?.name ? `Welcome, ${user.name.split(' ')[0]}` : 'Teacher Portal'}</Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
+              Start a live session and it becomes your classroom's secure projector
+            </Typography>
+          </Box>
+          <Tooltip title="Secure session">
+            <Chip
+              size="small"
+              variant="outlined"
+              label="Zero-Trust"
+              icon={<ShieldIcon sx={{ fontSize: 15 }} />}
+              sx={{ color: theme.palette.primary.main, borderColor: alpha(theme.palette.primary.main, 0.4) }}
+            />
           </Tooltip>
         </Toolbar>
       </AppBar>
+
       <Drawer
         variant={isMobile ? 'temporary' : 'permanent'}
         open={isMobile ? mobileOpen : true}
-        onClose={handleDrawerToggle}
+        onClose={() => setMobileOpen(false)}
         sx={{
           width: drawerWidth,
           flexShrink: 0,
           '& .MuiDrawer-paper': {
             width: drawerWidth,
             boxSizing: 'border-box',
-            borderRight: '1px solid',
-            borderColor: 'divider',
+            borderRight: `1px solid ${theme.palette.divider}`,
+            backgroundColor: '#10131a',
+            backdropFilter: 'blur(30px)',
           },
         }}
       >
         {drawer}
       </Drawer>
+
       <Box
         component="main"
         sx={{
           flexGrow: 1,
-          p: 3,
+          p: { xs: 2, md: 3.5 },
           width: { md: `calc(100% - ${drawerWidth}px)` },
           mt: '64px',
           ml: { md: `${drawerWidth}px` },

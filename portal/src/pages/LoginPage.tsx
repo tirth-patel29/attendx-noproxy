@@ -52,7 +52,7 @@ export default function LoginPage() {
       await login(data.email, data.password);
       navigate('/dashboard');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Invalid credentials. Please try again.');
+      setError(err.response?.data?.error?.message || 'Invalid credentials. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -60,7 +60,7 @@ export default function LoginPage() {
 
   return (
     <Container maxWidth="xs" sx={{ mt: 8, mb: 8 }}>
-      {/* Background decorative elements */}
+      {/* Background Aurora Glows */}
       <Box
         sx={{
           position: 'fixed',
@@ -81,9 +81,10 @@ export default function LoginPage() {
             width: 400,
             height: 400,
             borderRadius: '50%',
-            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
+            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
             opacity: 0.08,
             filter: 'blur(100px)',
+            animation: 'float 6s ease-in-out infinite',
           }}
         />
         <Box
@@ -94,9 +95,10 @@ export default function LoginPage() {
             width: 500,
             height: 500,
             borderRadius: '50%',
-            background: `linear-gradient(135deg, ${theme.palette.secondary.main} 0%, ${theme.palette.secondary.light} 100%)`,
+            background: `linear-gradient(135deg, ${theme.palette.secondary.main} 0%, ${theme.palette.warning.main} 100%)`,
             opacity: 0.06,
             filter: 'blur(120px)',
+            animation: 'float 8s ease-in-out infinite reverse',
           }}
         />
       </Box>
@@ -106,13 +108,24 @@ export default function LoginPage() {
         sx={{
           p: { xs: 4, sm: 5 },
           borderRadius: 3,
-          background: 'rgba(255, 255, 255, 0.9)',
+          background: 'rgba(16, 19, 26, 0.9)',
           backdropFilter: 'blur(20px)',
           border: '1px solid',
           borderColor: 'divider',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.08), 0 8px 24px rgba(0,0,0,0.06)',
+          boxShadow: '0 24px 80px rgba(0,0,0,0.4), 0 0 40px rgba(77, 142, 255, 0.1)',
           position: 'relative',
           zIndex: 1,
+          overflow: 'hidden',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 3,
+            background: 'linear-gradient(90deg, #4d8eff, #5de6ff, #fbbf24)',
+            opacity: 0.6,
+          },
         }}
       >
         {/* Header */}
@@ -122,25 +135,26 @@ export default function LoginPage() {
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: 72,
-              height: 72,
-              borderRadius: '20px',
-              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
+              width: 80,
+              height: 80,
+              borderRadius: '24px',
+              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
               mb: 3,
-              boxShadow: `0 12px 32px ${theme.palette.primary.main}40`,
+              boxShadow: `0 16px 40px ${alpha(theme.palette.primary.main, 0.4)}`,
+              animation: 'pulse-glow 3s ease-in-out infinite',
             }}
           >
-            <School sx={{ fontSize: 36, color: 'white' }} />
+            <School sx={{ fontSize: 40, color: '#002e6a' }} />
           </Box>
           <Typography variant="h3" fontWeight={800} color="text.primary" gutterBottom letterSpacing={-0.5}>
             Attendance Gateway
           </Typography>
           <Typography variant="h6" fontWeight={400} color="text.secondary">
-            Professor Portal — Zero-Trust Attendance
+            Teacher Portal — Zero-Trust Attendance
           </Typography>
         </Box>
 
-        {/* Features row */}
+        {/* Feature Indicators */}
         <Grid container spacing={2} sx={{ mb: 4 }}>
           <Grid item xs={4}>
             <Box sx={{ textAlign: 'center', p: 1 }}>
@@ -149,9 +163,9 @@ export default function LoginPage() {
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  width: 40,
-                  height: 40,
-                  borderRadius: '12px',
+                  width: 44,
+                  height: 44,
+                  borderRadius: '14px',
                   background: `${theme.palette.primary.main}15`,
                   color: theme.palette.primary.main,
                   mb: 1,
@@ -174,9 +188,9 @@ export default function LoginPage() {
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  width: 40,
-                  height: 40,
-                  borderRadius: '12px',
+                  width: 44,
+                  height: 44,
+                  borderRadius: '14px',
                   background: `${theme.palette.secondary.main}15`,
                   color: theme.palette.secondary.main,
                   mb: 1,
@@ -199,11 +213,11 @@ export default function LoginPage() {
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  width: 40,
-                  height: 40,
-                  borderRadius: '12px',
-                  background: `${theme.palette.warning?.main || '#f59e0b'}15`,
-                  color: theme.palette.warning?.main || '#f59e0b',
+                  width: 44,
+                  height: 44,
+                  borderRadius: '14px',
+                  background: `${theme.palette.warning.main}15`,
+                  color: theme.palette.warning.main,
                   mb: 1,
                 }}
               >
@@ -258,7 +272,7 @@ export default function LoginPage() {
             }}
             sx={{ mb: 2 }}
             inputProps={{
-              style: { fontSize: 16 }, // Prevent zoom on iOS
+              style: { fontSize: 16 },
             }}
           />
 
@@ -313,10 +327,9 @@ export default function LoginPage() {
               fontSize: 16,
               fontWeight: 600,
               borderRadius: 12,
-              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-              boxShadow: `0 8px 24px ${theme.palette.primary.main}40`,
+              boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.4)}`,
               '&:hover': {
-                boxShadow: `0 12px 32px ${theme.palette.primary.main}50`,
+                boxShadow: `0 12px 32px ${alpha(theme.palette.primary.main, 0.5)}`,
                 transform: 'translateY(-2px)',
               },
               '&:active': {
@@ -348,16 +361,11 @@ export default function LoginPage() {
 
           <Box sx={{ mt: 4, p: 3, borderRadius: 2, background: `${theme.palette.primary.main}08`, border: `1px solid ${theme.palette.primary.main}20` }}>
             <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
-              Demo Credentials
+              Sign in with your professor email
             </Typography>
-            <Typography variant="caption" color="text.primary" display="block" fontFamily="monospace" fontSize="0.75rem">
-              Email: prof.alex@college.edu
-            </Typography>
-            <Typography variant="caption" color="text.primary" display="block" fontFamily="monospace" fontSize="0.75rem">
-              Password: prof123
-            </Typography>
-            <Typography variant="caption" color="text.primary" display="block" fontFamily="monospace" fontSize="0.75rem" sx={{ mt: 1 }}>
-              Also: prof.maria@college.edu / prof123
+            <Typography variant="caption" color="text.primary" display="block">
+              Use the credentials issued by your administrator. Need a reset? Ask an admin to
+              reset your password in the Admin console.
             </Typography>
           </Box>
         </form>
@@ -375,3 +383,6 @@ export default function LoginPage() {
     </Container>
   );
 }
+
+// Helper for alpha function
+import { alpha } from '@mui/material';

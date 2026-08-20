@@ -23,6 +23,8 @@ RUN npm run build
 FROM node:20-alpine
 
 ENV NODE_ENV=production
+ENV TZ=Asia/Kolkata
+RUN apk add --no-cache tzdata && cp /usr/share/zoneinfo/Asia/Kolkata /etc/localtime && echo "Asia/Kolkata" > /etc/timezone
 WORKDIR /app
 
 # Copy package files

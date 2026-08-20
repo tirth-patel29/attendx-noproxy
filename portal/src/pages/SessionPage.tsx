@@ -56,7 +56,6 @@ export default function SessionPage() {
     loadSession();
     loadAttendance();
     startTokenPolling();
-    // Live attendance refresh while the session is projected
     attendanceInterval.current = setInterval(loadAttendance, 4000);
     return () => {
       if (pollingInterval.current) clearInterval(pollingInterval.current);
@@ -239,7 +238,7 @@ export default function SessionPage() {
         <Box
           sx={{
             height: '100vh',
-            bgcolor: '#050b18',
+            bgcolor: '#020617',
             color: '#fff',
             display: 'flex',
             flexDirection: 'column',
@@ -274,7 +273,7 @@ export default function SessionPage() {
           {currentToken ? (
             <ClassroomProjector sessionId={sessionId!} courseCode={session.course_code} size={460} />
           ) : (
-            <CircularProgress sx={{ color: '#4cc9f0' }} />
+            <CircularProgress sx={{ color: '#4d8eff' }} />
           )}
 
           <Button

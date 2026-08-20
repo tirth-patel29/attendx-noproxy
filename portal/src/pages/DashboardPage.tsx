@@ -54,7 +54,7 @@ export default function DashboardPage() {
       setSummary(sumRes.data || []);
       setError('');
     } catch (err: any) {
-      setError(err?.response?.data?.error || 'Failed to load dashboard');
+      setError(err?.response?.data?.error?.message || 'Failed to load dashboard');
     } finally {
       setLoading(false);
     }
@@ -68,14 +68,14 @@ export default function DashboardPage() {
       const res = await portalApi.startSession({ course_code: courseCode });
       navigate(`/sessions/${res.data.id}`);
     } catch (err: any) {
-      setError(err?.response?.data?.error || 'Failed to start session');
+      setError(err?.response?.data?.error?.message || 'Failed to start session');
       setStarting(null);
     }
   };
 
   const handleStop = async (id: string) => {
     if (!window.confirm('Stop this session? The projector QR will stop rotating.')) return;
-    try { await portalApi.stopSession(id); loadData(); } catch (e: any) { setError(e?.response?.data?.error || 'Stop failed'); }
+    try { await portalApi.stopSession(id); loadData(); } catch (e: any) { setError(e?.response?.data?.error?.message || 'Stop failed'); }
   };
 
   const active = sessions.filter((s) => s.is_active);
@@ -92,15 +92,21 @@ export default function DashboardPage() {
       {/* ===== Header banner ===== */}
       <Paper elevation={0} sx={{
         p: { xs: 3, md: 4 }, borderRadius: 4, mb: 4,
-        background: 'linear-gradient(135deg, #0b1e33 0%, #12263a 55%, #1a3550 100%)',
-        border: '1px solid rgba(76,201,240,0.15)',
+        background: 'linear-gradient(135deg, #050a18 0%, #10131a 55%, #1a2a3f 100%)',
+        border: '1px solid rgba(77, 142, 255, 0.15)',
         position: 'relative', overflow: 'hidden',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 0, left: 0, right: 0, height: 2,
+          background: 'linear-gradient(90deg, transparent, #4d8eff, #5de6ff, transparent)',
+        },
       }}>
-        <Box sx={{ position: 'absolute', right: -60, top: -60, width: 220, height: 220, borderRadius: '50%', bgcolor: 'rgba(76,201,240,0.07)' }} />
-        <Box sx={{ position: 'absolute', right: 40, bottom: -80, width: 180, height: 180, borderRadius: '50%', bgcolor: 'rgba(76,201,240,0.05)' }} />
+        <Box sx={{ position: 'absolute', right: -60, top: -60, width: 220, height: 220, borderRadius: '50%', bgcolor: 'rgba(77, 142, 255, 0.07)' }} />
+        <Box sx={{ position: 'absolute', right: 40, bottom: -80, width: 180, height: 180, borderRadius: '50%', bgcolor: 'rgba(93, 230, 255, 0.05)' }} />
         <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ md: 'center' }} spacing={2}>
           <Box>
-            <Typography variant="caption" sx={{ color: 'rgba(139,163,184,0.9)', letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+            <Typography variant="caption" sx={{ color: 'rgba(194,198,214,0.9)', letterSpacing: '0.2em', textTransform: 'uppercase' }}>
               {todayLabel}
             </Typography>
             <Typography variant="h4" fontWeight={800} sx={{ mt: 0.5 }}>
@@ -120,7 +126,7 @@ export default function DashboardPage() {
 
         <Grid container spacing={3} sx={{ mt: 3 }}>
           {[
-            { label: 'Lectures today', value: timetable.length, icon: <CalendarIcon />, accent: '#4cc9f0' },
+            { label: 'Lectures today', value: timetable.length, icon: <CalendarIcon />, accent: '#4d8eff' },
             { label: 'Live now', value: active.length, icon: <LiveIcon />, accent: '#4ade80' },
             { label: 'Present today', value: presentToday, icon: <CheckIcon />, accent: '#fbbf24' },
           ].map((s) => (
@@ -165,7 +171,7 @@ export default function DashboardPage() {
                 return (
                   <Grid item xs={12} sm={6} lg={4} key={lec.assignment_id}>
                     <Card elevation={0} sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 3,
-                      border: `1px solid ${live ? 'rgba(74,222,128,0.4)' : 'rgba(76,201,240,0.15)'}` }}>
+                      border: `1px solid ${live ? 'rgba(74,222,128,0.4)' : 'rgba(77, 142, 255, 0.15)'}` }}>
                       <CardContent sx={{ flex: 1 }}>
                         <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                           <Box>
@@ -193,9 +199,7 @@ export default function DashboardPage() {
                             {starting === lec.course_code ? 'Starting…' : 'Start attendance'}
                           </Button>
                         )}
-                        {live && (
-                          <Box sx={{ flex: 1 }} />
-                        )}
+                        {live && <Box sx={{ flex: 1 }} />}
                         {live && (
                           <Button size="small" startIcon={<QRCodeIcon />} onClick={() => navigate(`/sessions/${live.id}`)}>Project QR</Button>
                         )}
@@ -219,7 +223,7 @@ export default function DashboardPage() {
                   const overall = s.total_students > 0 ? Math.round((s.present_count / (s.sessions_total * s.total_students || 1)) * 100) : 0;
                   return (
                     <Grid item xs={12} sm={6} lg={4} key={s.course_code}>
-                      <Card elevation={0} sx={{ borderRadius: 3, border: '1px solid rgba(76,201,240,0.12)' }}>
+                      <Card elevation={0} sx={{ borderRadius: 3, border: '1px solid rgba(77, 142, 255, 0.12)' }}>
                         <CardContent>
                           <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                             <Box>
