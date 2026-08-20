@@ -53,7 +53,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: cd admin && npm ci
+      - run: cd admin && npm install
       - run: cd admin && npm run build
 
   docker-build:
