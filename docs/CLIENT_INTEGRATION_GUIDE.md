@@ -74,14 +74,16 @@ Use this to generate typed clients (Dart, Kotlin, Swift, TypeScript).
 
 ## 2. Measured Latency Profile (Tune Against This)
 
-From the reference deployment (`scripts/latency_test.py`, n≈30, public internet):
+From the reference deployment (`scripts/latency_test.py`, n≈40, public internet, 2026-08-20):
 
 | Layer | p50 | p95 | Worst |
 |-------|-----|-----|-------|
 | TCP connect (:443) | ~91 ms | ~95 ms | ~97 ms |
-| Server handling (`/latency-ping`) | ~1.4 ms | ~3–9 ms | — |
-| DB round-trip (`SELECT 1`) | ~1.4 ms | ~3–9 ms | — |
+| Server handling (`/latency-ping`) | **~1.1 ms** | **~1.3 ms** | — |
+| DB round-trip (`SELECT 1`) | **~1.1 ms** | **~1.3 ms** | — |
 | **Full gated path** (`/student/status`) | ~370 ms | **~470 ms** | ~1.0–1.1 s |
+
+> **Note:** Server+DB latency has improved significantly (~1.1 ms p50) after backend optimizations. The ~370–470 ms full-path latency is **entirely the network/tunnel path** (Cloudflare → cloudflared → reverse proxies). Your network may differ — measure with `python3 scripts/latency_test.py 40` from your actual location.
 
 **Key takeaways:**
 - The server + DB are ~1.4 ms — effectively free. The ~370–470 ms is **entirely the network/tunnel path** (Cloudflare → cloudflared → reverse proxies). Your network may differ — measure with `python3 scripts/latency_test.py 40` from your actual location.
