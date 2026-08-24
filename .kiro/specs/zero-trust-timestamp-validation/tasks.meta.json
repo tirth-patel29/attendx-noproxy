@@ -1,0 +1,94 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. Write bug condition exploration test": [
+      {
+        "executionId": "67970142-7743-4232-9bc9-ab104503a07d",
+        "chatSessionId": "sess_5d2974fb-926d-4246-bdde-99ef02cdc69b",
+        "timestamp": 1787581099965
+      },
+      {
+        "executionId": "67970142-7743-4232-9bc9-ab104503a07d",
+        "chatSessionId": "sess_5d2974fb-926d-4246-bdde-99ef02cdc69b",
+        "timestamp": 1787581110114
+      }
+    ],
+    "2. Write preservation property tests (BEFORE implementing fix)": [
+      {
+        "executionId": "67970142-7743-4232-9bc9-ab104503a07d",
+        "chatSessionId": "sess_5d2974fb-926d-4246-bdde-99ef02cdc69b",
+        "timestamp": 1787581100281
+      }
+    ],
+    "3.1 Update `/api/v1/time/validate` endpoint to capture server timestamp": [
+      {
+        "executionId": "67970142-7743-4232-9bc9-ab104503a07d",
+        "chatSessionId": "sess_5d2974fb-926d-4246-bdde-99ef02cdc69b",
+        "timestamp": 1787581100351
+      }
+    ],
+    "3.2 Update judge service to use server timestamps": [
+      {
+        "executionId": "67970142-7743-4232-9bc9-ab104503a07d",
+        "chatSessionId": "sess_5d2974fb-926d-4246-bdde-99ef02cdc69b",
+        "timestamp": 1787581100386
+      }
+    ],
+    "3.3 Update HMAC verification to use server timestamp": [
+      {
+        "executionId": "67970142-7743-4232-9bc9-ab104503a07d",
+        "chatSessionId": "sess_5d2974fb-926d-4246-bdde-99ef02cdc69b",
+        "timestamp": 1787581100420
+      }
+    ],
+    "3.4 Verify bug condition exploration test now passes": [
+      {
+        "executionId": "67970142-7743-4232-9bc9-ab104503a07d",
+        "chatSessionId": "sess_5d2974fb-926d-4246-bdde-99ef02cdc69b",
+        "timestamp": 1787581100465
+      }
+    ],
+    "3.5 Verify preservation tests still pass": [
+      {
+        "executionId": "67970142-7743-4232-9bc9-ab104503a07d",
+        "chatSessionId": "sess_5d2974fb-926d-4246-bdde-99ef02cdc69b",
+        "timestamp": 1787581100518
+      }
+    ],
+    "4.1 Create fix checking unit tests": [
+      {
+        "executionId": "67970142-7743-4232-9bc9-ab104503a07d",
+        "chatSessionId": "sess_5d2974fb-926d-4246-bdde-99ef02cdc69b",
+        "timestamp": 1787581100552
+      }
+    ],
+    "4.2 Create fix checking property-based tests": [
+      {
+        "executionId": "67970142-7743-4232-9bc9-ab104503a07d",
+        "chatSessionId": "sess_5d2974fb-926d-4246-bdde-99ef02cdc69b",
+        "timestamp": 1787581100593
+      }
+    ],
+    "4.3 Create integration tests for full claim flow": [
+      {
+        "executionId": "67970142-7743-4232-9bc9-ab104503a07d",
+        "chatSessionId": "sess_5d2974fb-926d-4246-bdde-99ef02cdc69b",
+        "timestamp": 1787581100629
+      }
+    ],
+    "5.1 Create/update CLIENT_INTEGRATION_GUIDE.md": [
+      {
+        "executionId": "67970142-7743-4232-9bc9-ab104503a07d",
+        "chatSessionId": "sess_5d2974fb-926d-4246-bdde-99ef02cdc69b",
+        "timestamp": 1787581100684
+      }
+    ],
+    "6. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "67970142-7743-4232-9bc9-ab104503a07d",
+        "chatSessionId": "sess_5d2974fb-926d-4246-bdde-99ef02cdc69b",
+        "timestamp": 1787581100718
+      }
+    ]
+  }
+}
