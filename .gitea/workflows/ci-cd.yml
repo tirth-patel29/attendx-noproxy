@@ -1,0 +1,45 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-deploy:
+    runs-on: [self-hosted, docker]
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build Backend image
+        run: |
+          cd /workspace/attendance-gateway/backend
+          docker build -t attendance-backend:latest .
+      
+      - name: Build Portal image
+        run: |
+          cd /workspace/attendance-gateway/portal
+          docker build -t attendance-portal:latest .
+      
+      - name: Build Admin image
+        run: |
+          cd /workspace/attendance-gateway/admin
+          docker build -t attendance-admin:latest .
+
+      - name: Deploy with docker-compose
+        run: |
+          cd /home/hetp/docker-stacks
+          docker compose up -d --build
+        env:
+          CACHE_BUST: ${{ github.sha }}
+
+      - name: Verify deploy
+        run: |
+          sleep 10
+          curl -sf https://api.atmyhome.tech/health | grep healthy
+          curl -sf https://portal.atmyhome.tech/ > /dev/null
+          curl -sf https://admin.atmyhome.tech/ > /dev/null
