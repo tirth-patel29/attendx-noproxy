@@ -57,13 +57,13 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* 🎉 ANIMATED WATERMELON UI BANNER */}
+      {/* ðŸŽ‰ ANIMATED WATERMELON UI BANNER */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <Card className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 border-0 text-white overflow-hidden relative">
+        <Card className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 border-0 text-white overflow-hidden relative shadow-2xl shadow-purple-500/50 animate-pulse-slow">
           <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRjMC0yLjIxLTEuNzktNC00LTRzLTQgMS43OS00IDQgMS43OSA0IDQgNCA0LTEuNzkgNC00em0wLTEwYzAtMi4yMS0xLjc5LTQtNC00cy00IDEuNzktNCA0IDEuNzkgNCA0IDQgNC0xLjc5IDQtNHptMC0xMGMwLTIuMjEtMS43OS00LTQtNHMtNCAxLjc5LTQgNCAxLjc5IDQgNCA0IDQtMS43OSA0LTR6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-20"></div>
           <CardContent className="pt-6 relative z-10">
             <div className="flex items-center gap-3">
@@ -85,10 +85,10 @@ export default function Dashboard() {
               </motion.div>
               <div>
                 <h2 className="text-2xl font-bold">
-                  🍉 Watermelon UI is Live!
+                  ðŸ‰ Watermelon UI is Live!
                 </h2>
                 <p className="text-white/90">
-                  Admin Console • Modern Design • Smooth Animations • Deployed Successfully
+                  Admin Console â€¢ Modern Design â€¢ Smooth Animations â€¢ Deployed Successfully
                 </p>
               </div>
             </div>
