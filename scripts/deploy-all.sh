@@ -17,12 +17,12 @@ SSH_HOST="${SSH_HOST:?set SSH_HOST, e.g. hetp@192.168.0.108}"
 SSH_KEY="${SSH_KEY:-}"
 HOST_STACKS="${HOST_STACKS:-/home/hetp/docker-stacks}"
 
-SSH_ARGS=()
-[ -n "$SSH_KEY" ] && SSH_ARGS=(-i "$SSH_KEY")
+SSH_ARGS=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null)
+[ -n "$SSH_KEY" ] && SSH_ARGS+=(-i "$SSH_KEY")
 # expand a leading ~ in SSH_KEY to the real home (works for CI runners too)
-if [[ "$SSH_KEY" == \~* ]]; then SSH_KEY="${SSH_KEY/#\~/$HOME}"; SSH_ARGS=(-i "$SSH_KEY"); fi
-RSYNC_SSH=ssh
-[ -n "$SSH_KEY" ] && RSYNC_SSH="ssh -i $SSH_KEY"
+if [[ "$SSH_KEY" == \~* ]]; then SSH_KEY="${SSH_KEY/#\~/$HOME}"; SSH_ARGS=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "$SSH_KEY"); fi
+RSYNC_SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+[ -n "$SSH_KEY" ] && RSYNC_SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i $SSH_KEY"
 
 deploy_app() {
   local local_src="$1" host_dir="$2"
