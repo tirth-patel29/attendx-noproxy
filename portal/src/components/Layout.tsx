@@ -1,189 +1,123 @@
-// src/components/Layout.tsx
-// Premium shell: sidebar navigation (Dashboard / Start Session), profile footer, logout.
-import { useState } from 'react';
-import { useNavigate, useLocation, Outlet, NavLink } from 'react-router-dom';
+﻿import { useState } from 'react';
+import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useMediaQuery, useTheme, alpha, Box, Tooltip } from '@mui/material';
-import {
-  AppBar, Toolbar, Typography, IconButton, Drawer, List, ListItem,
-  ListItemButton, ListItemIcon, ListItemText, Avatar, Divider, Chip,
-} from '@mui/material';
-import {
-  Menu as MenuIcon,
-  Dashboard as DashboardIcon,
-  EventNote as EventNoteIcon,
-  Logout as LogoutIcon,
-  Shield as ShieldIcon,
-} from '@mui/icons-material';
-
-const drawerWidth = 280;
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { LayoutDashboard, Plus, LogOut, Shield, Menu, X } from 'lucide-react';
 
 const NAV = [
-  { path: '/dashboard', label: 'Dashboard', icon: <DashboardIcon /> },
-  { path: '/sessions/new', label: 'Start Session', icon: <EventNoteIcon /> },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/sessions/new', label: 'Start Session', icon: Plus },
 ];
 
 export default function Layout() {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login', { replace: true });
-  };
-
-  const drawer = (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Brand */}
-      <Box sx={{ p: 2.5, display: 'flex', alignItems: 'center', gap: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
-        <Box
-          sx={{
-            width: 48, height: 48, borderRadius: 3, display: 'flex', alignItems: 'center',
-            justifyContent: 'center',
-            background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-            boxShadow: `0 8px 20px ${alpha(theme.palette.primary.main, 0.35)}`,
-          }}
-        >
-          <ShieldIcon sx={{ color: '#002e6a' }} fontSize="medium" />
-        </Box>
-        <Box>
-          <Typography variant="subtitle1" fontWeight={800} lineHeight={1.1} color="text.primary">
-            Teacher Portal
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            Attendance Gateway
-          </Typography>
-        </Box>
-      </Box>
-
-      {/* Nav */}
-      <List sx={{ flex: 1, px: 1.5, pt: 1.5 }}>
-        {NAV.map((item) => {
-          const active = location.pathname.startsWith(item.path);
-          return (
-            <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>
-              <ListItemButton
-                component={NavLink}
-                to={item.path}
-                selected={active}
-                sx={{
-                  borderRadius: 2,
-                  '&.Mui-selected': {
-                    bgcolor: `${alpha(theme.palette.primary.main, 0.14)}`,
-                    color: theme.palette.primary.main,
-                    borderLeft: `3px solid ${theme.palette.primary.main}`,
-                  },
-                }}
-              >
-                <ListItemIcon sx={{ minWidth: 40, color: active ? theme.palette.primary.main : 'inherit' }}>
-                  {item.icon}
-                </ListItemIcon>
-                <ListItemText primary={item.label} primaryTypographyProps={{ fontWeight: active ? 800 : 600 }} />
-              </ListItemButton>
-            </ListItem>
-          );
-        })}
-      </List>
-
-      {/* Profile footer */}
-      <Divider />
-      <List sx={{ px: 1.5, py: 1 }} dense>
-        <ListItem disablePadding>
-          <ListItemButton sx={{ borderRadius: 2 }}>
-            <Avatar sx={{ width: 38, height: 38, bgcolor: 'primary.main', color: '#002e6a', fontWeight: 800, fontSize: 16 }}>
-              {user?.name?.charAt(0)?.toUpperCase() || 'P'}
-            </Avatar>
-            <ListItemText
-              sx={{ ml: 1 }}
-              primary={user?.name || 'Teacher'}
-              secondaryTypographyProps={{ variant: 'caption', noWrap: true }}
-              secondary={user?.email}
-            />
-          </ListItemButton>
-        </ListItem>
-        <ListItem disablePadding sx={{ mt: 0.5 }}>
-          <ListItemButton onClick={handleLogout} sx={{ borderRadius: 2, color: theme.palette.error.main }}>
-            <ListItemIcon sx={{ minWidth: 40 }}><LogoutIcon fontSize="small" /></ListItemIcon>
-            <ListItemText primary="Sign out" primaryTypographyProps={{ fontWeight: 600 }} />
-          </ListItemButton>
-        </ListItem>
-      </List>
-    </Box>
-  );
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
-      <AppBar
-        position="fixed"
-        elevation={0}
-        sx={{
-          width: { md: `calc(100% - ${drawerWidth}px)` },
-          ml: { md: `${drawerWidth}px` },
-          bgcolor: 'rgba(16, 19, 26, 0.95)',
-          color: 'text.primary',
-          borderBottom: `1px solid ${theme.palette.divider}`,
-        }}
+    <div className="flex h-screen bg-background">
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          "fixed left-0 top-0 z-40 h-screen border-r bg-card transition-all duration-300",
+          sidebarOpen ? "w-64" : "w-16"
+        )}
       >
-        <Toolbar>
-          {isMobile && (
-            <IconButton color="inherit" edge="start" onClick={() => setMobileOpen(true)} sx={{ mr: 2 }}>
-              <MenuIcon />
-            </IconButton>
-          )}
-          <Box sx={{ flexGrow: 1 }}>
-            <Typography variant="subtitle1" fontWeight={800}>{user?.name ? `Welcome, ${user.name.split(' ')[0]}` : 'Teacher Portal'}</Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
-              Start a live session and it becomes your classroom's secure projector
-            </Typography>
-          </Box>
-          <Tooltip title="Secure session">
-            <Chip
-              size="small"
-              variant="outlined"
-              label="Zero-Trust"
-              icon={<ShieldIcon sx={{ fontSize: 15 }} />}
-              sx={{ color: theme.palette.primary.main, borderColor: alpha(theme.palette.primary.main, 0.4) }}
-            />
-          </Tooltip>
-        </Toolbar>
-      </AppBar>
+        <div className="flex h-full flex-col">
+          {/* Logo */}
+          <div className="flex h-16 items-center border-b px-4">
+            {sidebarOpen ? (
+              <div className="flex items-center gap-2">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg">
+                  <Shield className="h-5 w-5 text-white" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold">Teacher Portal</span>
+                  <span className="text-xs text-muted-foreground">Attendance Gateway</span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg mx-auto">
+                <Shield className="h-5 w-5 text-white" />
+              </div>
+            )}
+          </div>
 
-      <Drawer
-        variant={isMobile ? 'temporary' : 'permanent'}
-        open={isMobile ? mobileOpen : true}
-        onClose={() => setMobileOpen(false)}
-        sx={{
-          width: drawerWidth,
-          flexShrink: 0,
-          '& .MuiDrawer-paper': {
-            width: drawerWidth,
-            boxSizing: 'border-box',
-            borderRight: `1px solid ${theme.palette.divider}`,
-            backgroundColor: '#10131a',
-            backdropFilter: 'blur(30px)',
-          },
-        }}
-      >
-        {drawer}
-      </Drawer>
+          {/* Navigation */}
+          <nav className="flex-1 space-y-1 p-2">
+            {NAV.map((item) => {
+              const Icon = item.icon;
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={({ isActive }) =>
+                    cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                      isActive
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    )
+                  }
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  {sidebarOpen && <span>{item.label}</span>}
+                </NavLink>
+              );
+            })}
+          </nav>
 
-      <Box
-        component="main"
-        sx={{
-          flexGrow: 1,
-          p: { xs: 2, md: 3.5 },
-          width: { md: `calc(100% - ${drawerWidth}px)` },
-          mt: '64px',
-          ml: { md: `${drawerWidth}px` },
-          minHeight: 'calc(100vh - 64px)',
-        }}
-      >
-        <Outlet />
-      </Box>
-    </Box>
+          {/* User section */}
+          <div className="border-t p-2">
+            <div className="flex items-center gap-3 rounded-lg px-3 py-2">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground font-semibold">
+                {user?.name?.[0]?.toUpperCase() ?? 'T'}
+              </div>
+              {sidebarOpen && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{user?.name ?? 'Teacher'}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                </div>
+              )}
+            </div>
+            {sidebarOpen && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start mt-2 text-destructive hover:text-destructive"
+                onClick={() => {
+                  logout();
+                  navigate('/login');
+                }}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
+              </Button>
+            )}
+          </div>
+        </div>
+      </aside>
+
+      {/* Main content */}
+      <div className={cn("flex-1 transition-all duration-300", sidebarOpen ? "ml-64" : "ml-16")}>
+        {/* Top bar */}
+        <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+          >
+            {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </Button>
+          <h1 className="text-xl font-bold">Attendance Management</h1>
+        </header>
+
+        {/* Page content */}
+        <main className="p-6">
+          <Outlet />
+        </main>
+      </div>
+    </div>
   );
 }

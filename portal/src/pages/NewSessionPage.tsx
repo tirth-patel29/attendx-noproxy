@@ -1,29 +1,34 @@
-// src/pages/NewSessionPage.tsx
-// Manual session creation. NOTE: there is NO professor selector — the backend
-// derives the professor from the JWT, so a teacher can only ever start
-// sessions as themselves (fundamental auth fix).
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { portalApi } from '../services/portalApi';
-import {
-  Box, Typography, Button, TextField, Alert, CircularProgress, Paper, Stack, Avatar, Chip,
-} from '@mui/material';
-import { ArrowBack as ArrowBackIcon, Bolt as BoltIcon, Lock as LockIcon } from '@mui/icons-material';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ArrowLeft, Zap, Lock, User, Calendar } from 'lucide-react';
 
 export default function NewSessionPage() {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const [courseCode, setCourseCode] = useState('');
   const [sessionDate, setSessionDate] = useState(new Date().toISOString().split('T')[0]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async () => {
-    if (!courseCode.trim()) { setError('Course code is required'); return; }
-    setError(''); setSubmitting(true);
+    if (!courseCode.trim()) {
+      setError('Course code is required');
+      return;
+    }
+    setError('');
+    setSubmitting(true);
     try {
-      const session = await portalApi.startSession({ course_code: courseCode.trim(), session_date: sessionDate });
+      const session = await portalApi.startSession({
+        course_code: courseCode.trim(),
+        session_date: sessionDate,
+      });
       navigate(`/sessions/${session.data.id}`);
     } catch (err: any) {
       setError(err.response?.data?.error?.message || 'Failed to create session');
@@ -31,46 +36,115 @@ export default function NewSessionPage() {
     }
   };
 
-  if (authLoading) {
-    return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '70vh' }}><CircularProgress /></Box>;
-  }
-
   return (
-    <Box sx={{ maxWidth: 560, mx: 'auto' }}>
-      <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/dashboard')} sx={{ mb: 2, color: 'text.secondary' }}>
+    <div className="max-w-2xl mx-auto space-y-4">
+      <Button variant="ghost" onClick={() => navigate('/dashboard')}>
+        <ArrowLeft className="mr-2 h-4 w-4" />
         Back to Dashboard
       </Button>
 
-      <Typography variant="h4" fontWeight={800} sx={{ mb: 1 }}>Start a session</Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Point the smartboard at this screen after starting — the QR is your dumb-terminal projector.
-      </Typography>
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Start Attendance Session</h1>
+        <p className="text-muted-foreground mt-1">
+          Create a new session and display the QR code for students to scan
+        </p>
+      </div>
 
-      {error && <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>{error}</Alert>}
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-      <Paper sx={{ p: 4, borderRadius: 3, border: '1px solid rgba(139,163,184,0.15)' }}>
-        {/* Who is conducting — locked from the JWT */}
-        <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 3 }}>
-          <Avatar sx={{ bgcolor: 'primary.main', color: '#002e6a', fontWeight: 800 }}>
-            {user?.name?.charAt(0)?.toUpperCase() || 'P'}
-          </Avatar>
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="subtitle1" fontWeight={700}>{user?.name}</Typography>
-            <Typography variant="caption" color="text.secondary">{user?.email}</Typography>
-          </Box>
-          <Chip size="small" icon={<LockIcon />} label="You — from your login" sx={{ color: '#4d8eff' }} variant="outlined" />
-        </Stack>
+      <Card>
+        <CardHeader>
+          <CardTitle>Session Details</CardTitle>
+          <CardDescription>
+            Configure your attendance session. The QR code will be displayed after creation.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Professor Info */}
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-muted">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground font-semibold">
+              {user?.name?.[0]?.toUpperCase() || 'P'}
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold flex items-center gap-2">
+                <User className="h-3 w-3" />
+                {user?.name}
+              </p>
+              <p className="text-xs text-muted-foreground">{user?.email}</p>
+            </div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Lock className="h-3 w-3" />
+              <span>Auto-detected from login</span>
+            </div>
+          </div>
 
-        <TextField fullWidth label="Course code" placeholder="e.g. CS201" value={courseCode}
-          onChange={(e) => setCourseCode(e.target.value.toUpperCase())} sx={{ mb: 3 }} />
+          {/* Course Code */}
+          <div className="space-y-2">
+            <Label htmlFor="course">Course Code</Label>
+            <Input
+              id="course"
+              placeholder="e.g., CS201, MATH101"
+              value={courseCode}
+              onChange={(e) => setCourseCode(e.target.value.toUpperCase())}
+              className="font-mono"
+              autoFocus
+            />
+            <p className="text-xs text-muted-foreground">
+              Enter the course code for this attendance session
+            </p>
+          </div>
 
-        <TextField fullWidth label="Session date" type="date" value={sessionDate}
-          onChange={(e) => setSessionDate(e.target.value)} sx={{ mb: 4 }} InputLabelProps={{ shrink: true }} />
+          {/* Session Date */}
+          <div className="space-y-2">
+            <Label htmlFor="date" className="flex items-center gap-2">
+              <Calendar className="h-3 w-3" />
+              Session Date
+            </Label>
+            <Input
+              id="date"
+              type="date"
+              value={sessionDate}
+              onChange={(e) => setSessionDate(e.target.value)}
+            />
+          </div>
 
-        <Button variant="contained" size="large" fullWidth startIcon={<BoltIcon />} onClick={handleSubmit} disabled={submitting} sx={{ py: 1.5 }}>
-          {submitting ? <CircularProgress size={24} color="inherit" /> : 'Start session'}
-        </Button>
-      </Paper>
-    </Box>
+          {/* Submit Button */}
+          <Button
+            className="w-full"
+            size="lg"
+            onClick={handleSubmit}
+            disabled={submitting || !courseCode.trim()}
+          >
+            {submitting ? (
+              'Starting Session...'
+            ) : (
+              <>
+                <Zap className="mr-2 h-4 w-4" />
+                Start Session
+              </>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/20">
+        <CardContent className="pt-6">
+          <h3 className="font-semibold mb-2 flex items-center gap-2">
+            <Zap className="h-4 w-4 text-blue-600" />
+            What happens next?
+          </h3>
+          <ul className="space-y-1 text-sm text-muted-foreground">
+            <li>• A rotating QR code will be displayed on screen</li>
+            <li>• Project it on the smartboard for students to scan</li>
+            <li>• Real-time attendance tracking begins immediately</li>
+            <li>• Students use the mobile app to mark attendance</li>
+          </ul>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
