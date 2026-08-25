@@ -28,7 +28,8 @@ server {
     # API proxy -> backend judge + admin console.
     # BACKEND_UPSTREAM is injected by the nginx entrypoint (envsubst), e.g.
     #   BACKEND_UPSTREAM=attendance-backend:3001  (docker-compose default)
-    location /api {
+    # Match /api/ with trailing slash to avoid matching /api-keys
+    location /api/ {
         proxy_pass http://${BACKEND_UPSTREAM};
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
