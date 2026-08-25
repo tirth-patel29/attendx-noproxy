@@ -1,29 +1,16 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import { CssBaseline, ThemeProvider, createTheme } from '@mui/material';
-import App from './App';
 import { AuthProvider } from './context/AuthContext';
+import App from './App';
+import './index.css';
 
-const theme = createTheme({
-  palette: {
-    mode: 'dark',
-    primary: { main: '#4cc9f0' },
-    secondary: { main: '#7209b7' },
-    background: { default: '#0d1b2a', paper: '#12263a' },
-  },
-  typography: { fontFamily: `'Inter', 'Segoe UI', Roboto, sans-serif` },
-});
-
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <BrowserRouter>
       <AuthProvider>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
+        <App />
       </AuthProvider>
-    </ThemeProvider>
-  </React.StrictMode>
+    </BrowserRouter>
+  </StrictMode>
 );

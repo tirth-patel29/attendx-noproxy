@@ -1,227 +1,225 @@
-import { useEffect, useState } from 'react';
-import {
-  Box, Card, Typography, Button, Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, Alert, Chip, Stack, InputAdornment, Tooltip, Paper,
-} from '@mui/material';
-import { Search, Edit, Delete, DevicesOther, Refresh, Key as KeyIcon, PersonAddAlt1 } from '@mui/icons-material';
+﻿import { useEffect, useState } from 'react';
 import { adminApi, Student, Division } from '../services/adminApi';
-import MenuItem from '@mui/material/MenuItem';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Plus, Pencil, Trash2, Smartphone, Search, RefreshCw } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface FormState { roll_no: string; email: string; name: string; division_id: string; }
-const empty = { roll_no: '', email: '', name: '', division_id: '' };
+const empty: FormState = { roll_no: '', email: '', name: '', division_id: '' };
 
 export default function Students() {
   const [rows, setRows] = useState<Student[]>([]);
-  const [divs, setDivs] = useState<Division[]>([]);
-  const [query, setQuery] = useState('');
-  const [dialog, setDialog] = useState<null | { mode: 'edit'; id: string }>(null);
+  const [divisions, setDivisions] = useState<Division[]>([]);
+  const [dialog, setDialog] = useState<null | { mode: 'create' | 'edit'; id?: string }>(null);
   const [form, setForm] = useState<FormState>(empty);
+  const [search, setSearch] = useState('');
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [secretDialog, setSecretDialog] = useState<null | { title: string; secret: string; note: string }>(null);
-  const [confirm, setConfirm] = useState<null | { action: 'reset' | 'rotate' | 'delete' | 'forgot'; student: Student }>(null);
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const load = () => {
-    adminApi.students().then((r) => setRows(r.data)).catch(() => {});
-    adminApi.divisions().then((r) => setDivs(r.data)).catch(() => {});
+    setLoading(true);
+    Promise.all([adminApi.students(), adminApi.divisions()])
+      .then(([s, d]) => { setRows(s.data); setDivisions(d.data); setLoading(false); })
+      .catch(() => { setMsg({ type: 'error', text: 'Failed to load data' }); setLoading(false); });
   };
   useEffect(() => { load(); }, []);
 
-  const showErr = (e: any, fallback: string) => setMsg({ type: 'error', text: e?.response?.data?.error ?? fallback });
+  const filtered = rows.filter((s) =>
+    s.name.toLowerCase().includes(search.toLowerCase()) ||
+    s.email.toLowerCase().includes(search.toLowerCase()) ||
+    s.roll_no.toLowerCase().includes(search.toLowerCase())
+  );
 
-  const q = query.trim().toLowerCase();
-  const filtered = q
-    ? rows.filter((s) =>
-        s.roll_no.toLowerCase().includes(q) ||
-        s.name.toLowerCase().includes(q) ||
-        s.email.toLowerCase().includes(q))
-    : rows;
-
-  const doAction = async (s: Student) => {
-    setBusy(true);
-    try {
-      switch (confirm?.action) {
-        case 'reset': {
-          const r = await adminApi.resetDevice(s.id);
-          setSecretDialog({
-            title: 'Device reset complete — new HMAC signer',
-            secret: r.data.secret_hmac_key,
-            note: `Hardware tattoo for ${s.roll_no} unbound; old device locked out. On next app login the student's device rebinds automatically and receives this signer.`,
-          });
-          setMsg({ type: 'success', text: 'Device reset + HMAC rotated' });
-          break;
-        }
-        case 'rotate': {
-          const r = await adminApi.rotateHmac(s.id);
-          setSecretDialog({ title: 'HMAC key rotated', secret: r.data.secret_hmac_key, note: `New signer for ${s.roll_no}. The app refreshes it on next login.` });
-          setMsg({ type: 'success', text: 'HMAC rotated' });
-          break;
-        }
-        case 'forgot': {
-          await adminApi.forgotPassword(s.id);
-          setMsg({ type: 'success', text: `Password cleared — ${s.roll_no} will set a new one in the app` });
-          break;
-        }
-        case 'delete': {
-          await adminApi.deleteStudent(s.id);
-          setMsg({ type: 'success', text: 'Student deleted' });
-          break;
-        }
-      }
-      setConfirm(null); load();
-    } catch (e) { showErr(e, 'Action failed'); } finally { setBusy(false); }
+  const openCreate = () => { setForm(empty); setDialog({ mode: 'create' }); };
+  const openEdit = (s: Student) => {
+    setForm({ roll_no: s.roll_no, email: s.email, name: s.name, division_id: s.division_id || '' });
+    setDialog({ mode: 'edit', id: s.student_uuid });
   };
 
   const save = async () => {
     setBusy(true);
     try {
-      if (dialog?.id) {
-        await adminApi.updateStudent(dialog.id, { ...form, division_id: form.division_id || null });
+      if (dialog?.mode === 'create') {
+        await adminApi.createStudent(form);
+        setMsg({ type: 'success', text: `Student ${form.name} created` });
+      } else if (dialog?.id) {
+        await adminApi.updateStudent(dialog.id, form);
         setMsg({ type: 'success', text: 'Student updated' });
       }
-      setDialog(null); load();
-    } catch (e) { showErr(e, 'Save failed'); } finally { setBusy(false); }
+      setDialog(null);
+      load();
+    } catch (err: any) {
+      setMsg({ type: 'error', text: err?.response?.data?.error?.message ?? 'Save failed' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doDelete = async (s: Student) => {
+    if (!window.confirm(`Delete student ${s.name}? This will remove their attendance records.`)) return;
+    setBusy(true);
+    try {
+      await adminApi.deleteStudent(s.student_uuid);
+      setMsg({ type: 'success', text: 'Student deleted' });
+      load();
+    } catch (err: any) {
+      setMsg({ type: 'error', text: err?.response?.data?.error?.message ?? 'Delete failed' });
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
-        <Typography variant="h5" fontWeight={700}>Students</Typography>
-        <Chip
-          icon={<PersonAddAlt1 />}
-          label="Students self-register in the app — accounts are created on their phone"
-          variant="outlined"
-          sx={{ color: 'text.secondary' }}
-        />
-      </Box>
-      {msg && <Alert severity={msg.type} sx={{ mb: 2 }} onClose={() => setMsg(null)}>{msg.text}</Alert>}
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Students</h1>
+          <p className="text-muted-foreground">Manage student registrations and device bindings</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="icon" onClick={load} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+          <Button onClick={openCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Student
+          </Button>
+        </div>
+      </div>
 
-      {/* Search */}
-      <Paper elevation={0} sx={{ p: 1.5, mb: 2, borderRadius: 2, border: '1px solid rgba(139,163,184,0.15)' }}>
-        <TextField
-          fullWidth size="small" placeholder="Search by roll number, name or email…"
-          value={query} onChange={(e) => setQuery(e.target.value)}
-          InputProps={{ startAdornment: (<InputAdornment position="start"><Search /></InputAdornment>) }}
+      {msg && (
+        <Alert variant={msg.type === 'error' ? 'destructive' : 'default'}>
+          <AlertDescription>{msg.text}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="relative">
+        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search by name, email, or roll number..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9"
         />
-      </Paper>
+      </div>
 
       <Card>
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Roll No</TableCell><TableCell>Name</TableCell><TableCell>Email</TableCell>
-                <TableCell>Division</TableCell><TableCell>Device</TableCell><TableCell>Password</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filtered.map((s) => (
-                <TableRow key={s.id} hover>
-                  <TableCell sx={{ fontWeight: 600 }}>{s.roll_no}</TableCell>
-                  <TableCell>{s.name}</TableCell>
-                  <TableCell>{s.email}</TableCell>
-                  <TableCell>{s.division_name ?? '—'}</TableCell>
-                  <TableCell>
-                    <Chip size="small" variant="outlined" color={s.is_bound ? 'success' : 'warning'} label={s.is_bound ? 'Bound' : 'Unbound'} />
-                  </TableCell>
-                  <TableCell>
-                    <Chip size="small" variant="outlined" color={s.has_password ? 'info' : 'error'} label={s.has_password ? 'Set' : 'Not set'} />
-                  </TableCell>
-                  <TableCell align="right">
-                    <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                      <Tooltip title="Forgot password (student sets a new one in-app)">
-                        <IconButton size="small" color="secondary" onClick={() => setConfirm({ action: 'forgot', student: s })}>
-                          <KeyIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Reset device (unbind + new HMAC)">
-                        <IconButton size="small" color="warning" onClick={() => setConfirm({ action: 'reset', student: s })}><DevicesOther /></IconButton>
-                      </Tooltip>
-                      <Tooltip title="Rotate HMAC key">
-                        <IconButton size="small" color="info" onClick={() => setConfirm({ action: 'rotate', student: s })}><Refresh /></IconButton>
-                      </Tooltip>
-                      <Tooltip title="Edit">
-                        <IconButton size="small" onClick={() => { setForm({ roll_no: s.roll_no, email: s.email, name: s.name, division_id: s.division_id ?? '' }); setDialog({ mode: 'edit', id: s.id }); }}><Edit /></IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton size="small" color="error" onClick={() => setConfirm({ action: 'delete', student: s })}><Delete /></IconButton>
-                      </Tooltip>
-                    </Stack>
-                  </TableCell>
+        <CardHeader>
+          <CardTitle>Student Directory</CardTitle>
+          <CardDescription>
+            {filtered.length} of {rows.length} students {search && '(filtered)'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="space-y-2">
+              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12" />)}
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Roll No</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Division</TableHead>
+                  <TableHead>Device</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ))}
-              {filtered.length === 0 && (
-                <TableRow><TableCell colSpan={7} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                  {rows.length === 0 ? 'No students yet — they register themselves in the app.' : `No students match "${query}".`}
-                </TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+              </TableHeader>
+              <TableBody>
+                {filtered.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                      {search ? 'No students match your search' : 'No students found'}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filtered.map((s) => (
+                    <TableRow key={s.student_uuid}>
+                      <TableCell className="font-mono font-medium">{s.roll_no}</TableCell>
+                      <TableCell>{s.name}</TableCell>
+                      <TableCell className="text-muted-foreground">{s.email}</TableCell>
+                      <TableCell>{s.division_name || '—'}</TableCell>
+                      <TableCell>
+                        {s.bound_device_id ? (
+                          <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400 text-xs">
+                            <Smartphone className="h-3 w-3" />
+                            Bound
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">Not bound</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(s)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => doDelete(s)} className="text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
       </Card>
 
-      {/* edit */}
-      <Dialog open={Boolean(dialog)} onClose={() => setDialog(null)} fullWidth maxWidth="sm">
-        <DialogTitle>Edit student</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-          <TextField label="Roll number" value={form.roll_no} onChange={(e) => setForm({ ...form, roll_no: e.target.value.toUpperCase() })} fullWidth />
-          <TextField label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} fullWidth />
-          <TextField label="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} fullWidth />
-          <TextField select label="Division" value={form.division_id} onChange={(e) => setForm({ ...form, division_id: e.target.value })} fullWidth>
-            <MenuItem value=""><em>None</em></MenuItem>
-            {divs.map((d) => <MenuItem key={d.id} value={d.id}>{d.name}</MenuItem>)}
-          </TextField>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDialog(null)}>Cancel</Button>
-          <Button variant="contained" onClick={save} disabled={busy}>Save</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* confirm */}
-      <Dialog open={Boolean(confirm)} onClose={() => setConfirm(null)} fullWidth maxWidth="xs">
-        <DialogTitle>
-          {confirm?.action === 'reset' ? 'Reset device' : confirm?.action === 'rotate' ? 'Rotate HMAC' : confirm?.action === 'forgot' ? 'Forgot password' : 'Delete student'}
-        </DialogTitle>
+      {/* Create/Edit Dialog */}
+      <Dialog open={Boolean(dialog)} onOpenChange={() => setDialog(null)}>
         <DialogContent>
-          {confirm?.action === 'reset' && (
-            <Alert severity="warning">Unbind the hardware tattoo for <b>{confirm.student.roll_no}</b> and mint a new HMAC signer. Old device is locked out. Audit-logged.</Alert>
-          )}
-          {confirm?.action === 'rotate' && (
-            <Alert severity="info">Rotate the Gate-4 HMAC signer for <b>{confirm.student.roll_no}</b> (hardware stays bound). Audit-logged.</Alert>
-          )}
-          {confirm?.action === 'forgot' && (
-            <Alert severity="info">Clear the password for <b>{confirm.student.roll_no}</b>? The next time they open the app they'll be asked to set a new password (twice). Audit-logged.</Alert>
-          )}
-          {confirm?.action === 'delete' && (
-            <Alert severity="error">Permanently delete <b>{confirm.student.roll_no}</b> ({confirm.student.name})? Attendance history is removed.</Alert>
-          )}
+          <DialogHeader>
+            <DialogTitle>{dialog?.mode === 'create' ? 'Add New Student' : 'Edit Student'}</DialogTitle>
+            <DialogDescription>
+              {dialog?.mode === 'create' ? 'Register a new student account' : 'Update student information'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="roll">Roll Number</Label>
+              <Input id="roll" value={form.roll_no} onChange={(e) => setForm({ ...form, roll_no: e.target.value })} placeholder="24DCE051" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="name">Full Name</Label>
+              <Input id="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="John Doe" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="john@student.edu" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="division">Division</Label>
+              <select
+                id="division"
+                value={form.division_id}
+                onChange={(e) => setForm({ ...form, division_id: e.target.value })}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+              >
+                <option value="">No division</option>
+                {divisions.map((d) => (
+                  <option key={d.division_id} value={d.division_id}>{d.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialog(null)}>Cancel</Button>
+            <Button onClick={save} disabled={busy}>{busy ? 'Saving...' : 'Save'}</Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirm(null)}>Cancel</Button>
-          <Button variant="contained" color={confirm?.action === 'delete' ? 'error' : 'primary'} disabled={busy}
-            onClick={() => confirm && doAction(confirm.student)}>
-            {busy ? 'Working…' : 'Confirm'}
-          </Button>
-        </DialogActions>
       </Dialog>
-
-      {/* secret reveal */}
-      <Dialog open={Boolean(secretDialog)} onClose={() => setSecretDialog(null)} fullWidth maxWidth="sm">
-        <DialogTitle>{secretDialog?.title}</DialogTitle>
-        <DialogContent>
-          <Box sx={{ p: 2, mb: 2, borderRadius: 2, bgcolor: '#0d1b2a', border: '1px solid rgba(76,201,240,0.2)' }}>
-            <Typography variant="caption" color="text.secondary">HMAC secret (Gate 4 signer)</Typography>
-            <Typography sx={{ fontFamily: 'monospace', wordBreak: 'break-all', fontSize: 14 }}>{secretDialog?.secret}</Typography>
-          </Box>
-          <Typography variant="body2" color="text.secondary">{secretDialog?.note}</Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button color="primary" onClick={() => { navigator.clipboard?.writeText(secretDialog?.secret ?? ''); setSecretDialog(null); }}>Copy & close</Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+    </div>
   );
 }
