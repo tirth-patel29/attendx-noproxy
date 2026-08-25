@@ -76,6 +76,7 @@ export interface ApiKey {
   status: string;
   created_at: string;
   last_used_at: string | null;
+  created_by: string;
 }
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -135,7 +136,7 @@ export const adminApi = {
     api.put(`/admin/assignments/${id}`, data),
   deleteAssignment: (id: string) => api.delete(`/admin/assignments/${id}`),
   // API keys console (shared client keys; transport gate)
-  apiKeys: () => api.get<{ keys: ApiKey[] }>('/admin/api-keys'),
+  apiKeys: () => api.get<ApiKey[]>('/admin/api-keys'),
   createApiKey: (label: string) =>
     api.post<{ key_uuid: string; label: string; prefix: string; api_key: string; created_at: string }>('/admin/api-keys', { label }),
   revokeApiKey: (uuid: string) => api.post(`/admin/api-keys/${uuid}/revoke`),

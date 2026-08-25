@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { adminApi, ApiKey } from '../services/adminApi';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,7 +38,7 @@ export default function ApiKeys() {
     if (!window.confirm(`Revoke key "${k.label}"? Applications using this key will stop working.`)) return;
     setBusy(true);
     try {
-      await adminApi.revokeApiKey(k.key_id);
+      await adminApi.revokeApiKey(k.key_uuid);
       setMsg({ type: 'success', text: 'API key revoked' });
       load();
     } catch (e: any) {
@@ -116,14 +116,14 @@ export default function ApiKeys() {
                 </TableRow>
               ) : (
                 rows.map((k) => (
-                  <TableRow key={k.key_id}>
+                  <TableRow key={k.key_uuid}>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Key className="h-4 w-4 text-muted-foreground" />
                         <span className="font-medium">{k.label}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">{k.key_id}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{k.key_uuid}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Calendar className="h-3 w-3" />
