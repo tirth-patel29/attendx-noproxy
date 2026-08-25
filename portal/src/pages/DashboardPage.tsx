@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { motion } from 'framer-motion';
 import {
   Plus,
   Radio,
@@ -16,7 +15,6 @@ import {
   Play,
   QrCode,
   Clock,
-  Sparkles,
 } from 'lucide-react';
 
 interface SessionWithCounts extends Session {
@@ -68,49 +66,8 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* ðŸŽ‰ ANIMATED WATERMELON UI BANNER */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <Card className="bg-gradient-to-r from-green-500 via-teal-500 to-cyan-500 border-0 text-white overflow-hidden relative shadow-2xl shadow-green-500/50 animate-pulse-slow">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRjMC0yLjIxLTEuNzktNC00LTRzLTQgMS43OS00IDQgMS43OSA0IDQgNCA0LTEuNzkgNC00em0wLTEwYzAtMi4yMS0xLjc5LTQtNC00cy00IDEuNzktNCA0IDEuNzkgNCA0IDQgNC0xLjc5IDQtNHptMC0xMGMwLTIuMjEtMS43OS00LTQtNHMtNCAxLjc5LTQgNCAxLjc5IDQgNCA0IDQtMS43OSA0LTR6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-20"></div>
-          <CardContent className="pt-6 relative z-10">
-            <div className="flex items-center gap-3">
-              <motion.div
-                animate={{
-                  rotate: [0, 10, -10, 10, 0],
-                  scale: [1, 1.1, 1, 1.1, 1],
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  repeatDelay: 3,
-                }}
-              >
-                <Sparkles className="h-8 w-8" />
-              </motion.div>
-              <div>
-                <h2 className="text-2xl font-bold">
-                  ðŸ‰ Watermelon UI is Live!
-                </h2>
-                <p className="text-white/90">
-                  Teacher Portal â€¢ Modern Design â€¢ Smooth Animations â€¢ Deployed Successfully
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
       {/* Header */}
-      <motion.div
-        className="flex items-center justify-between"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.2 }}
-      >
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
             Welcome, {user?.name?.split(' ')[0] || 'Professor'}
@@ -130,7 +87,7 @@ export default function DashboardPage() {
             Start Session
           </Button>
         </div>
-      </motion.div>
+      </div>
 
       {error && (
         <Alert variant="destructive">
@@ -138,145 +95,130 @@ export default function DashboardPage() {
         </Alert>
       )}
 
-      {/* Quick Stats - Animated */}
+      {/* Quick Stats */}
       <div className="grid gap-4 md:grid-cols-3">
-        {[
-          { title: 'Active Sessions', value: active.length, icon: Radio, color: 'text-green-500', desc: 'Live attendance tracking' },
-          { title: 'Today\'s Sessions', value: sessions.length, icon: Calendar, color: 'text-blue-500', desc: 'Total sessions conducted' },
-          { title: 'Present Today', value: presentToday, icon: Users, color: 'text-purple-500', desc: 'Students marked present' },
-        ].map((stat, index) => (
-          <motion.div
-            key={stat.title}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 + index * 0.1 }}
-          >
-            <Card className="hover:shadow-lg transition-shadow">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-                <stat.icon className={`h-4 w-4 ${stat.color}`} />
-              </CardHeader>
-              <CardContent>
-                <motion.div
-                  className="text-2xl font-bold"
-                  initial={{ scale: 0.5 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: 0.5 + index * 0.1, type: 'spring' }}
-                >
-                  {stat.value}
-                </motion.div>
-                <p className="text-xs text-muted-foreground">{stat.desc}</p>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Sessions</CardTitle>
+            <Radio className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{active.length}</div>
+            <p className="text-xs text-muted-foreground">Live attendance tracking</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Today's Sessions</CardTitle>
+            <Calendar className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{sessions.length}</div>
+            <p className="text-xs text-muted-foreground">Total sessions conducted</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Present Today</CardTitle>
+            <Users className="h-4 w-4 text-purple-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{presentToday}</div>
+            <p className="text-xs text-muted-foreground">Students marked present</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Scheduled Lectures */}
       {timetable.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.6 }}
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle>Today's Schedule</CardTitle>
-              <CardDescription>Start attendance for your scheduled lectures</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {timetable.map((tt: any, index: number) => (
-                  <motion.div
-                    key={tt.course_code}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.7 + index * 0.1 }}
-                    whileHover={{ scale: 1.02 }}
-                    className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary font-semibold">
-                        {tt.course_code?.substring(0, 2)}
-                      </div>
-                      <div>
-                        <p className="font-semibold">{tt.course_code}</p>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          <span>{tt.start_time} - {tt.end_time}</span>
-                          <span>â€¢</span>
-                          <span>{tt.division_name}</span>
-                        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Today's Schedule</CardTitle>
+            <CardDescription>Start attendance for your scheduled lectures</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {timetable.map((tt: any) => (
+                <div
+                  key={tt.course_code}
+                  className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary font-semibold">
+                      {tt.course_code?.substring(0, 2)}
+                    </div>
+                    <div>
+                      <p className="font-semibold">{tt.course_code}</p>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        <span>{tt.start_time} - {tt.end_time}</span>
+                        <span>•</span>
+                        <span>{tt.division_name}</span>
                       </div>
                     </div>
-                    <Button
-                      size="sm"
-                      onClick={() => startLecture(tt.course_code)}
-                      disabled={starting === tt.course_code}
-                    >
-                      {starting === tt.course_code ? (
-                        'Starting...'
-                      ) : (
-                        <>
-                          <Play className="mr-2 h-3 w-3" />
-                          Start
-                        </>
-                      )}
-                    </Button>
-                  </motion.div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => startLecture(tt.course_code)}
+                    disabled={starting === tt.course_code}
+                  >
+                    {starting === tt.course_code ? (
+                      'Starting...'
+                    ) : (
+                      <>
+                        <Play className="mr-2 h-3 w-3" />
+                        Start
+                      </>
+                    )}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Active Sessions */}
       {active.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.8 }}
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Radio className="h-5 w-5 text-green-500 animate-pulse" />
-                Live Sessions
-              </CardTitle>
-              <CardDescription>Currently active attendance sessions</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {active.map((s) => (
-                  <motion.div
-                    key={s.id}
-                    whileHover={{ scale: 1.02 }}
-                    className="flex items-center justify-between p-3 rounded-lg border bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900"
-                  >
-                    <div>
-                      <p className="font-semibold">{s.course_code}</p>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Users className="h-3 w-3" />
-                        <span>{s.present_count || 0} present</span>
-                        <span>â€¢</span>
-                        <span>Started {new Date(s.created_at).toLocaleTimeString()}</span>
-                      </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Radio className="h-5 w-5 text-green-500 animate-pulse" />
+              Live Sessions
+            </CardTitle>
+            <CardDescription>Currently active attendance sessions</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {active.map((s) => (
+                <div
+                  key={s.id}
+                  className="flex items-center justify-between p-3 rounded-lg border bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900"
+                >
+                  <div>
+                    <p className="font-semibold">{s.course_code}</p>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Users className="h-3 w-3" />
+                      <span>{s.present_count || 0} present</span>
+                      <span>•</span>
+                      <span>Started {new Date(s.created_at).toLocaleTimeString()}</span>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/sessions/${s.id}`)}
-                    >
-                      <QrCode className="mr-2 h-3 w-3" />
-                      View
-                    </Button>
-                  </motion.div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/sessions/${s.id}`)}
+                  >
+                    <QrCode className="mr-2 h-3 w-3" />
+                    View
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {loading && (

@@ -17,7 +17,7 @@ export default function ApiKeys() {
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const load = () => adminApi.apiKeys().then((r) => setRows(r.data)).catch(() => {});
+  const load = () => adminApi.apiKeys().then((r) => setRows(r.data.keys || r.data)).catch(() => {});
   useEffect(() => { load(); }, []);
 
   const create = async () => {
