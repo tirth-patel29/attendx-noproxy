@@ -1,4 +1,4 @@
-server {
+﻿server {
     listen 3000;
     server_name localhost;
     root /usr/share/nginx/html;
@@ -7,13 +7,22 @@ server {
     gzip on;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
 
-    add_header X-Frame-Options "SAMEORIGIN";
-    add_header X-Content-Type-Options "nosniff";
-    add_header X-XSS-Protection "1; mode=block";
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
 
-    # SPA fallback (react-router)
-    location / {
-        try_files $uri $uri/ /index.html;
+    # NEVER cache index.html - force fresh fetch for SPA entry point
+    location = /index.html {
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        add_header Pragma "no-cache" always;
+        add_header Expires "0" always;
+        try_files $uri =404;
+    }
+
+    # Static assets caching - Vite already adds content hashes to filenames
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable" always;
     }
 
     # API proxy -> backend judge + admin console.
@@ -31,14 +40,14 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-
     location /health {
         access_log off;
         return 200 "healthy\n";
         add_header Content-Type text/plain;
+    }
+
+    # SPA fallback (react-router) - must come last
+    location / {
+        try_files $uri $uri/ /index.html;
     }
 }
