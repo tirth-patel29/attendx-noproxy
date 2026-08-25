@@ -1,14 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-# Deploy/update ALL apps on the homelab (or any ssh host running the same
-# stack layout). Usage:
-#
-#   SSH_HOST=hetp@192.168.0.108 ./scripts/deploy-all.sh
-#   SSH_HOST=user@server SSH_KEY=~/.ssh/id_ed25519 ./scripts/deploy-all.sh
-#
-# This is the "code → build image → update container" cycle: each stack dir on
-# the host contains the app source + a docker-compose.yml; we rsync the changed
-# source over, then rebuild + recreate the container.
+# Deploy/update ALL apps on the homelab - simplified version using git pull
 # ============================================================================
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -19,23 +11,28 @@ HOST_STACKS="${HOST_STACKS:-/home/hetp/docker-stacks}"
 
 SSH_ARGS=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null)
 [ -n "$SSH_KEY" ] && SSH_ARGS+=(-i "$SSH_KEY")
-# expand a leading ~ in SSH_KEY to the real home (works for CI runners too)
 if [[ "$SSH_KEY" == \~* ]]; then SSH_KEY="${SSH_KEY/#\~/$HOME}"; SSH_ARGS=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "$SSH_KEY"); fi
-RSYNC_SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-[ -n "$SSH_KEY" ] && RSYNC_SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i $SSH_KEY"
 
-deploy_app() {
-  local local_src="$1" host_dir="$2"
-  echo "▶ Syncing $local_src -> $SSH_HOST:$host_dir"
-  rsync -az --exclude node_modules --exclude dist --exclude .git --exclude .dart_tool \
-    -e "$RSYNC_SSH" "$local_src"/ "$SSH_HOST:$host_dir"/
-  echo "▶ Rebuilding $host_dir"
-  ssh "${SSH_ARGS[@]}" "$SSH_HOST" "cd '$host_dir' && CACHE_BUST=\$(date +%s) docker compose up -d --build"
-}
+echo "▶ Pulling latest code on server..."
+ssh "${SSH_ARGS[@]}" "$SSH_HOST" "cd /home/hetp/attendance-gateway && git pull origin main"
 
-deploy_app backend   "$HOST_STACKS/attendance-backend"
-deploy_app portal    "$HOST_STACKS/attendance-portal/portal"
-deploy_app admin     "$HOST_STACKS/attendance-admin/admin"
+echo "▶ Syncing backend..."
+ssh "${SSH_ARGS[@]}" "$SSH_HOST" "cp -r /home/hetp/attendance-gateway/backend/* $HOST_STACKS/attendance-backend/"
+
+echo "▶ Syncing portal..."
+ssh "${SSH_ARGS[@]}" "$SSH_HOST" "cp -r /home/hetp/attendance-gateway/portal/* $HOST_STACKS/attendance-portal/portal/"
+
+echo "▶ Syncing admin..."
+ssh "${SSH_ARGS[@]}" "$SSH_HOST" "cp -r /home/hetp/attendance-gateway/admin/* $HOST_STACKS/attendance-admin/admin/"
+
+echo "▶ Rebuilding backend..."
+ssh "${SSH_ARGS[@]}" "$SSH_HOST" "cd $HOST_STACKS/attendance-backend && CACHE_BUST=\$(date +%s) docker compose up -d --build"
+
+echo "▶ Rebuilding portal..."
+ssh "${SSH_ARGS[@]}" "$SSH_HOST" "cd $HOST_STACKS/attendance-portal && CACHE_BUST=\$(date +%s) docker compose up -d --build"
+
+echo "▶ Rebuilding admin..."
+ssh "${SSH_ARGS[@]}" "$SSH_HOST" "cd $HOST_STACKS/attendance-admin && CACHE_BUST=\$(date +%s) docker compose up -d --build"
 
 echo "✔ Deployed. Verifying:"
 ssh "${SSH_ARGS[@]}" "$SSH_HOST" 'docker ps --filter name=attendance- --format "{{.Names}}  {{.Status}}"'
