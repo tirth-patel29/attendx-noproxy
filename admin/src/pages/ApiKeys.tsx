@@ -1,186 +1,182 @@
-import { useEffect, useState } from 'react';
-import {
-  Box, Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, Alert, IconButton, Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, Paper, LinearProgress, Typography, Tooltip,
-} from '@mui/material';
-import { Add as AddIcon, ContentCopy as CopyIcon, DeleteForever as RevokeIcon, Key as KeyIcon } from '@mui/icons-material';
+﻿import { useEffect, useState } from 'react';
 import { adminApi, ApiKey } from '../services/adminApi';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Plus, Copy, Trash2, Key, Calendar, User } from 'lucide-react';
 
 export default function ApiKeys() {
-  const [keys, setKeys] = useState<ApiKey[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string | null>(null);
-
-  const [mintOpen, setMintOpen] = useState(false);
+  const [rows, setRows] = useState<ApiKey[]>([]);
+  const [dialog, setDialog] = useState(false);
   const [label, setLabel] = useState('');
-  const [mintBusy, setMintBusy] = useState(false);
-  const [mintErr, setMintErr] = useState<string | null>(null);
-  const [newKey, setNewKey] = useState<{ label: string; api_key: string } | null>(null);
+  const [newKey, setNewKey] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const [flash, setFlash] = useState<string | null>(null);
-
-  const load = async () => {
-    setLoading(true);
-    setErr(null);
-    try {
-      const res = await adminApi.apiKeys();
-      setKeys(res.data.keys ?? []);
-    } catch (e: any) {
-      setErr(e?.response?.data?.error ?? 'Failed to load API keys');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  const load = () => adminApi.apiKeys().then((r) => setRows(r.data)).catch(() => {});
   useEffect(() => { load(); }, []);
 
-  const copy = (t: string) => { navigator.clipboard?.writeText(t); setFlash('Copied to clipboard'); };
-
-  const mint = async () => {
-    if (!label.trim()) { setMintErr('Give this key a label (e.g. student-apk)'); return; }
-    setMintBusy(true); setMintErr(null);
+  const create = async () => {
+    setBusy(true);
     try {
-      const res = await adminApi.createApiKey(label.trim());
-      setMintOpen(false);
-      setLabel('');
-      setNewKey({ label: res.data.label, api_key: res.data.api_key });
+      const res = await adminApi.createApiKey(label);
+      setNewKey(res.data.api_key);
+      setMsg({ type: 'success', text: 'API key created. Copy it now - it will not be shown again.' });
       load();
     } catch (e: any) {
-      setMintErr(e?.response?.data?.error ?? 'Mint failed');
+      setMsg({ type: 'error', text: e?.response?.data?.error ?? 'Create failed' });
     } finally {
-      setMintBusy(false);
+      setBusy(false);
     }
   };
 
   const revoke = async (k: ApiKey) => {
-    if (!window.confirm(`Revoke key "${k.label}" (${k.prefix})? Client apps using it will be rejected immediately.`)) return;
+    if (!window.confirm(`Revoke key "${k.label}"? Applications using this key will stop working.`)) return;
+    setBusy(true);
     try {
-      await adminApi.revokeApiKey(k.key_uuid);
-      setFlash(`Revoked ${k.label}`);
+      await adminApi.revokeApiKey(k.key_id);
+      setMsg({ type: 'success', text: 'API key revoked' });
       load();
     } catch (e: any) {
-      setErr(e?.response?.data?.error ?? 'Revoke failed');
+      setMsg({ type: 'error', text: e?.response?.data?.error ?? 'Revoke failed' });
+    } finally {
+      setBusy(false);
     }
   };
 
+  const copyKey = (key: string) => {
+    navigator.clipboard.writeText(key);
+    setMsg({ type: 'success', text: 'API key copied to clipboard' });
+  };
+
   return (
-    <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <KeyIcon color="primary" />
-          <Typography variant="h6" fontWeight={700}>API Keys</Typography>
-        </Box>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setMintOpen(true)}>
-          Generate Key
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">API Keys</h1>
+          <p className="text-muted-foreground">Manage API access keys for applications</p>
+        </div>
+        <Button onClick={() => { setLabel(''); setNewKey(null); setDialog(true); }}>
+          <Plus className="mr-2 h-4 w-4" />
+          Create API Key
         </Button>
-      </Box>
+      </div>
 
-      <Alert severity="info" sx={{ mb: 2 }}>
-        These shared keys authenticate the <strong>client app</strong> (the student APK, sent as the{' '}
-        <code>X-Api-Key</code> header). A key is shown only once at mint time — if lost, generate a new one and
-        revoke the old. Revoking a key immediately rejects that client.
-      </Alert>
-
-      {err && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setErr(null)}>{err}</Alert>}
-      {flash && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setFlash(null)}>{flash}</Alert>}
-
-      {loading ? (
-        <LinearProgress />
-      ) : (
-        <TableContainer component={Paper}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Label</TableCell>
-                <TableCell>Prefix</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Created</TableCell>
-                <TableCell>Last used</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {keys.length === 0 && (
-                <TableRow><TableCell colSpan={6} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                  No API keys yet. Generate your first one.
-                </TableCell></TableRow>
-              )}
-              {keys.map((k) => (
-                <TableRow key={k.key_uuid}>
-                  <TableCell sx={{ fontWeight: 600 }}>{k.label}</TableCell>
-                  <TableCell><Typography fontFamily="monospace">{k.prefix}</Typography></TableCell>
-                  <TableCell>
-                    <Chip
-                      size="small"
-                      label={k.status}
-                      color={k.status === 'active' ? 'success' : 'error'}
-                    />
-                  </TableCell>
-                  <TableCell>{k.created_at ? new Date(k.created_at).toLocaleString() : '—'}</TableCell>
-                  <TableCell>{k.last_used_at ? new Date(k.last_used_at).toLocaleString() : 'never'}</TableCell>
-                  <TableCell align="right">
-                    {k.status === 'active' && (
-                      <Tooltip title="Revoke">
-                        <IconButton size="small" color="error" onClick={() => revoke(k)}>
-                          <RevokeIcon />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+      {msg && (
+        <Alert variant={msg.type === 'error' ? 'destructive' : 'default'}>
+          <AlertDescription>{msg.text}</AlertDescription>
+        </Alert>
       )}
 
-      {/* Mint dialog */}
-      <Dialog open={mintOpen} onClose={() => setMintOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle>Generate API Key</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Label"
-            placeholder="e.g. student-apk"
-            fullWidth
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-          />
-          {mintErr && <Alert severity="error" sx={{ mt: 2 }}>{mintErr}</Alert>}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setMintOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={mint} disabled={mintBusy}>
-            {mintBusy ? 'Generating…' : 'Generate'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {newKey && (
+        <Card className="border-green-500">
+          <CardHeader>
+            <CardTitle className="text-green-600 dark:text-green-400">New API Key Created</CardTitle>
+            <CardDescription>Copy this key now. For security reasons, it will not be shown again.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 rounded bg-muted px-3 py-2 text-sm font-mono break-all">
+                {newKey}
+              </code>
+              <Button size="icon" variant="outline" onClick={() => copyKey(newKey)}>
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Show-once dialog */}
-      <Dialog open={!!newKey} onClose={() => setNewKey(null)} fullWidth maxWidth="sm">
-        <DialogTitle>Key generated — copy it now</DialogTitle>
-        <DialogContent>
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            This is the <strong>only</strong> time the raw key is shown. It cannot be retrieved again.
-          </Alert>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, bgcolor: 'background.paper', p: 1.5, borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
-            <Typography fontFamily="monospace" sx={{ flex: 1, wordBreak: 'break-all', fontSize: 13 }}>
-              {newKey?.api_key}
-            </Typography>
-            <IconButton onClick={() => newKey && copy(newKey.api_key)}><CopyIcon /></IconButton>
-          </Box>
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-            Embed it when building the client: <code>--dart-define=API_KEY=…</code> (Flutter) or send it as the{' '}
-            <code>X-Api-Key</code> header.
-          </Typography>
+      <Card>
+        <CardHeader>
+          <CardTitle>Active API Keys</CardTitle>
+          <CardDescription>{rows.length} keys configured</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Label</TableHead>
+                <TableHead>Key ID</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead>Creator</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                    No API keys yet. Create one to allow application access.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                rows.map((k) => (
+                  <TableRow key={k.key_id}>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Key className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">{k.label}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{k.key_id}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Calendar className="h-3 w-3" />
+                        {new Date(k.created_at).toLocaleDateString()}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <User className="h-3 w-3" />
+                        {k.created_by}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon" onClick={() => revoke(k)} className="text-destructive">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Dialog open={dialog} onOpenChange={setDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create API Key</DialogTitle>
+            <DialogDescription>
+              Generate a new API key for application access. The key will only be shown once.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="label">Key Label</Label>
+              <Input
+                id="label"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder="Mobile App / Web Portal / Integration"
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialog(false)}>Cancel</Button>
+            <Button onClick={create} disabled={busy || !label.trim()}>
+              {busy ? 'Creating...' : 'Create Key'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions>
-          <Button variant="contained" onClick={() => { navigator.clipboard?.writeText(newKey?.api_key ?? ''); setFlash('Copied to clipboard'); }}>Copy &amp; Close</Button>
-          <Button onClick={() => setNewKey(null)}>Close</Button>
-        </DialogActions>
       </Dialog>
-    </Box>
+    </div>
   );
 }
