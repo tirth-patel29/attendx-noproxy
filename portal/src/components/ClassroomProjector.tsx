@@ -1,29 +1,18 @@
 // src/components/ClassroomProjector.tsx
-// The classroom projector — a "Dumb Terminal" (SRS Gate 3: High-Frequency Token Rotation).
-//
-// Architectural role (see docs/ARCHITECTURE_SRS.md):
-//  - The projector is a PASSIVE display, never the source of truth. It simply renders
-//    whatever token the server hands it over a persistent Socket.IO connection.
-//  - On connect it emits `join:session` for the active session room; the server's
-//    metronome then broadcasts a `token:new` event roughly every 3 seconds, and this
-//    component re-renders its QR with the new payload instantly.
-//  - The QR is STATIC and CONSTANTLY VISIBLE while a token is live — deliberately NO
-//    CSS background patterns and NO flashing/opacity animation. Moiré interference is
-//    a physical effect of re-photographing an LCD panel, and the 250ms rejection is
-//    backend math (the Judge engine). Neither belongs in the frontend.
+// Enhanced Classroom Projector with split-screen mode
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { QRCodeSVG } from 'qrcode.react';
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Monitor, Users, CheckCircle2 } from 'lucide-react';
 
 interface ClassroomProjectorProps {
-  /** Active course session UUID (36-char) used to join the session's socket room. */
   sessionId: string;
-  /** Human-readable course code shown as a badge (optional). */
   courseCode?: string;
-  /** Backend origin for Socket.IO. Defaults to window.location.origin. */
   socketUrl?: string;
-  /** QR code edge length in pixels. */
   size?: number;
 }
 
@@ -33,15 +22,23 @@ interface TokenEvent {
   expires_at_epoch?: number;
 }
 
+interface AttendanceEntry {
+  student_name: string;
+  student_enrollment: string;
+  timestamp: number;
+}
+
 export default function ClassroomProjector({
   sessionId,
   courseCode,
   socketUrl,
-  size = 320,
+  size = 512,
 }: ClassroomProjectorProps) {
   const [token, setToken] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   const [flashing, setFlashing] = useState(false);
+  const [splitScreen, setSplitScreen] = useState(false);
+  const [attendanceEntries, setAttendanceEntries] = useState<AttendanceEntry[]>([]);
   const socketRef = useRef<Socket | null>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -69,6 +66,11 @@ export default function ClassroomProjector({
       flashTimer.current = setTimeout(() => setFlashing(false), 100);
     });
 
+    // Listen for attendance updates
+    socket.on('attendance:new', (entry: AttendanceEntry) => {
+      setAttendanceEntries((prev) => [entry, ...prev].slice(0, 20)); // Keep last 20 entries
+    });
+
     socket.on('disconnect', () => setConnected(false));
 
     return () => {
@@ -81,72 +83,188 @@ export default function ClassroomProjector({
     };
   }, [sessionId, socketUrl]);
 
-  // STATE A = session anchor (2900ms). STATE B = token flash (100ms).
-  // The QR encodes the same payload grammar the app's filter-gate expects:
-  //   anchor -> ATTN:<session>
-  //   flash  -> ATTN:<session>:<token>
   const qrValue = flashing && token ? `ATTN:${sessionId}:${token}` : `ATTN:${sessionId}`;
 
   return (
-    <div
-      className={cn(
-        "flex flex-col items-center gap-4 px-8 py-6 rounded-2xl relative overflow-hidden",
-        "bg-gradient-to-br from-slate-950/95 to-slate-900/90 backdrop-blur-xl",
-        "shadow-2xl shadow-black/50",
-        connected 
-          ? "border-2 border-blue-500/40" 
-          : "border-2 border-slate-700/20"
-      )}
-      style={{
-        boxShadow: connected
-          ? '0 24px 80px rgba(0,0,0,0.5), 0 0 60px rgba(77, 142, 255, 0.15), inset 0 1px 0 rgba(255,255,255,0.05)'
-          : '0 24px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)'
-      }}
-    >
-      {/* Top glow line when connected */}
-      {connected && (
-        <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-100" />
-      )}
-
-      {courseCode && (
-        <p className="text-sm font-bold text-slate-400 tracking-[0.12em] uppercase">
-          {courseCode}
-        </p>
-      )}
-
-      {/* QR Code Container — Dark glass with subtle glow */}
-      <div 
-        className="flex justify-center items-center p-4 rounded-lg border"
-        style={{
-          background: 'rgba(2, 6, 23, 0.8)',
-          borderColor: 'rgba(77, 142, 255, 0.2)',
-          boxShadow: '0 12px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.03), 0 0 40px rgba(77, 142, 255, 0.1)'
-        }}
-      >
-        <QRCodeSVG
-          value={qrValue}
-          size={size}
-          bgColor="#020617"
-          fgColor="#e1e2ec"
-          level="M"
-          marginSize={2}
-        />
+    <div className="fixed inset-0 flex flex-col bg-gradient-to-br from-slate-950 to-slate-900">
+      {/* Header Bar */}
+      <div className="flex items-center justify-between px-8 py-4 bg-slate-900/50 backdrop-blur-sm border-b border-slate-700/20">
+        <div className="flex items-center gap-3">
+          {courseCode && (
+            <h1 className="text-2xl font-bold text-slate-100 tracking-wide">
+              {courseCode}
+            </h1>
+          )}
+          <div className={cn(
+            "flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium",
+            connected 
+              ? "bg-green-500/20 text-green-400 border border-green-500/30"
+              : "bg-slate-700/20 text-slate-400 border border-slate-600/30"
+          )}>
+            <div className={cn(
+              "w-2 h-2 rounded-full",
+              connected ? "bg-green-500 animate-pulse" : "bg-slate-500"
+            )} />
+            {connected ? 'Live' : 'Disconnected'}
+          </div>
+        </div>
+        
+        <Button
+          onClick={() => setSplitScreen(!splitScreen)}
+          variant={splitScreen ? "default" : "outline"}
+          className="gap-2"
+        >
+          <Monitor className="h-4 w-4" />
+          {splitScreen ? 'Full Screen QR' : 'Split Screen'}
+        </Button>
       </div>
 
-      {/* Human-readable current token — always visible so the professor can verify it. */}
-      <p
-        className="font-mono font-black tracking-[0.35em] text-2xl md:text-3xl leading-tight text-slate-100"
-        style={{
-          textIndent: '0.35em',
-          textShadow: '0 0 20px rgba(77, 142, 255, 0.3)'
-        }}
-      >
-        {token ?? '------'}
-      </p>
+      {/* Main Content */}
+      <div className="flex-1 flex">
+        {/* QR Code Panel */}
+        <motion.div
+          animate={{ width: splitScreen ? '50%' : '100%' }}
+          transition={{ duration: 0.3 }}
+          className="flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-slate-950 border-r border-slate-700/20"
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5 }}
+            className="flex flex-col items-center gap-8"
+          >
+            {/* QR Code with Pulse Animation */}
+            <motion.div
+              animate={{ scale: [1, 1.02, 1] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+              className="relative"
+            >
+              <div 
+                className="flex justify-center items-center p-8 rounded-2xl shadow-2xl"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.98)',
+                  boxShadow: connected
+                    ? '0 24px 80px rgba(59, 130, 246, 0.3), 0 0 60px rgba(59, 130, 246, 0.2)'
+                    : '0 24px 80px rgba(0, 0, 0, 0.3)'
+                }}
+              >
+                <QRCodeSVG
+                  value={qrValue}
+                  size={splitScreen ? 400 : size}
+                  bgColor="#ffffff"
+                  fgColor="#000000"
+                  level="M"
+                  marginSize={2}
+                />
+              </div>
 
-      <p className="text-xs text-slate-400">
-        {connected ? 'Live · token rotates every 3s' : 'Disconnected · reconnecting…'}
-      </p>
+              {/* Animated Corner Borders */}
+              {connected && (
+                <>
+                  <motion.div
+                    className="absolute top-0 left-0 w-16 h-16 border-t-4 border-l-4 border-blue-500 rounded-tl-2xl"
+                    animate={{ opacity: [0.5, 1, 0.5] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  />
+                  <motion.div
+                    className="absolute top-0 right-0 w-16 h-16 border-t-4 border-r-4 border-blue-500 rounded-tr-2xl"
+                    animate={{ opacity: [0.5, 1, 0.5] }}
+                    transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
+                  />
+                  <motion.div
+                    className="absolute bottom-0 left-0 w-16 h-16 border-b-4 border-l-4 border-blue-500 rounded-bl-2xl"
+                    animate={{ opacity: [0.5, 1, 0.5] }}
+                    transition={{ duration: 2, repeat: Infinity, delay: 1 }}
+                  />
+                  <motion.div
+                    className="absolute bottom-0 right-0 w-16 h-16 border-b-4 border-r-4 border-blue-500 rounded-br-2xl"
+                    animate={{ opacity: [0.5, 1, 0.5] }}
+                    transition={{ duration: 2, repeat: Infinity, delay: 1.5 }}
+                  />
+                </>
+              )}
+            </motion.div>
+
+            {/* Instructions */}
+            <motion.div
+              animate={{ opacity: [1, 0.7, 1] }}
+              transition={{ duration: 3, repeat: Infinity }}
+              className="text-center"
+            >
+              <p className="text-3xl font-bold text-slate-100 flex items-center gap-3">
+                <span>📱</span>
+                Scan to mark your attendance
+              </p>
+              <p className="text-lg text-slate-400 mt-2">
+                Open the attendance app and scan this QR code
+              </p>
+            </motion.div>
+          </motion.div>
+        </motion.div>
+
+        {/* Live Feed Panel (Split Screen Mode) */}
+        {splitScreen && (
+          <motion.div
+            initial={{ opacity: 0, x: 100 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.3 }}
+            className="w-1/2 flex flex-col bg-slate-950"
+          >
+            <Card className="m-6 flex-1 bg-slate-900/50 border-slate-700/20">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-slate-100">
+                  <Users className="h-5 w-5 text-green-500" />
+                  Live Attendance Feed
+                  <span className="text-sm text-slate-400 font-normal ml-auto">
+                    {attendanceEntries.length} students marked present
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 overflow-auto max-h-[calc(100vh-200px)]">
+                <div className="space-y-2">
+                  {attendanceEntries.length === 0 ? (
+                    <div className="text-center py-12 text-slate-400">
+                      <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                      <p>Waiting for students to mark attendance...</p>
+                    </div>
+                  ) : (
+                    attendanceEntries.map((entry, index) => (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, x: -20, backgroundColor: "rgba(34, 197, 94, 0.2)" }}
+                        animate={{ opacity: 1, x: 0, backgroundColor: "rgba(15, 23, 42, 0.5)" }}
+                        transition={{ duration: 0.3 }}
+                        className="flex items-center justify-between p-3 rounded-lg border border-slate-700/30"
+                      >
+                        <div className="flex items-center gap-3">
+                          <CheckCircle2 className="h-5 w-5 text-green-500" />
+                          <div>
+                            <p className="font-semibold text-slate-100">{entry.student_name}</p>
+                            <p className="text-xs text-slate-400">{entry.student_enrollment}</p>
+                          </div>
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          {new Date(entry.timestamp).toLocaleTimeString()}
+                        </p>
+                      </motion.div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </div>
+
+      {/* Footer Stats */}
+      <div className="flex items-center justify-center px-8 py-3 bg-slate-900/50 backdrop-blur-sm border-t border-slate-700/20">
+        <p className="text-sm text-slate-400">
+          {connected 
+            ? `Token rotates every 3 seconds • ${attendanceEntries.length} ${attendanceEntries.length === 1 ? 'student' : 'students'} present`
+            : 'Reconnecting to server...'
+          }
+        </p>
+      </div>
     </div>
   );
 }
