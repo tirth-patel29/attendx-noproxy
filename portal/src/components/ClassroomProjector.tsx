@@ -14,7 +14,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { QRCodeSVG } from 'qrcode.react';
-import { Box, Typography, alpha } from '@mui/material';
+import { cn } from '@/lib/utils';
 
 interface ClassroomProjectorProps {
   /** Active course session UUID (36-char) used to join the session's socket room. */
@@ -88,62 +88,41 @@ export default function ClassroomProjector({
   const qrValue = flashing && token ? `ATTN:${sessionId}:${token}` : `ATTN:${sessionId}`;
 
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 2,
-        px: 5,
-        py: 4,
-        borderRadius: 3,
-        // Dark glass projector panel
-        background: 'linear-gradient(135deg, rgba(16, 19, 26, 0.95) 0%, rgba(29, 32, 39, 0.9) 100%)',
-        backdropFilter: 'blur(40px)',
-        border: connected ? `2px solid ${alpha('#4d8eff', 0.4)}` : `2px solid ${alpha('#8c909f', 0.2)}`,
-        boxShadow: `
-          0 24px 80px rgba(0,0,0,0.5),
-          0 0 60px rgba(77, 142, 255, 0.15),
-          inset 0 1px 0 rgba(255,255,255,0.05)
-        `,
-        position: 'relative',
-        overflow: 'hidden',
-        '&::before': {
-          content: '""',
-          position: 'absolute',
-          top: 0, left: 0, right: 0, height: 2,
-          background: 'linear-gradient(90deg, transparent, #4d8eff, #5de6ff, transparent)',
-          opacity: connected ? 1 : 0,
-          transition: 'opacity 0.3s ease',
-        },
+    <div
+      className={cn(
+        "flex flex-col items-center gap-4 px-8 py-6 rounded-2xl relative overflow-hidden",
+        "bg-gradient-to-br from-slate-950/95 to-slate-900/90 backdrop-blur-xl",
+        "shadow-2xl shadow-black/50",
+        connected 
+          ? "border-2 border-blue-500/40" 
+          : "border-2 border-slate-700/20"
+      )}
+      style={{
+        boxShadow: connected
+          ? '0 24px 80px rgba(0,0,0,0.5), 0 0 60px rgba(77, 142, 255, 0.15), inset 0 1px 0 rgba(255,255,255,0.05)'
+          : '0 24px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)'
       }}
     >
+      {/* Top glow line when connected */}
+      {connected && (
+        <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-100" />
+      )}
+
       {courseCode && (
-        <Typography
-          variant="subtitle1"
-          fontWeight={700}
-          color="text.secondary"
-          letterSpacing="0.12em"
-        >
+        <p className="text-sm font-bold text-slate-400 tracking-[0.12em] uppercase">
           {courseCode}
-        </Typography>
+        </p>
       )}
 
       {/* QR Code Container — Dark glass with subtle glow */}
-      <Box sx={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 2,
-        borderRadius: 2,
-        background: 'rgba(2, 6, 23, 0.8)',
-        border: `1px solid ${alpha('#4d8eff', 0.2)}`,
-        boxShadow: `
-          0 12px 40px rgba(0,0,0,0.4),
-          inset 0 1px 0 rgba(255,255,255,0.03),
-          0 0 40px rgba(77, 142, 255, 0.1)
-        `,
-      }}>
+      <div 
+        className="flex justify-center items-center p-4 rounded-lg border"
+        style={{
+          background: 'rgba(2, 6, 23, 0.8)',
+          borderColor: 'rgba(77, 142, 255, 0.2)',
+          boxShadow: '0 12px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.03), 0 0 40px rgba(77, 142, 255, 0.1)'
+        }}
+      >
         <QRCodeSVG
           value={qrValue}
           size={size}
@@ -152,28 +131,22 @@ export default function ClassroomProjector({
           level="M"
           marginSize={2}
         />
-      </Box>
+      </div>
 
       {/* Human-readable current token — always visible so the professor can verify it. */}
-      <Typography
-        display="block"
-        sx={{
-          fontFamily: '"JetBrains Mono", "Fira Code", monospace',
-          fontWeight: 900,
-          letterSpacing: '0.35em',
+      <p
+        className="font-mono font-black tracking-[0.35em] text-2xl md:text-3xl leading-tight text-slate-100"
+        style={{
           textIndent: '0.35em',
-          fontSize: { xs: 20, sm: 24, md: 28 },
-          lineHeight: 1.2,
-          color: '#e1e2ec',
-          textShadow: '0 0 20px rgba(77, 142, 255, 0.3)',
+          textShadow: '0 0 20px rgba(77, 142, 255, 0.3)'
         }}
       >
         {token ?? '------'}
-      </Typography>
+      </p>
 
-      <Typography variant="caption" color="text.secondary">
+      <p className="text-xs text-slate-400">
         {connected ? 'Live · token rotates every 3s' : 'Disconnected · reconnecting…'}
-      </Typography>
-    </Box>
+      </p>
+    </div>
   );
 }

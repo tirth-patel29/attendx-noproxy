@@ -1,15 +1,14 @@
 // src/components/QRCodeModal.tsx
 import {
   Dialog,
-  DialogTitle,
   DialogContent,
-  DialogActions,
-  Button,
-  Typography,
-  IconButton,
-  Box,
-} from '@mui/material';
-import { Close as CloseIcon, QrCode as QRCodeIcon, Refresh as RefreshIcon } from '@mui/icons-material';
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { QrCode, RefreshCw } from "lucide-react";
 
 interface QRCodeModalProps {
   open: boolean;
@@ -29,46 +28,47 @@ export default function QRCodeModal({
   onRefresh,
 }: QRCodeModalProps) {
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h6">
-          <QRCodeIcon sx={{ mr: 1 }} />
-          Session QR Code
-        </Typography>
-        <IconButton onClick={onClose}>
-          <CloseIcon />
-        </IconButton>
-      </DialogTitle>
-      <DialogContent>
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', p: 2 }}>
-          <Typography variant="h6" gutterBottom>Session: {sessionCode}</Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <QrCode className="h-5 w-5" />
+            Session QR Code
+          </DialogTitle>
+          <DialogDescription>
             Scan this QR code to mark attendance
-          </Typography>
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="flex flex-col items-center space-y-4 py-4">
+          <h3 className="text-lg font-semibold">Session: {sessionCode}</h3>
           
-          <Box sx={{ mt: 2, p: 3, bgcolor: 'grey.50', borderRadius: 2, textAlign: 'center', minWidth: 280 }}>
-            <Typography variant="h2" fontFamily="monospace" fontWeight={700} letterSpacing="0.3em" color="primary.main">
+          <div className="rounded-lg bg-accent p-6 text-center min-w-[280px]">
+            <p className="font-mono text-3xl font-bold tracking-[0.3em] text-primary">
               {token}
-            </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+            </p>
+            <p className="text-xs text-muted-foreground mt-2">
               Refreshes every 3 seconds
-            </Typography>
-          </Box>
+            </p>
+          </div>
 
           <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
+            variant="outline"
             onClick={onRefresh}
             disabled={refreshing}
-            sx={{ mt: 2 }}
+            className="w-full"
           >
+            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh Token
           </Button>
-        </Box>
+        </div>
+
+        <DialogFooter>
+          <Button variant="secondary" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Close</Button>
-      </DialogActions>
     </Dialog>
   );
 }
