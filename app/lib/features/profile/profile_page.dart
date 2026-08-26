@@ -1,150 +1,137 @@
-import 'package:attendance_gateway/core/services/api_service.dart';
-
-// lib/features/profile/profile_page.dart
-// Profile — student-facing identity and settings. Clean, simple, no crypto.
 import 'package:flutter/material.dart';
-import 'package:attendance_gateway/core/services/secure_storage_service.dart';
-import 'package:attendance_gateway/main.dart';
-import 'package:attendance_gateway/features/history/history_tab.dart';
+import 'package:flutter/services.dart';
+import '../../core/constants/app_constants.dart';
+import '../../core/services/storage_service.dart';
+import '../../shared/theme/app_theme.dart';
+import '../auth/auth_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
-
-  @override
-  State<ProfilePage> createState() => _ProfilePageState();
+  @override State<ProfilePage> createState() => _ProfilePageState();
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  String _name = '';
-  String _rollNo = '';
-  String _email = '';
-  String _division = '';
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
+  String _name = '', _rollNo = '', _uuid = '';
+  @override void initState() { super.initState(); _load(); }
 
   Future<void> _load() async {
-    final name = await SecureStorageService.getStudentName() ?? '';
-    final roll = await SecureStorageService.getStudentRollNo() ?? '';
-    final email = '$roll@charusat.edu.in';
-    final div = await _getDivision();
-    if (!mounted) return;
-    setState(() {
-      _name = name;
-      _rollNo = roll;
-      _email = email;
-      _division = div ?? '';
-      _loading = false;
-    });
+    final n = await StorageService.getName()       ?? '';
+    final r = await StorageService.getRollNo()     ?? '';
+    final u = await StorageService.getStudentUuid() ?? '';
+    if (mounted) setState(() { _name = n; _rollNo = r; _uuid = u; });
   }
 
-  Future<String?> _getDivision() async {
-    try {
-      final token = await SecureStorageService.getAccessToken();
-      if (token == null || token.isEmpty) return null;
-      final data = await ApiService.getStudentAttendance(accessToken: token);
-      return (data['profile'] as Map?)?['division_name'] as String?;
-    } catch (_) {
-      return null;
-    }
+  Future<void> _logout() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: kSurface,
+        title: const Text('Sign Out', style: TextStyle(color: kText)),
+        content: const Text('Are you sure you want to sign out?', style: TextStyle(color: kTextMuted)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel', style: TextStyle(color: kTextMuted))),
+          TextButton(onPressed: () => Navigator.pop(ctx, true),  child: const Text('Sign Out', style: TextStyle(color: kDanger))),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    await StorageService.clearAll();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AuthPage()), (_) => false);
   }
 
   @override
   Widget build(BuildContext context) {
+    final initial = _name.isNotEmpty ? _name[0].toUpperCase() : '?';
     return Scaffold(
-      appBar: AppBar(title: Text('Profile')),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator(color: kPrimary))
-          : ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
-                Center(
-                  child: Container(
-                    width: 80, height: 80,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: const LinearGradient(colors: [kPrimary, kPrimaryLight]),
-                    ),
-                    child: Icon(Icons.person, color: Colors.white, size: 40),
-                  ),
-                ),
-                SizedBox(height: 16),
-                Center(
-                  child: Text(
-                    _name.isEmpty ? 'Student' : _name,
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: kPrimary),
-                  ),
-                ),
-                Center(
-                  child: Text(
-                    _rollNo.isEmpty ? '—' : _rollNo,
-                    style: const TextStyle(fontSize: 15, color: kTextSecondary),
-                  ),
-                ),
-                SizedBox(height: 28),
-
-                Text('Student Details', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: kPrimary)),
-                SizedBox(height: 12),
-
-                _infoCard('Student ID', _rollNo.isEmpty ? '—' : _rollNo),
-                _infoCard('University Email', _email),
-                _infoCard('Course', _division.isEmpty ? '—' : _division),
-
-                SizedBox(height: 32),
-                _actionCard(Icons.bar_chart_outlined, 'Attendance History', () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const HistoryTab()),
-                  );
-                }),
-                SizedBox(height: 16),
-
-                // Soft divider
-                Container(height: 1, color: const Color(0xFFE7E9F0)),
-
-                SizedBox(height: 16),
-                const Center(child: Text('Secure Attendance Gateway', style: TextStyle(fontSize: 12, color: kTextSecondary))),
-                SizedBox(height: 24),
-              ],
-            ),
-    );
-  }
-
-  Widget _infoCard(String label, String value) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE7E9F0)),
-      ),
-      child: Row(
+      appBar: AppBar(title: const Text('Profile')),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
         children: [
-          Expanded(child: Text(label, style: const TextStyle(color: kTextSecondary, fontSize: 13))),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w700, color: kPrimary)),
+          Center(child: Container(
+            width: 80, height: 80,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(colors: [kPrimary, kPrimaryVar]),
+              boxShadow: [BoxShadow(color: kPrimary.withValues(alpha: 0.35), blurRadius: 20)],
+            ),
+            child: Center(child: Text(initial,
+                style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w800))),
+          )),
+          const SizedBox(height: 12),
+          Center(child: Text(_name.isEmpty ? 'Student' : _name,
+              style: const TextStyle(color: kText, fontSize: 20, fontWeight: FontWeight.w800))),
+          if (_rollNo.isNotEmpty) Center(child: Text(
+            '$_rollNo@${AppConstants.emailDomain}',
+            style: const TextStyle(color: kTextMuted, fontSize: 12),
+          )),
+          const SizedBox(height: 28),
+
+          _section('Account', [
+            _row('Student ID', _rollNo.isEmpty ? '—' : _rollNo),
+            _divider(),
+            _row('Email', _rollNo.isEmpty ? '—' : '$_rollNo@${AppConstants.emailDomain}'),
+          ]),
+          const SizedBox(height: 14),
+
+          _section('Device', [
+            _rowTap('Device UUID',
+              _uuid.isEmpty ? '—' : '${_uuid.substring(0, 8)}…${_uuid.substring(_uuid.length - 4)}',
+              () {
+                Clipboard.setData(ClipboardData(text: _uuid));
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('UUID copied to clipboard')));
+              }),
+          ]),
+          const SizedBox(height: 24),
+
+          Container(
+            decoration: BoxDecoration(
+              color: kDanger.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: kDanger.withValues(alpha: 0.25)),
+            ),
+            child: ListTile(
+              leading: const Icon(Icons.logout_rounded, color: kDanger),
+              title: const Text('Sign Out', style: TextStyle(color: kDanger, fontWeight: FontWeight.w700)),
+              onTap: _logout,
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Center(child: Text('Attendance Gateway v1.0',
+              style: TextStyle(color: kTextMuted, fontSize: 11))),
         ],
       ),
     );
   }
 
-  Widget _actionCard(IconData icon, String label, VoidCallback onTap) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE7E9F0)),
+  Widget _section(String title, List<Widget> rows) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(title.toUpperCase(), style: const TextStyle(color: kTextMuted, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8)),
+      const SizedBox(height: 8),
+      Container(
+        decoration: BoxDecoration(color: kSurface, borderRadius: BorderRadius.circular(14), border: Border.all(color: kSurface2)),
+        child: Column(children: rows),
       ),
-      child: ListTile(
-        leading: Icon(icon, color: kPrimary),
-        title: Text(label, style: const TextStyle(fontWeight: FontWeight.w700, color: kPrimary)),
-        trailing: Icon(Icons.chevron_right, color: kTextSecondary),
-        onTap: onTap,
-      ),
-    );
-  }
+    ],
+  );
+
+  Widget _divider() => const Divider(height: 1, indent: 16, endIndent: 16);
+
+  Widget _row(String label, String val) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    child: Row(children: [
+      Text(label, style: const TextStyle(color: kTextMuted, fontSize: 13)),
+      const Spacer(),
+      Text(val, style: const TextStyle(color: kText, fontWeight: FontWeight.w600, fontSize: 13)),
+    ]),
+  );
+
+  Widget _rowTap(String label, String val, VoidCallback onTap) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(14),
+    child: _row(label, val),
+  );
 }

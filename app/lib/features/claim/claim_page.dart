@@ -1,381 +1,207 @@
-// lib/features/claim/claim_page.dart
-/// Main claim attendance page - ties together all 4 gates
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:attendance_gateway/core/constants/app_constants.dart';
-import 'package:attendance_gateway/core/services/secure_storage_service.dart';
-import 'package:attendance_gateway/features/precheck/precheck_orchestrator.dart';
-import 'package:attendance_gateway/features/auth/student_auth_page.dart';
-import 'package:attendance_gateway/features/scan/attendance_scanner_page.dart';
-import 'package:attendance_gateway/shared/utils/extensions.dart';
+import '../../core/constants/app_constants.dart';
+import '../../core/services/api_service.dart';
+import '../../core/services/storage_service.dart';
+import '../../core/services/crypto_service.dart';
+import '../../core/services/device_service.dart';
+import '../../shared/theme/app_theme.dart';
+import '../scan/scanner_page.dart';
 
-class ClaimPage extends ConsumerStatefulWidget {
+enum _ClaimState { idle, scanning, claiming, success, failed }
+
+class ClaimPage extends StatefulWidget {
   const ClaimPage({super.key});
-
-  @override
-  ConsumerState<ClaimPage> createState() => _ClaimPageState();
+  @override State<ClaimPage> createState() => _ClaimPageState();
 }
 
-class _ClaimPageState extends ConsumerState<ClaimPage> {
-  final _rollNoController = TextEditingController();
-
-  String? _studentUuid;
-  String? _sessionUuid;
-  String? _tokenVal;
-  bool _isLoading = false;
-  String? _errorMessage;
-  Map<String, dynamic>? _claimResult;
+class _ClaimPageState extends State<ClaimPage> {
+  _ClaimState _s = _ClaimState.idle;
+  String? _rollNo;
+  String? _msg;
+  Map<String, dynamic>? _result;
 
   @override
   void initState() {
     super.initState();
-    _loadStudentInfo();
+    StorageService.getRollNo().then((v) { if (mounted) setState(() => _rollNo = v); });
   }
 
-  Future<void> _loadStudentInfo() async {
-    // Check if already provisioned
-    final provisioned = await SecureStorageService.isProvisioned();
-    if (provisioned) {
-      final studentUuid = await SecureStorageService.getStudentUuid();
-      final rollNo = await SecureStorageService.getStudentRollNo();
-      if (studentUuid != null) {
-        setState(() {
-          _studentUuid = studentUuid;
-          _rollNoController.text = rollNo ?? '';
-        });
-      }
-    }
-  }
-
-
-  Future<void> _claimAttendance() async {
-    if (_studentUuid == null) {
-      setState(() => _errorMessage = 'Please provision first');
-      return;
-    }
-
-    // Gate 3: Photonic Intercept — scan the projector's ATTN QR.
-    final payload = await Navigator.of(context).push<AttendancePayload>(
-      MaterialPageRoute(builder: (_) => const AttendanceScannerPage()),
+  Future<void> _scan() async {
+    setState(() { _s = _ClaimState.scanning; _msg = null; _result = null; });
+    final payload = await Navigator.of(context).push<ScannedPayload>(
+      MaterialPageRoute(builder: (_) => const ScannerPage()),
     );
-    if (payload == null || !mounted) return;
+    if (!mounted) return;
+    if (payload == null) { setState(() => _s = _ClaimState.idle); return; }
+    _claim(payload);
+  }
 
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-      _claimResult = null;
-      _sessionUuid = payload.sessionUuid;
-      _tokenVal = payload.token;
-    });
-
+  Future<void> _claim(ScannedPayload p) async {
+    setState(() { _s = _ClaimState.claiming; _msg = 'Verifying identity…'; });
     try {
-      // Run the SRS pre-check pipeline (Gates 1→4) with the intercepted token.
-      final precheck = PrecheckOrchestrator();
-      final precheckPassed = await precheck.runPrecheck(
-        studentUuid: _studentUuid!,
-        sessionUuid: payload.sessionUuid,
-        tokenVal: payload.token,
+      final token   = await StorageService.getToken() ?? '';
+      final uuid    = await StorageService.getStudentUuid() ?? '';
+      final hmacKey = await StorageService.getHmac() ?? '';
+      final dId     = await StorageService.getDeviceId() ?? await DeviceService.getDeviceIdHash();
+
+      setState(() => _msg = 'Requesting challenge…');
+      final ch    = await ApiService.getChallenge(p.sessionUuid);
+      final nonce = (ch['nonce'] as String?) ?? CryptoService.nonce();
+      final raw   = ch['server_time_ms'] ?? ch['issued_at_epoch'];
+      final sTime = raw is num ? raw.toInt() : await ApiService.getServerTimeMs();
+
+      setState(() => _msg = 'Computing HMAC…');
+      final sig = CryptoService.hmac(
+        key: hmacKey, sessionUuid: p.sessionUuid, studentUuid: uuid,
+        tokenVal: p.tokenVal, claimedTime: sTime, deviceIdHash: dId, nonce: nonce,
       );
 
-      if (!precheckPassed) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = precheck.errorMessage ?? 'Pre-check failed';
-        });
-        return;
-      }
-
-      // Submit claim (server nonce + HMAC wax seal + 250ms judgment)
-      final result = await precheck.submitClaim();
-
-      setState(() {
-        _isLoading = false;
-        _claimResult = result;
-        _errorMessage = null;
-      });
+      setState(() => _msg = 'Submitting claim…');
+      final res = await ApiService.claimAttendance(
+        sessionUuid: p.sessionUuid, studentUuid: uuid, tokenVal: p.tokenVal,
+        clientClaimedTime: sTime, deviceIdHash: dId, nonce: nonce, hmacSig: sig,
+      );
+      setState(() { _s = _ClaimState.success; _result = res; _msg = null; });
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Claim failed: $e';
-      });
+      setState(() { _s = _ClaimState.failed; _msg = e.toString(); });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mark Attendance'),
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+      appBar: AppBar(title: const Text('Mark Attendance')),
+      body: Padding(
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Header
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Zero-Trust Attendance',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Cryptographic proof of physical presence',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Provisioning is handled by StudentAuthPage — if this device has
-            // no identity stored, route the student back to sign in.
-            if (_studentUuid == null) ...[
-              _buildReauth(),
-            ] else ...[
-              _buildClaimSection(),
-            ],
-            
-            const SizedBox(height: 16),
-            
-            // Error/Result display
-            if (_errorMessage != null) ...[
-              Card(
-                color: Colors.red[50],
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.error_outline, color: Colors.red),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          _errorMessage!,
-                          style: const TextStyle(color: Colors.red),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-            
-            if (_claimResult != null) ...[
-              _buildResultCard(),
-            ],
+            _identityCard(),
+            const SizedBox(height: 28),
+            Expanded(child: _body()),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildReauth() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Not signed in', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            const Text(
-              'Sign in with your college ID to bind this device and mark attendance.',
-              style: TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: () => Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (_) => const StudentAuthPage()),
-                ),
-                icon: const Icon(Icons.login),
-                label: const Text('Sign in / register'),
-              ),
-            ),
-          ],
+  Widget _identityCard() {
+    final initial = (_rollNo?.isNotEmpty == true) ? _rollNo![0].toUpperCase() : '?';
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+          color: kSurface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: kSurface2)),
+      child: Row(children: [
+        Container(
+          width: 40, height: 40,
+          decoration: const BoxDecoration(shape: BoxShape.circle,
+              gradient: LinearGradient(colors: [kPrimary, kPrimaryVar])),
+          child: Center(child: Text(initial,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800))),
         ),
-      ),
-    );
-  }
-              Widget _buildClaimSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.verified_user, color: Colors.green),
-                const SizedBox(width: 8),
-                Text(
-                  'Provisioned as ${_rollNoController.text}',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _isLoading ? null : _claimAttendance,
-                icon: _isLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Icon(Icons.qr_code_scanner),
-                label: Text(_isLoading ? 'Scanning & Verifying...' : 'Mark Attendance'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+        const SizedBox(width: 12),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(_rollNo ?? 'Unknown',
+              style: const TextStyle(color: kText, fontWeight: FontWeight.w700)),
+          Text('${_rollNo?.toLowerCase() ?? ''}@${AppConstants.emailDomain}'
+              .replaceFirst('null@', '—@'),
+              style: const TextStyle(color: kTextMuted, fontSize: 11)),
+        ]),
+        const Spacer(),
+        const Icon(Icons.verified_rounded, color: kSuccess, size: 18),
+      ]),
     );
   }
 
-  Widget _buildResultCard() {
-    if (_claimResult == null) return const SizedBox.shrink();
-    
-    final success = _claimResult!['status'] == 'PRESENT';
-    
-    return Card(
-      color: success ? Colors.green[50] : Colors.red[50],
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  success ? Icons.check_circle : Icons.cancel,
-                  color: success ? Colors.green : Colors.red,
-                  size: 32,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    success ? 'Attendance Verified!' : 'Attendance Failed',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: success ? Colors.green : Colors.red,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (_claimResult!['verification_delta_ms'] != null)
-              Text(
-                'Verification Delta: ${_claimResult!['verification_delta_ms']}ms',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            if (_claimResult!['ledger_uuid'] != null)
-              Text(
-                'Record: ${_claimResult!['ledger_uuid'].toString().shortUuid}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget _body() {
+    switch (_s) {
+      case _ClaimState.claiming:
+        return Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          const CircularProgressIndicator(color: kPrimary),
+          const SizedBox(height: 20),
+          Text(_msg ?? 'Processing…', style: const TextStyle(color: kTextMuted, fontSize: 13)),
+        ]);
 
-  Widget _buildGatesStatus() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      case _ClaimState.success:
+        return _resultCard(ok: true);
+
+      case _ClaimState.failed:
+        return _resultCard(ok: false);
+
+      default:
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              'Security Gates Status',
-              style: Theme.of(context).textTheme.titleLarge,
+            Container(
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: kPrimary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: kPrimary.withValues(alpha: 0.25)),
+              ),
+              child: const Column(children: [
+                Icon(Icons.qr_code_scanner_rounded, color: kPrimary, size: 60),
+                SizedBox(height: 14),
+                Text('Ready to Scan',
+                    style: TextStyle(color: kText, fontSize: 18, fontWeight: FontWeight.w800)),
+                SizedBox(height: 8),
+                Text('Point at the QR code on the classroom projector',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: kTextMuted, fontSize: 13, height: 1.5)),
+              ]),
             ),
-            const SizedBox(height: 12),
-            _buildGateStatusTile(
-              title: AppConstants.gate1Title,
-              description: AppConstants.gate1Description,
-              icon: '🔐',
-              status: _studentUuid != null ? 'Ready' : 'Not Provisioned',
-              color: _studentUuid != null ? Colors.green : Colors.orange,
-            ),
-            _buildGateStatusTile(
-              title: AppConstants.gate2Title,
-              description: AppConstants.gate2Description,
-              icon: '👆',
-              status: 'Requires Biometric',
-              color: Colors.blue,
-            ),
-            _buildGateStatusTile(
-              title: AppConstants.gate3Title,
-              description: AppConstants.gate3Description,
-              icon: '📱',
-              status: 'Waiting for Token',
-              color: Colors.purple,
-            ),
-            _buildGateStatusTile(
-              title: AppConstants.gate4Title,
-              description: AppConstants.gate4Description,
-              icon: '🔏',
-              status: 'Requires Time Sync',
-              color: Colors.orange,
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: _scan,
+              icon: const Icon(Icons.qr_code_scanner_rounded),
+              label: const Text('Scan QR Code'),
+              style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 15)),
             ),
           ],
-        ),
-      ),
-    );
+        );
+    }
   }
 
-  Widget _buildGateStatusTile({
-    required String title,
-    required String description,
-    required String icon,
-    required String status,
-    required Color color,
-  }) {
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: color.withValues(alpha: 0.1),
-        child: Text(icon, style: const TextStyle(fontSize: 20)),
-      ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: Text(description, style: const TextStyle(fontSize: 12)),
-      trailing: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+  Widget _resultCard({required bool ok}) {
+    final delta = _result?['verification_delta_ms'];
+    return Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      Container(
+        padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
+          color: (ok ? kSuccess : kDanger).withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: (ok ? kSuccess : kDanger).withValues(alpha: 0.3)),
         ),
-        child: Text(
-          status,
-          style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 12),
-        ),
+        child: Column(children: [
+          Icon(ok ? Icons.check_circle_rounded : Icons.cancel_rounded,
+              color: ok ? kSuccess : kDanger, size: 60),
+          const SizedBox(height: 14),
+          Text(ok ? 'Attendance Verified!' : 'Verification Failed',
+              style: TextStyle(color: ok ? kSuccess : kDanger,
+                  fontSize: 18, fontWeight: FontWeight.w800)),
+          if (ok && delta != null) ...[
+            const SizedBox(height: 6),
+            Text('Delta: ${delta}ms',
+                style: TextStyle(color: ok ? kSuccess : kDanger, fontSize: 12)),
+          ],
+          if (!ok && _msg != null) ...[
+            const SizedBox(height: 8),
+            Text(_msg!, textAlign: TextAlign.center,
+                style: const TextStyle(color: kTextMuted, fontSize: 12)),
+          ],
+        ]),
       ),
-      dense: true,
-    );
-  }
-
-  @override
-  void dispose() {
-    _rollNoController.dispose();
-    super.dispose();
+      const SizedBox(height: 20),
+      OutlinedButton.icon(
+        onPressed: () => setState(() { _s = _ClaimState.idle; _result = null; _msg = null; }),
+        icon: const Icon(Icons.refresh_rounded),
+        label: const Text('Scan Again'),
+        style: OutlinedButton.styleFrom(
+            foregroundColor: kPrimary, side: const BorderSide(color: kPrimary)),
+      ),
+    ]);
   }
 }
