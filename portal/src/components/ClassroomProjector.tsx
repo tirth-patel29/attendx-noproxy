@@ -133,12 +133,8 @@ export default function ClassroomProjector({
             transition={{ duration: 0.5 }}
             className="flex flex-col items-center gap-8"
           >
-            {/* QR Code with Pulse Animation */}
-            <motion.div
-              animate={{ scale: [1, 1.02, 1] }}
-              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              className="relative"
-            >
+            {/* QR Code */}
+            <div className="relative">
               <div 
                 className="flex justify-center items-center p-8 rounded-2xl shadow-2xl"
                 style={{
@@ -183,7 +179,7 @@ export default function ClassroomProjector({
                   />
                 </>
               )}
-            </motion.div>
+            </div>
 
             {/* Instructions */}
             <motion.div

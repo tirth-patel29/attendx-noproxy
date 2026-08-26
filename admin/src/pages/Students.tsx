@@ -1,14 +1,26 @@
 ﻿import { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 import { adminApi, Student, Division } from '../services/adminApi';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Plus, Pencil, Trash2, Smartphone, Search, RefreshCw } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { FloatingInput } from '@/components/ui/floating-input';
+import { InlineDisclosureMenu, MenuItemProps } from '@/components/ui/inline-disclosure-menu';
+import { Plus, Pencil, Trash2, Smartphone, Search, RefreshCw, KeyRound } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Label } from '@/components/ui/label';
 
 interface FormState { roll_no: string; email: string; name: string; division_id: string; }
 const empty: FormState = { roll_no: '', email: '', name: '', division_id: '' };
@@ -19,15 +31,16 @@ export default function Students() {
   const [dialog, setDialog] = useState<null | { mode: 'create' | 'edit'; id?: string }>(null);
   const [form, setForm] = useState<FormState>(empty);
   const [search, setSearch] = useState('');
-  const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Student | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const load = () => {
     setLoading(true);
     Promise.all([adminApi.students(), adminApi.divisions()])
-      .then(([s, d]) => { setRows(s.data); setDivisions(d.data); setLoading(false); })
-      .catch(() => { setMsg({ type: 'error', text: 'Failed to load data' }); setLoading(false); });
+      .then(([s, d]) => { setRows(s.data); setDivisions(d.data); })
+      .catch(() => toast.error('Failed to load data'))
+      .finally(() => setLoading(false));
   };
   useEffect(() => { load(); }, []);
 
@@ -40,7 +53,7 @@ export default function Students() {
   const openCreate = () => { setForm(empty); setDialog({ mode: 'create' }); };
   const openEdit = (s: Student) => {
     setForm({ roll_no: s.roll_no, email: s.email, name: s.name, division_id: s.division_id || '' });
-    setDialog({ mode: 'edit', id: s.student_uuid });
+    setDialog({ mode: 'edit', id: s.id });
   };
 
   const save = async () => {
@@ -48,36 +61,103 @@ export default function Students() {
     try {
       if (dialog?.mode === 'create') {
         await adminApi.createStudent(form);
-        setMsg({ type: 'success', text: `Student ${form.name} created` });
+        toast.success(`Student ${form.name} created`);
       } else if (dialog?.id) {
         await adminApi.updateStudent(dialog.id, form);
-        setMsg({ type: 'success', text: 'Student updated' });
+        toast.success('Student updated');
       }
       setDialog(null);
       load();
     } catch (err: any) {
-      setMsg({ type: 'error', text: err?.response?.data?.error?.message ?? 'Save failed' });
+      toast.error(err?.response?.data?.error?.message ?? 'Save failed');
     } finally {
       setBusy(false);
     }
   };
 
-  const doDelete = async (s: Student) => {
-    if (!window.confirm(`Delete student ${s.name}? This will remove their attendance records.`)) return;
+  const doDelete = async () => {
+    if (!deleteTarget) return;
     setBusy(true);
     try {
-      await adminApi.deleteStudent(s.student_uuid);
-      setMsg({ type: 'success', text: 'Student deleted' });
+      await adminApi.deleteStudent(deleteTarget.id);
+      toast.success('Student deleted');
+      setDeleteTarget(null);
       load();
     } catch (err: any) {
-      setMsg({ type: 'error', text: err?.response?.data?.error?.message ?? 'Delete failed' });
+      toast.error(err?.response?.data?.error?.message ?? 'Delete failed');
     } finally {
       setBusy(false);
     }
   };
 
+  const doResetDevice = async (s: Student) => {
+    setBusy(true);
+    try {
+      await adminApi.resetDevice(s.id);
+      toast.success(`Device reset for ${s.name}`);
+      load();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message ?? 'Reset device failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doRotateHmac = async (s: Student) => {
+    setBusy(true);
+    try {
+      await adminApi.rotateHmac(s.id);
+      toast.success(`HMAC key rotated for ${s.name}`);
+      load();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message ?? 'Rotate HMAC failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doForgotPassword = async (s: Student) => {
+    setBusy(true);
+    try {
+      await adminApi.forgotPassword(s.id);
+      toast.success(`Password reset triggered for ${s.name}`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message ?? 'Password reset failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const getMenuItems = (s: Student): MenuItemProps[] => [
+    {
+      icon: <Pencil className="h-5 w-5" />,
+      label: 'Edit',
+      onClick: () => openEdit(s),
+    },
+    {
+      icon: <Smartphone className="h-5 w-5" />,
+      label: 'Reset Device',
+      onClick: () => doResetDevice(s),
+    },
+    {
+      icon: <RefreshCw className="h-5 w-5" />,
+      label: 'Rotate HMAC',
+      onClick: () => doRotateHmac(s),
+    },
+    {
+      icon: <KeyRound className="h-5 w-5" />,
+      label: 'Reset Password',
+      onClick: () => doForgotPassword(s),
+    },
+  ];
+
   return (
-    <div className="space-y-4">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+      className="space-y-4"
+    >
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Students</h1>
@@ -94,19 +174,14 @@ export default function Students() {
         </div>
       </div>
 
-      {msg && (
-        <Alert variant={msg.type === 'error' ? 'destructive' : 'default'}>
-          <AlertDescription>{msg.text}</AlertDescription>
-        </Alert>
-      )}
-
       <div className="relative">
         <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-        <Input
+        <input
+          type="text"
           placeholder="Search by name, email, or roll number..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 pl-9 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
       </div>
 
@@ -142,34 +217,40 @@ export default function Students() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((s) => (
-                    <TableRow key={s.student_uuid}>
-                      <TableCell className="font-mono font-medium">{s.roll_no}</TableCell>
-                      <TableCell>{s.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{s.email}</TableCell>
-                      <TableCell>{s.division_name || '—'}</TableCell>
-                      <TableCell>
-                        {s.bound_device_id ? (
-                          <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400 text-xs">
-                            <Smartphone className="h-3 w-3" />
-                            Bound
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">Not bound</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => openEdit(s)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => doDelete(s)} className="text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  <AnimatePresence initial={false}>
+                    {filtered.map((s, index) => (
+                      <motion.tr
+                        key={s.id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 10 }}
+                        transition={{ duration: 0.2, delay: index * 0.03 }}
+                        className="border-b transition-colors hover:bg-muted/50"
+                      >
+                        <TableCell className="font-mono font-medium">{s.roll_no}</TableCell>
+                        <TableCell>{s.name}</TableCell>
+                        <TableCell className="text-muted-foreground">{s.email}</TableCell>
+                        <TableCell>{s.division_name || '—'}</TableCell>
+                        <TableCell>
+                          {s.bound_device_id ? (
+                            <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400 text-xs">
+                              <Smartphone className="h-3 w-3" />
+                              Bound
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">Not bound</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <InlineDisclosureMenu
+                            menuItems={getMenuItems(s)}
+                            showDelete={true}
+                            onDelete={() => setDeleteTarget(s)}
+                          />
+                        </TableCell>
+                      </motion.tr>
+                    ))}
+                  </AnimatePresence>
                 )}
               </TableBody>
             </Table>
@@ -186,30 +267,37 @@ export default function Students() {
               {dialog?.mode === 'create' ? 'Register a new student account' : 'Update student information'}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="roll">Roll Number</Label>
-              <Input id="roll" value={form.roll_no} onChange={(e) => setForm({ ...form, roll_no: e.target.value })} placeholder="24DCE051" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
-              <Input id="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="John Doe" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="john@student.edu" />
-            </div>
+          <div className="space-y-5 py-4">
+            <FloatingInput
+              label="Roll Number"
+              value={form.roll_no}
+              onChange={(e) => setForm({ ...form, roll_no: e.target.value })}
+              placeholder=" "
+            />
+            <FloatingInput
+              label="Full Name"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder=" "
+            />
+            <FloatingInput
+              label="Email"
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              placeholder=" "
+            />
             <div className="space-y-2">
               <Label htmlFor="division">Division</Label>
               <select
                 id="division"
                 value={form.division_id}
                 onChange={(e) => setForm({ ...form, division_id: e.target.value })}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <option value="">No division</option>
                 {divisions.map((d) => (
-                  <option key={d.division_id} value={d.division_id}>{d.name}</option>
+                  <option key={d.id} value={d.id}>{d.name}</option>
                 ))}
               </select>
             </div>
@@ -220,6 +308,27 @@ export default function Students() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+
+      {/* Delete Confirmation AlertDialog */}
+      <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {deleteTarget?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove their attendance records. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={doDelete}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </motion.div>
   );
 }

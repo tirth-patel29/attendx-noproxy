@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
+import { MinimalCarousel, CarouselCard } from '@/components/ui/minimal-carousel';
 import {
   Plus,
   Radio,
@@ -22,22 +23,6 @@ interface SessionWithCounts extends Session {
   total_students?: number;
   present_count?: number;
 }
-
-// Animation variants
-const container = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-    },
-  },
-};
-
-const item = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0 },
-};
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -81,6 +66,30 @@ export default function DashboardPage() {
   const active = sessions.filter((s) => s.is_active);
   const presentToday = sessions.reduce((a, s) => a + (s.present_count || 0), 0);
 
+  const statCards: CarouselCard[] = [
+    {
+      id: 'active',
+      title: 'Active Sessions',
+      value: String(active.length),
+      color: 'bg-gradient-to-br from-green-500 to-emerald-600',
+      icon: Radio,
+    },
+    {
+      id: 'today',
+      title: "Today's Sessions",
+      value: String(sessions.length),
+      color: 'bg-gradient-to-br from-blue-500 to-blue-700',
+      icon: Calendar,
+    },
+    {
+      id: 'present',
+      title: 'Present Today',
+      value: String(presentToday),
+      color: 'bg-gradient-to-br from-purple-500 to-violet-700',
+      icon: Users,
+    },
+  ];
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -117,68 +126,13 @@ export default function DashboardPage() {
         </Alert>
       )}
 
-      {/* Quick Stats with Staggered Animation */}
+      {/* Quick Stats — MinimalCarousel */}
       <motion.div
-        variants={container}
-        initial="hidden"
-        animate="show"
-        className="grid gap-4 md:grid-cols-3"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.1 }}
       >
-        <motion.div
-          variants={item}
-          whileHover={{ y: -4, scale: 1.02 }}
-          transition={{ duration: 0.2 }}
-        >
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Sessions</CardTitle>
-              <motion.div
-                animate={{ scale: [1, 1.2, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
-                <Radio className="h-4 w-4 text-green-500" />
-              </motion.div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{active.length}</div>
-              <p className="text-xs text-muted-foreground">Live attendance tracking</p>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div
-          variants={item}
-          whileHover={{ y: -4, scale: 1.02 }}
-          transition={{ duration: 0.2 }}
-        >
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Today's Sessions</CardTitle>
-              <Calendar className="h-4 w-4 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{sessions.length}</div>
-              <p className="text-xs text-muted-foreground">Total sessions conducted</p>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div
-          variants={item}
-          whileHover={{ y: -4, scale: 1.02 }}
-          transition={{ duration: 0.2 }}
-        >
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Present Today</CardTitle>
-              <Users className="h-4 w-4 text-purple-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{presentToday}</div>
-              <p className="text-xs text-muted-foreground">Students marked present</p>
-            </CardContent>
-          </Card>
-        </motion.div>
+        <MinimalCarousel cards={statCards} />
       </motion.div>
 
       {/* Scheduled Lectures */}
@@ -250,12 +204,7 @@ export default function DashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <motion.div
-                  animate={{ scale: [1, 1.2, 1] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                >
-                  <Radio className="h-5 w-5 text-green-500" />
-                </motion.div>
+                <Radio className="h-5 w-5 text-green-500" />
                 Live Sessions
               </CardTitle>
               <CardDescription>Currently active attendance sessions</CardDescription>

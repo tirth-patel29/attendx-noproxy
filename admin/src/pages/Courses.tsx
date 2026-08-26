@@ -4,11 +4,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { FloatingInput } from '@/components/ui/floating-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { InlineDisclosureMenu } from '@/components/ui/inline-disclosure-menu';
+import { Plus, Pencil } from 'lucide-react';
+import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface FormState { code: string; title: string; credits: number; division_id: string; }
 const empty: FormState = { code: '', title: '', credits: 3, division_id: '' };
@@ -18,7 +22,7 @@ export default function Courses() {
   const [divisions, setDivisions] = useState<Division[]>([]);
   const [dialog, setDialog] = useState<null | { mode: 'create' | 'edit'; id?: string }>(null);
   const [form, setForm] = useState<FormState>(empty);
-  const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Course | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = () => {
@@ -44,30 +48,35 @@ export default function Courses() {
       setDialog(null);
       setForm(empty);
       load();
-      setMsg({ type: 'success', text: 'Course saved' });
+      toast.success('Course saved');
     } catch (e: any) {
-      setMsg({ type: 'error', text: e?.response?.data?.error ?? 'Save failed' });
+      toast.error(e?.response?.data?.error ?? 'Save failed');
     } finally {
       setBusy(false);
     }
   };
 
   const del = async (c: Course) => {
-    if (!window.confirm(`Delete course ${c.course_code}?`)) return;
     setBusy(true);
     try {
       await adminApi.deleteCourse(c.id);
-      setMsg({ type: 'success', text: 'Course deleted' });
+      toast.success('Course deleted');
       load();
     } catch (e: any) {
-      setMsg({ type: 'error', text: e?.response?.data?.error ?? 'Delete failed' });
+      toast.error(e?.response?.data?.error ?? 'Delete failed');
     } finally {
       setBusy(false);
+      setDeleteTarget(null);
     }
   };
 
   return (
-    <div className="space-y-4">
+    <motion.div
+      className="space-y-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+    >
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Courses</h1>
@@ -78,12 +87,6 @@ export default function Courses() {
           Add Course
         </Button>
       </div>
-
-      {msg && (
-        <Alert variant={msg.type === 'error' ? 'destructive' : 'default'}>
-          <AlertDescription>{msg.text}</AlertDescription>
-        </Alert>
-      )}
 
       <Card>
         <CardHeader>
@@ -109,24 +112,35 @@ export default function Courses() {
                   </TableCell>
                 </TableRow>
               ) : (
-                rows.map((c) => (
-                  <TableRow key={c.id}>
-                    <TableCell className="font-mono font-semibold">{c.course_code}</TableCell>
-                    <TableCell>{c.title}</TableCell>
-                    <TableCell>{c.credits}</TableCell>
-                    <TableCell className="text-muted-foreground">{c.division_name || '—'}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(c)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => del(c)} className="text-destructive">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                <AnimatePresence>
+                  {rows.map((c, index) => (
+                    <motion.tr
+                      key={c.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.04 }}
+                      className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
+                    >
+                      <TableCell className="font-mono font-semibold">{c.course_code}</TableCell>
+                      <TableCell>{c.title}</TableCell>
+                      <TableCell>{c.credits}</TableCell>
+                      <TableCell className="text-muted-foreground">{c.division_name || '—'}</TableCell>
+                      <TableCell className="text-right">
+                        <InlineDisclosureMenu
+                          menuItems={[
+                            {
+                              icon: <Pencil className="h-5 w-5" />,
+                              label: 'Edit',
+                              onClick: () => openEdit(c),
+                            },
+                          ]}
+                          showDelete
+                          onDelete={() => setDeleteTarget(c)}
+                        />
+                      </TableCell>
+                    </motion.tr>
+                  ))}
+                </AnimatePresence>
               )}
             </TableBody>
           </Table>
@@ -142,25 +156,19 @@ export default function Courses() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="code">Course Code</Label>
-              <Input
-                id="code"
-                value={form.code}
-                onChange={(e) => setForm({ ...form, code: e.target.value })}
-                placeholder="CS101"
-                disabled={dialog?.mode === 'edit'}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="title">Title</Label>
-              <Input
-                id="title"
-                value={form.title}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                placeholder="Introduction to Computer Science"
-              />
-            </div>
+            <FloatingInput
+              label="Course Code"
+              value={form.code}
+              onChange={(e) => setForm({ ...form, code: e.target.value })}
+              placeholder="CS101"
+              disabled={dialog?.mode === 'edit'}
+            />
+            <FloatingInput
+              label="Title"
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              placeholder="Introduction to Computer Science"
+            />
             <div className="space-y-2">
               <Label htmlFor="credits">Credits</Label>
               <Input
@@ -197,6 +205,27 @@ export default function Courses() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Course</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete course <strong>{deleteTarget?.course_code}</strong> — {deleteTarget?.title}?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteTarget && del(deleteTarget)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </motion.div>
   );
 }
