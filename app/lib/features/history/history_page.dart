@@ -119,8 +119,21 @@ class _HistoryPageState extends State<HistoryPage> {
               final title = (r['course_title'] as String?) ?? (r['course_code'] as String?) ?? 'Lecture';
               String when = '';
               try {
-                final raw = r['server_logged_time'] ?? r['session_date'];
-                if (raw != null) when = DateFormat('dd MMM · HH:mm').format(DateTime.parse(raw.toString()).toLocal());
+                var raw = r['server_logged_time'] 
+                    ?? r['logged_at'] 
+                    ?? r['created_at'] 
+                    ?? r['client_claimed_time'] 
+                    ?? r['session_date'];
+                if (raw != null) {
+                  DateTime dt;
+                  if (raw is num) {
+                    // epoch milliseconds
+                    dt = DateTime.fromMillisecondsSinceEpoch(raw.toInt()).toLocal();
+                  } else {
+                    dt = DateTime.parse(raw.toString()).toLocal();
+                  }
+                  when = DateFormat('dd MMM · HH:mm').format(dt);
+                }
               } catch (_) {}
               final delta = (r['verification_delta_ms'] as num?)?.toInt();
               return Container(

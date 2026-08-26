@@ -26,3 +26,6 @@ deploy/supabase/volumes/
 
 # shared client API key (never commit)
 .api_key
+
+# Release APKs (too large for git - distribute separately)
+releases/*.apk

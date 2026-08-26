@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/storage_service.dart';
 import '../../core/services/crypto_service.dart';
@@ -175,10 +176,19 @@ class _DashboardPageState extends State<DashboardPage> {
                       const Icon(Icons.check_circle_rounded, color: kSuccess, size: 28),
                       const SizedBox(width: 12),
                       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        const Text('Attendance Verified!', style: TextStyle(color: kSuccess, fontWeight: FontWeight.w800, fontSize: 15)),
-                        if (_claimResult?['verification_delta_ms'] != null)
-                          Text('Delta: ${_claimResult!["verification_delta_ms"]}ms',
-                              style: const TextStyle(color: kSuccess, fontSize: 12)),
+                        const Text('Attendance Verified!',
+                            style: TextStyle(color: kSuccess, fontWeight: FontWeight.w800, fontSize: 15)),
+                        const SizedBox(height: 2),
+                        Text(
+                          [
+                            if ((_claimResult?['course_code'] ?? _claimResult?['session']?['course_code']) != null)
+                              (_claimResult!['course_code'] ?? _claimResult!['session']['course_code']).toString(),
+                            DateFormat('HH:mm').format(DateTime.now()),
+                            if (_claimResult?['verification_delta_ms'] != null)
+                              'Δ ${_claimResult!["verification_delta_ms"]}ms',
+                          ].join('  ·  '),
+                          style: const TextStyle(color: kSuccess, fontSize: 11),
+                        ),
                       ])),
                     ]),
                   ),
