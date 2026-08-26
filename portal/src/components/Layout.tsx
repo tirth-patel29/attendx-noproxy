@@ -1,20 +1,64 @@
-﻿import { useState } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Outlet, NavLink, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
 import { ThemeToggle } from './ThemeToggle';
-import { LayoutDashboard, Plus, LogOut, Shield, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Plus, LogOut, Shield, Menu, X, Home } from 'lucide-react';
 
 const NAV = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/sessions/new', label: 'Start Session', icon: Plus },
 ];
 
+// Helper function to format breadcrumb labels
+function formatBreadcrumbLabel(segment: string): string {
+  // Handle special cases
+  if (segment === 'new') return 'New Session';
+  if (segment === 'sessions') return 'Sessions';
+  if (segment === 'dashboard') return 'Dashboard';
+  
+  // UUID pattern detection (8-4-4-4-12 format)
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(segment)) {
+    return 'Session Details';
+  }
+  
+  // Default: capitalize and replace hyphens with spaces
+  return segment
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Generate breadcrumbs from current location
+  const generateBreadcrumbs = (): Array<{ path: string; label: string }> => {
+    const paths = location.pathname.split('/').filter(Boolean);
+    const breadcrumbs: Array<{ path: string; label: string }> = [];
+
+    paths.forEach((segment, index) => {
+      const path = '/' + paths.slice(0, index + 1).join('/');
+      const label = formatBreadcrumbLabel(segment);
+      breadcrumbs.push({ path, label });
+    });
+
+    return breadcrumbs;
+  };
+
+  const breadcrumbs = generateBreadcrumbs();
 
   return (
     <div className="flex h-screen bg-background">
@@ -116,6 +160,39 @@ export default function Layout() {
             <ThemeToggle />
           </div>
         </header>
+
+        {/* Breadcrumb Navigation */}
+        {breadcrumbs.length > 0 && location.pathname !== '/login' && (
+          <div className="border-b bg-muted/40 px-6 py-3">
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink asChild>
+                    <Link to="/dashboard" className="flex items-center gap-1.5">
+                      <Home className="h-3.5 w-3.5" />
+                      <span className="sr-only">Home</span>
+                    </Link>
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                
+                {breadcrumbs.map((crumb, index) => (
+                  <span key={crumb.path} className="contents">
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                      {index === breadcrumbs.length - 1 ? (
+                        <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                      ) : (
+                        <BreadcrumbLink asChild>
+                          <Link to={crumb.path}>{crumb.label}</Link>
+                        </BreadcrumbLink>
+                      )}
+                    </BreadcrumbItem>
+                  </span>
+                ))}
+              </BreadcrumbList>
+            </Breadcrumb>
+          </div>
+        )}
 
         {/* Page content */}
         <main className="p-6">
