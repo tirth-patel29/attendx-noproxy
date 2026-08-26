@@ -4,8 +4,8 @@ plugins {
 }
 
 android {
-    namespace = "tech.atmyhome.attendance"
-    compileSdk = 35
+    namespace = "com.example.attendance_gateway"
+    compileSdk = 36
     ndkVersion = "28.2.13676358"
 
     compileOptions {
