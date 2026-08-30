@@ -16,12 +16,13 @@ jobs:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
-          host: 16.192.8.185
+          host: 15.206.244.63
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           timeout: 600s
           script: |
             set -e
+
             echo "=== Pull latest code ==="
             cd /home/ubuntu/attendance-gateway
             git fetch origin main
@@ -29,8 +30,7 @@ jobs:
 
             echo "=== Run migrations ==="
             for f in $(ls /home/ubuntu/attendance-gateway/migrations/*.sql | sort -V); do
-              echo "Running: $(basename $f)"
-              docker exec -i supabase-db psql -U postgres -d postgres < "$f" 2>&1 | grep -v NOTICE | tail -1
+              docker exec -i supabase-db psql -U postgres -d postgres < "$f" 2>&1 | grep -vE 'NOTICE|already exists' | tail -1
             done
 
             echo "=== Build images ==="
