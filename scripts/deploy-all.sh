@@ -17,13 +17,13 @@ echo "▶ Pulling latest code on server..."
 ssh "${SSH_ARGS[@]}" "$SSH_HOST" "cd /home/hetp/attendance-gateway && git pull origin main"
 
 echo "▶ Syncing backend..."
-ssh "${SSH_ARGS[@]}" "$SSH_HOST" "cp -r /home/hetp/attendance-gateway/backend/* $HOST_STACKS/attendance-backend/"
+ssh "${SSH_ARGS[@]}" "$SSH_HOST" "cp -r /home/hetp/attendance-gateway/backend/* $HOST_STACKS/attendance-backend/ && cp /home/hetp/attendance-gateway/backend/.dockerignore $HOST_STACKS/attendance-backend/ 2>/dev/null || true"
 
 echo "▶ Syncing portal..."
-ssh "${SSH_ARGS[@]}" "$SSH_HOST" "cp -r /home/hetp/attendance-gateway/portal/* $HOST_STACKS/attendance-portal/portal/"
+ssh "${SSH_ARGS[@]}" "$SSH_HOST" "cp -r /home/hetp/attendance-gateway/portal/* $HOST_STACKS/attendance-portal/portal/ && cp /home/hetp/attendance-gateway/portal/.dockerignore $HOST_STACKS/attendance-portal/portal/ 2>/dev/null || true"
 
 echo "▶ Syncing admin..."
-ssh "${SSH_ARGS[@]}" "$SSH_HOST" "cp -r /home/hetp/attendance-gateway/admin/* $HOST_STACKS/attendance-admin/admin/"
+ssh "${SSH_ARGS[@]}" "$SSH_HOST" "cp -r /home/hetp/attendance-gateway/admin/* $HOST_STACKS/attendance-admin/admin/ && cp /home/hetp/attendance-gateway/admin/.dockerignore $HOST_STACKS/attendance-admin/admin/ 2>/dev/null || true"
 
 echo "▶ Rebuilding backend..."
 ssh "${SSH_ARGS[@]}" "$SSH_HOST" "cd $HOST_STACKS/attendance-backend && CACHE_BUST=\$(date +%s) docker compose up -d --build"

@@ -1,267 +1,178 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { useAuth } from '../context/AuthContext';
-import { portalApi } from '../services/portalApi';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { FloatingInput } from '@/components/ui/floating-input';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ArrowLeft, Zap, Lock, User, Calendar, CheckCircle2 } from 'lucide-react';
+import * as React from "react";
+import { useNavigate } from "react-router-dom";
+import { motion } from "motion/react";
+import { Play, CalendarDays, Clock, BookOpen } from "lucide-react";
+import { PageHeader } from "@/components/attendx/PageHeader";
+import { GlassCard } from "@/components/attendx/GlassCard";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { staggerContainer, riseItem } from "@/lib/motion";
+import { useTeacherTimetable } from "@/hooks/useTeacherDashboard";
+import { useStartSession } from "@/hooks/useSessions";
 
 export default function NewSessionPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const [courseCode, setCourseCode] = useState('');
-  const [sessionDate, setSessionDate] = useState(new Date().toISOString().split('T')[0]);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
-  const [fieldErrors, setFieldErrors] = useState<{ courseCode?: string }>({});
+  const [courseCode, setCourseCode] = React.useState("");
+  const [date, setDate] = React.useState(new Date().toISOString().split("T")[0]);
+  const [time, setTime] = React.useState(new Date().toTimeString().slice(0, 5));
+  const [error, setError] = React.useState("");
+  
+  const { data: timetable } = useTeacherTimetable();
+  const startSession = useStartSession();
 
-  const validateForm = () => {
-    const errors: { courseCode?: string } = {};
-    
-    if (!courseCode.trim()) {
-      errors.courseCode = 'Course code is required';
-    } else if (courseCode.trim().length < 2) {
-      errors.courseCode = 'Course code must be at least 2 characters';
-    }
-    
-    setFieldErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
+  // Extract unique courses from timetable week
+  const uniqueCourses = React.useMemo(() => {
+    if (!timetable?.week) return [];
+    const map = new Map();
+    timetable.week.forEach(t => {
+      if (!map.has(t.course_code)) {
+        map.set(t.course_code, t);
+      }
+    });
+    return Array.from(map.values());
+  }, [timetable]);
 
-  const handleSubmit = async () => {
-    if (!validateForm()) {
+  const selectedCourse = uniqueCourses.find((c) => c.course_code === courseCode);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    if (!courseCode) {
+      setError("Please select a course to start the session for.");
       return;
     }
     
-    setError('');
-    setSubmitting(true);
     try {
-      const session = await portalApi.startSession({
-        course_code: courseCode.trim(),
-        session_date: sessionDate,
-      });
-      navigate(`/sessions/${session.data.id}`);
+      const res = await startSession.mutateAsync({ course_code: courseCode, session_date: date });
+      navigate(`/sessions/${res.id}`);
     } catch (err: any) {
-      setError(err.response?.data?.error?.message || 'Failed to create session');
-      setSubmitting(false);
+      setError(err?.response?.data?.error?.message || err.message || "Failed to start session");
     }
-  };
+  }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className="max-w-2xl mx-auto space-y-4"
-    >
-      <Button variant="ghost" onClick={() => navigate('/dashboard')}>
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        Back to Dashboard
-      </Button>
-
+    <div className="px-4 py-6 sm:px-6 lg:px-8">
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.1 }}
+        variants={staggerContainer}
+        initial="hidden"
+        animate="show"
+        className="mx-auto max-w-2xl space-y-6"
       >
-        <h1 className="text-3xl font-bold tracking-tight">Start Attendance Session</h1>
-        <p className="text-muted-foreground mt-1">
-          Create a new session and display the QR code for students to scan
-        </p>
-      </motion.div>
+        <PageHeader
+          title="Start a Secure Session"
+          subtitle="Create a live attendance session for your classroom."
+        />
 
-      {error && (
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        </motion.div>
-      )}
-
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.2, duration: 0.3 }}
-      >
-        <Card>
-          <CardHeader>
-            <CardTitle>Session Details</CardTitle>
-            <CardDescription>
-              Configure your attendance session. The QR code will be displayed after creation.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Professor Info */}
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 }}
-              className="flex items-center gap-3 p-3 rounded-lg bg-muted"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground font-semibold">
-                {user?.name?.[0]?.toUpperCase() || 'P'}
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold flex items-center gap-2">
-                  <User className="h-3 w-3" />
-                  {user?.name}
-                </p>
-                <p className="text-xs text-muted-foreground">{user?.email}</p>
-              </div>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Lock className="h-3 w-3" />
-                <span>Auto-detected from login</span>
-              </div>
-            </motion.div>
-
-            {/* Course Code with Floating Input */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="space-y-2"
-            >
-              <FloatingInput
-                id="course"
-                label="Course Code"
-                placeholder=" "
-                value={courseCode}
-                onChange={(e) => {
-                  setCourseCode(e.target.value.toUpperCase());
-                  if (fieldErrors.courseCode) {
-                    setFieldErrors({ ...fieldErrors, courseCode: undefined });
-                  }
-                }}
-                className="font-mono"
-                autoFocus
-              />
-              {fieldErrors.courseCode && (
-                <motion.p
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="text-xs text-destructive flex items-center gap-1"
-                >
-                  <motion.span
-                    animate={{ x: [-5, 5, -5, 5, 0] }}
-                    transition={{ duration: 0.4 }}
-                  >
-                    {fieldErrors.courseCode}
-                  </motion.span>
-                </motion.p>
+        <motion.div variants={riseItem}>
+          <GlassCard>
+            <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+              {error && (
+                <div className="rounded-xl bg-destructive/10 px-4 py-2.5 text-[12.5px] text-destructive ring-1 ring-inset ring-destructive/20" role="alert">
+                  {error}
+                </div>
               )}
-              {!fieldErrors.courseCode && courseCode.trim().length >= 2 && (
-                <motion.p
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1"
-                >
-                  <CheckCircle2 className="h-3 w-3" />
-                  Valid course code
-                </motion.p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Enter the course code for this attendance session
-              </p>
-            </motion.div>
 
-            {/* Session Date with Floating Input */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-              className="space-y-2"
-            >
-              <div className="flex items-center gap-2 text-sm font-medium mb-2">
-                <Calendar className="h-3 w-3" />
-                Session Date
-              </div>
-              <FloatingInput
-                id="date"
-                type="date"
-                label="Date"
-                value={sessionDate}
-                onChange={(e) => setSessionDate(e.target.value)}
-              />
-            </motion.div>
-
-            {/* Submit Button */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-            >
-              <Button
-                className="w-full"
-                size="lg"
-                onClick={handleSubmit}
-                disabled={submitting || !courseCode.trim()}
-              >
-                {submitting ? (
-                  <motion.div
-                    className="flex items-center gap-2"
-                    animate={{ opacity: [1, 0.5, 1] }}
-                    transition={{ duration: 1.5, repeat: Infinity }}
-                  >
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    >
-                      <Zap className="h-4 w-4" />
-                    </motion.div>
-                    Starting Session...
-                  </motion.div>
-                ) : (
-                  <>
-                    <Zap className="mr-2 h-4 w-4" />
-                    Start Session
-                  </>
+              {/* Subject */}
+              <div className="space-y-1.5">
+                <Label htmlFor="start-subject" className="flex items-center gap-1.5 text-[12.5px] font-medium">
+                  <BookOpen className="size-3.5 text-muted-foreground" />
+                  Course
+                </Label>
+                <Select value={courseCode} onValueChange={setCourseCode}>
+                  <SelectTrigger id="start-subject" className="h-10">
+                    <SelectValue placeholder="Select course" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {uniqueCourses.map((c) => (
+                      <SelectItem key={c.course_code} value={c.course_code}>
+                        {c.course_code} — {c.course_title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedCourse && (
+                  <p className="text-[11.5px] text-muted-foreground">
+                    Division: {selectedCourse.division_name}
+                  </p>
                 )}
-              </Button>
-            </motion.div>
-          </CardContent>
-        </Card>
-      </motion.div>
+              </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.7 }}
-      >
-        <Card className="border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/20">
-          <CardContent className="pt-6">
-            <h3 className="font-semibold mb-3 flex items-center gap-2">
-              <Zap className="h-4 w-4 text-blue-600" />
-              What happens next?
-            </h3>
-            <motion.ul className="space-y-2">
-              {[
-                'A rotating QR code will be displayed on screen',
-                'Project it on the smartboard for students to scan',
-                'Real-time attendance tracking begins immediately',
-                'Students use the mobile app to mark attendance'
-              ].map((text, index) => (
-                <motion.li
-                  key={index}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.8 + index * 0.1 }}
-                  className="text-sm text-muted-foreground flex items-center gap-2"
+              {/* Date + Time */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="start-date" className="flex items-center gap-1.5 text-[12.5px] font-medium">
+                    <CalendarDays className="size-3.5 text-muted-foreground" />
+                    Date
+                  </Label>
+                  <Input
+                    id="start-date"
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="h-10"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="start-time" className="flex items-center gap-1.5 text-[12.5px] font-medium">
+                    <Clock className="size-3.5 text-muted-foreground" />
+                    Time
+                  </Label>
+                  <Input
+                    id="start-time"
+                    type="time"
+                    value={time}
+                    onChange={(e) => setTime(e.target.value)}
+                    className="h-10"
+                  />
+                </div>
+              </div>
+
+              {/* Security info */}
+              <div className="rounded-xl bg-primary-soft px-4 py-3 text-[12px] text-primary-deep ring-1 ring-inset ring-primary/20">
+                <strong>Zero-trust QR session:</strong> Each QR token is cryptographically signed
+                and refreshes automatically. Students must be on the campus network to verify.
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-3 pt-1">
+                <Button
+                  id="start-cancel"
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate("/dashboard")}
                 >
-                  <CheckCircle2 className="h-3 w-3 text-blue-600 flex-shrink-0" />
-                  {text}
-                </motion.li>
-              ))}
-            </motion.ul>
-          </CardContent>
-        </Card>
+                  Cancel
+                </Button>
+                <Button
+                  id="start-submit"
+                  type="submit"
+                  disabled={startSession.isPending}
+                >
+                  {startSession.isPending ? (
+                    <span className="flex items-center gap-2">
+                      <span className="size-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                      Starting…
+                    </span>
+                  ) : (
+                    <>
+                      <Play className="size-4" />
+                      Start Session
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </GlassCard>
+        </motion.div>
       </motion.div>
-    </motion.div>
+    </div>
   );
 }

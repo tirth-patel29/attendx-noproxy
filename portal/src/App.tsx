@@ -7,6 +7,12 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import SessionPage from './pages/SessionPage';
 import NewSessionPage from './pages/NewSessionPage';
+import AcademicHierarchyPage from './pages/admin/AcademicHierarchyPage';
+import StudentsPage from './pages/admin/StudentsPage';
+import FacultyPage from './pages/admin/FacultyPage';
+import SubjectsPage from './pages/admin/SubjectsPage';
+import SessionsPage from './pages/admin/SessionsPage';
+import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import Layout from './components/Layout';
 import { Loader2 } from 'lucide-react';
 
@@ -42,6 +48,12 @@ export default function App() {
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="sessions/new" element={<NewSessionPage />} />
           <Route path="sessions/:sessionId" element={<SessionPage />} />
+          <Route path="admin/dashboard" element={<AdminDashboardPage />} />
+          <Route path="admin/divisions" element={<AcademicHierarchyPage />} />
+          <Route path="admin/students" element={<StudentsPage />} />
+          <Route path="admin/faculty" element={<FacultyPage />} />
+          <Route path="admin/subjects" element={<SubjectsPage />} />
+          <Route path="admin/sessions" element={<SessionsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

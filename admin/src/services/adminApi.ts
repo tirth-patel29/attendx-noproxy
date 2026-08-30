@@ -32,6 +32,11 @@ export interface Student {
   name: string;
   division_id: string | null;
   division_name: string | null;
+  batch_id: string | null;
+  batch_name: string | null;
+  branch_name: string | null;
+  department_name: string | null;
+  college_name: string | null;
   bound_device_id: string | null;
   secret_hmac_key: string | null;
   is_bound: boolean;
@@ -39,11 +44,52 @@ export interface Student {
   created_at?: string;
 }
 
-export interface Division {
+export interface College {
   id: string;
   name: string;
-  course_count: number;
-  student_count: number;
+  code: string;
+}
+
+export interface Department {
+  id: string;
+  college_id: string;
+  college_name?: string;
+  name: string;
+  code: string;
+}
+
+export interface Branch {
+  id: string;
+  department_id: string;
+  department_name?: string;
+  college_name?: string;
+  name: string;
+  code: string;
+}
+
+export interface Batch {
+  id: string;
+  division_id: string;
+  division_name?: string;
+  branch_name?: string;
+  name: string;
+  code: string | null;
+  start_roll: string | null;
+  end_roll: string | null;
+}
+
+export interface Division {
+  id: string | undefined; // some responses might map this as division_id
+  division_id?: string;
+  branch_id?: string | null;
+  branch_name?: string;
+  department_name?: string;
+  college_name?: string;
+  name: string;
+  code?: string | null;
+  academic_year?: number | null;
+  course_count?: number;
+  student_count?: number;
 }
 
 export interface Course {
@@ -105,9 +151,9 @@ export const adminApi = {
   // students
   students: () => api.get<Student[]>('/admin/students'),
   student: (id: string) => api.get<Student>(`/admin/students/${id}`),
-  createStudent: (data: { roll_no: string; email: string; name: string; division_id?: string | null }) =>
+  createStudent: (data: { roll_no: string; email: string; name: string; division_id?: string | null; batch_id?: string | null }) =>
     api.post('/admin/students', data),
-  updateStudent: (id: string, data: { roll_no: string; email: string; name: string; division_id?: string | null }) =>
+  updateStudent: (id: string, data: { roll_no: string; email: string; name: string; division_id?: string | null; batch_id?: string | null }) =>
     api.put(`/admin/students/${id}`, data),
   deleteStudent: (id: string) => api.delete(`/admin/students/${id}`),
   resetDevice: (id: string) => api.post(`/admin/students/${id}/reset-device`),
@@ -115,6 +161,7 @@ export const adminApi = {
   forgotPassword: (id: string) => api.post(`/admin/students/${id}/forgot-password`),
 
   // divisions
+  // divisions (legacy facade, new CRUD via academicApi below)
   divisions: () => api.get<Division[]>('/admin/divisions'),
   createDivision: (name: string) => api.post('/admin/divisions', { name }),
   updateDivision: (id: string, name: string) => api.put(`/admin/divisions/${id}`, { name }),
@@ -140,4 +187,40 @@ export const adminApi = {
   createApiKey: (label: string) =>
     api.post<{ key_uuid: string; label: string; prefix: string; api_key: string; created_at: string }>('/admin/api-keys', { label }),
   revokeApiKey: (uuid: string) => api.post(`/admin/api-keys/${uuid}/revoke`),
+};
+
+export const academicApi = {
+  // Colleges
+  colleges: () => api.get<College[]>('/admin/academic/colleges'),
+  createCollege: (data: { name: string; code: string }) => api.post('/admin/academic/colleges', data),
+  updateCollege: (id: string, data: { name: string; code: string }) => api.put(`/admin/academic/colleges/${id}`, data),
+  deleteCollege: (id: string) => api.delete(`/admin/academic/colleges/${id}`),
+
+  // Departments
+  departments: () => api.get<Department[]>('/admin/academic/departments'),
+  createDepartment: (data: { college_id: string; name: string; code: string }) => api.post('/admin/academic/departments', data),
+  updateDepartment: (id: string, data: { college_id: string; name: string; code: string }) => api.put(`/admin/academic/departments/${id}`, data),
+  deleteDepartment: (id: string) => api.delete(`/admin/academic/departments/${id}`),
+
+  // Branches
+  branches: () => api.get<Branch[]>('/admin/academic/branches'),
+  createBranch: (data: { department_id: string; name: string; code: string }) => api.post('/admin/academic/branches', data),
+  updateBranch: (id: string, data: { department_id: string; name: string; code: string }) => api.put(`/admin/academic/branches/${id}`, data),
+  deleteBranch: (id: string) => api.delete(`/admin/academic/branches/${id}`),
+
+  // Divisions (Full Academic CRUD)
+  divisions: () => api.get<Division[]>('/admin/academic/divisions'),
+  createDivision: (data: { branch_id?: string | null; name: string; code?: string | null; academic_year?: number | null }) => 
+    api.post('/admin/academic/divisions', data),
+  updateDivision: (id: string, data: { branch_id?: string | null; name: string; code?: string | null; academic_year?: number | null }) => 
+    api.put(`/admin/academic/divisions/${id}`, data),
+  deleteDivision: (id: string) => api.delete(`/admin/academic/divisions/${id}`),
+
+  // Batches
+  batches: () => api.get<Batch[]>('/admin/academic/batches'),
+  createBatch: (data: { division_id: string; name: string; code?: string | null; start_roll?: string | null; end_roll?: string | null }) => 
+    api.post('/admin/academic/batches', data),
+  updateBatch: (id: string, data: { division_id: string; name: string; code?: string | null; start_roll?: string | null; end_roll?: string | null }) => 
+    api.put(`/admin/academic/batches/${id}`, data),
+  deleteBatch: (id: string) => api.delete(`/admin/academic/batches/${id}`),
 };

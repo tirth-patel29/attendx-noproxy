@@ -16,7 +16,7 @@ import {
   motion,
   type Transition,
   type Variants,
-} from "motion/react";
+} from "framer-motion";
 
 export interface MenuItemProps {
   icon: React.ReactNode;

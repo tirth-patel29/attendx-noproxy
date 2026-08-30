@@ -48,15 +48,23 @@ import {
   Moon,
   Home,
   ChevronDown,
+  Building2,
+  Layers,
+  GitBranch,
+  BookMarked,
 } from 'lucide-react';
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/teachers', label: 'Teachers', icon: Users },
-  { to: '/students', label: 'Students', icon: GraduationCap },
+  { to: '/colleges', label: 'Colleges', icon: Building2 },
+  { to: '/departments', label: 'Departments', icon: Layers },
+  { to: '/branches', label: 'Branches', icon: GitBranch },
+  { to: '/batches', label: 'Batches', icon: BookMarked },
   { to: '/divisions', label: 'Divisions', icon: Network },
   { to: '/courses', label: 'Courses', icon: BookOpen },
   { to: '/timetable', label: 'Timetable', icon: Calendar },
+  { to: '/teachers', label: 'Teachers', icon: Users },
+  { to: '/students', label: 'Students', icon: GraduationCap },
   { to: '/api-keys', label: 'API Keys', icon: Key },
 ];
 
@@ -88,6 +96,10 @@ function formatBreadcrumbLabel(segment: string): string {
   if (segment === 'timetable') return 'Timetable';
   if (segment === 'teachers') return 'Teachers';
   if (segment === 'students') return 'Students';
+  if (segment === 'colleges') return 'Colleges';
+  if (segment === 'departments') return 'Departments';
+  if (segment === 'branches') return 'Branches';
+  if (segment === 'batches') return 'Batches';
   if (segment === 'divisions') return 'Divisions';
   if (segment === 'courses') return 'Courses';
   if (segment === 'api-keys') return 'API Keys';
@@ -403,9 +415,10 @@ export default function Layout() {
 
       {/* ── Toaster ── */}
       <Toaster
-        position="bottom-right"
+        position="top-center"
         toastOptions={{
           duration: 4000,
+          className: 'z-[9999]',
           style: {
             background: 'hsl(var(--background))',
             color: 'hsl(var(--foreground))',

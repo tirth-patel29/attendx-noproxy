@@ -3,14 +3,14 @@ FROM node:20-alpine AS build
 
 WORKDIR /app
 
-# Cache bust argument - changes on every build to force fresh source copy
-ARG CACHE_BUST=1
-
 # Copy package files
 COPY package*.json ./
 
 # Install ALL deps (prod + dev) for building
 RUN npm install
+
+# Cache bust argument - changes on every build to force fresh source copy
+ARG CACHE_BUST=1
 
 # Copy source
 COPY . .

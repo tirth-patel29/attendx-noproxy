@@ -1,8 +1,6 @@
-﻿import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { adminApi, Course, Division } from '../services/adminApi';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
@@ -10,12 +8,16 @@ import { Label } from '@/components/ui/label';
 import { FloatingInput } from '@/components/ui/floating-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { InlineDisclosureMenu } from '@/components/ui/inline-disclosure-menu';
-import { Plus, Pencil } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
+import { PageHeader } from '@/components/attendx/PageHeader';
+import { GlassCard } from '@/components/attendx/GlassCard';
+import { DataTable, type Column } from '@/components/attendx/DataTable';
+import { staggerContainer, riseItem } from '@/lib/motion';
 
-interface FormState { code: string; title: string; credits: number; division_id: string; }
-const empty: FormState = { code: '', title: '', credits: 3, division_id: '' };
+interface FormState { code: string; title: string; division_id: string; }
+const empty: FormState = { code: '', title: '', division_id: '' };
 
 export default function Courses() {
   const [rows, setRows] = useState<Course[]>([]);
@@ -24,16 +26,19 @@ export default function Courses() {
   const [form, setForm] = useState<FormState>(empty);
   const [deleteTarget, setDeleteTarget] = useState<Course | null>(null);
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const load = () => {
+    setLoading(true);
     Promise.all([adminApi.courses(), adminApi.divisions()])
       .then(([c, d]) => { setRows(c.data); setDivisions(d.data); })
-      .catch(() => {});
+      .catch(() => toast.error('Failed to load courses'))
+      .finally(() => setLoading(false));
   };
   useEffect(() => { load(); }, []);
 
   const openEdit = (c: Course) => {
-    setForm({ code: c.course_code, title: c.title, credits: c.credits, division_id: c.division_id || '' });
+    setForm({ code: c.course_code, title: c.title, division_id: c.division_id || '' });
     setDialog({ mode: 'edit', id: c.id });
   };
 
@@ -41,9 +46,9 @@ export default function Courses() {
     setBusy(true);
     try {
       if (dialog?.mode === 'create') {
-        await adminApi.createCourse({ course_code: form.code, title: form.title, credits: form.credits, division_id: form.division_id || null });
+        await adminApi.createCourse({ course_code: form.code, title: form.title, division_id: form.division_id || null });
       } else if (dialog?.id) {
-        await adminApi.updateCourse(dialog.id, { title: form.title, credits: form.credits, division_id: form.division_id || null });
+        await adminApi.updateCourse(dialog.id, { course_code: form.code, title: form.title, division_id: form.division_id || null });
       }
       setDialog(null);
       setForm(empty);
@@ -70,82 +75,70 @@ export default function Courses() {
     }
   };
 
-  return (
-    <motion.div
-      className="space-y-4"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.3 }}
-    >
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Courses</h1>
-          <p className="text-muted-foreground">Manage course catalog and assignments</p>
-        </div>
-        <Button onClick={() => { setForm(empty); setDialog({ mode: 'create' }); }}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Course
-        </Button>
-      </div>
+  const columns: Column<Course>[] = [
+    { key: "course_code", header: "Code", className: "font-mono font-medium" },
+    { key: "title", header: "Course Title" },
+    { key: "division_name", header: "Division", render: (r) => (
+      <span className="text-muted-foreground">{r.division_name || '—'}</span>
+    )},
+    { key: "actions", header: "", className: "text-right w-[60px]", render: (r) => (
+      <InlineDisclosureMenu
+        trigger={<Button variant="ghost" size="icon-sm" className="h-7 w-7 text-muted-foreground" aria-label="Actions">...</Button>}
+        items={[
+          {
+            key: 'edit',
+            label: 'Edit Course',
+            icon: Pencil,
+            onClick: () => openEdit(r)
+          },
+          {
+            key: 'delete',
+            label: 'Delete',
+            icon: Trash2,
+            variant: 'danger',
+            onClick: () => setDeleteTarget(r)
+          }
+        ]}
+      />
+    )}
+  ];
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Course Catalog</CardTitle>
-          <CardDescription>{rows.length} courses available</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Code</TableHead>
-                <TableHead>Title</TableHead>
-                <TableHead>Credits</TableHead>
-                <TableHead>Division</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                    No courses found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                <AnimatePresence>
-                  {rows.map((c, index) => (
-                    <motion.tr
-                      key={c.id}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.04 }}
-                      className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
-                    >
-                      <TableCell className="font-mono font-semibold">{c.course_code}</TableCell>
-                      <TableCell>{c.title}</TableCell>
-                      <TableCell>{c.credits}</TableCell>
-                      <TableCell className="text-muted-foreground">{c.division_name || '—'}</TableCell>
-                      <TableCell className="text-right">
-                        <InlineDisclosureMenu
-                          menuItems={[
-                            {
-                              icon: <Pencil className="h-5 w-5" />,
-                              label: 'Edit',
-                              onClick: () => openEdit(c),
-                            },
-                          ]}
-                          showDelete
-                          onDelete={() => setDeleteTarget(c)}
-                        />
-                      </TableCell>
-                    </motion.tr>
-                  ))}
-                </AnimatePresence>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+  return (
+    <div className="px-4 py-6 sm:px-6 lg:px-8">
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="show"
+        className="mx-auto max-w-6xl space-y-6"
+      >
+        <PageHeader
+          title="Courses"
+          subtitle="Manage course catalog and subject assignments"
+        />
+
+        <motion.div variants={riseItem}>
+          <GlassCard padded={false}>
+            <div className="p-5">
+              <DataTable
+                data={rows}
+                columns={columns}
+                keyExtractor={(r) => r.id}
+                searchPlaceholder="Search courses by code or title…"
+                searchKeys={["course_code", "title"]}
+                pageSize={10}
+                loading={loading}
+                emptyTitle="No courses found"
+                emptyDescription="Add a course to get started."
+                toolbar={
+                  <Button onClick={() => { setForm(empty); setDialog({ mode: 'create' }); }} className="h-9 text-[13px] font-medium">
+                    <Plus className="mr-1.5 size-4" /> Add Course
+                  </Button>
+                }
+              />
+            </div>
+          </GlassCard>
+        </motion.div>
+      </motion.div>
 
       <Dialog open={Boolean(dialog)} onOpenChange={() => setDialog(null)}>
         <DialogContent>
@@ -157,6 +150,7 @@ export default function Courses() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <FloatingInput
+              id="code"
               label="Course Code"
               value={form.code}
               onChange={(e) => setForm({ ...form, code: e.target.value })}
@@ -164,32 +158,22 @@ export default function Courses() {
               disabled={dialog?.mode === 'edit'}
             />
             <FloatingInput
+              id="title"
               label="Title"
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
               placeholder="Introduction to Computer Science"
             />
             <div className="space-y-2">
-              <Label htmlFor="credits">Credits</Label>
-              <Input
-                id="credits"
-                type="number"
-                value={form.credits}
-                onChange={(e) => setForm({ ...form, credits: parseInt(e.target.value) || 0 })}
-                min="1"
-                max="6"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="division">Division (Optional)</Label>
+              <Label htmlFor="division" className="text-[12.5px] font-medium">Division (Optional)</Label>
               <Select value={form.division_id} onValueChange={(v) => setForm({ ...form, division_id: v })}>
-                <SelectTrigger>
+                <SelectTrigger className="h-12">
                   <SelectValue placeholder="No specific division" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">No specific division</SelectItem>
                   {divisions.map((d) => (
-                    <SelectItem key={d.division_id} value={d.division_id}>
+                    <SelectItem key={d.id} value={d.id}>
                       {d.name}
                     </SelectItem>
                   ))}
@@ -211,7 +195,7 @@ export default function Courses() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Course</AlertDialogTitle>
             <AlertDialogDescription>
-              Delete course <strong>{deleteTarget?.course_code}</strong> — {deleteTarget?.title}?
+              Delete course <strong className="text-foreground">{deleteTarget?.course_code}</strong> — {deleteTarget?.title}?
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -226,6 +210,6 @@ export default function Courses() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </motion.div>
+    </div>
   );
 }

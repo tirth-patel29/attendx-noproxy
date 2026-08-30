@@ -1,5 +1,6 @@
-﻿# ============================================================================
+# ============================================================================
 # Gitea Actions — build + typecheck + test + auto-deploy on push to main.
+# Uses self-hosted runner with labels: [docker, ubuntu, self-hosted]
 # ============================================================================
 name: build-test-deploy
 
@@ -13,74 +14,181 @@ permissions:
 
 jobs:
   backend:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, docker]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: cd backend && npm ci
-      - run: cd backend && npm run build
+      - name: Install git
+        run: apk add --no-cache git
+      - name: Checkout code
+        run: |
+          cd /root
+          if [ -d attendance-gateway/.git ]; then
+            cd attendance-gateway
+            git config --global --add safe.directory /root/attendance-gateway
+            git fetch --depth=1 origin main
+            git reset --hard origin/main
+          else
+            git clone --depth=1 --branch main http://gitea:3000/het/attendance-gateway.git
+            cd attendance-gateway
+            git config --global --add safe.directory /root/attendance-gateway
+          fi
+      - name: Install Node.js
+        run: |
+          apk add --no-cache nodejs npm
+          node --version
+          npm --version
+      - name: Install backend dependencies
+        run: cd /root/attendance-gateway/backend && npm ci
+      - name: Build backend
+        run: cd /root/attendance-gateway/backend && npm run build
 
   portal:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, docker]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: cd portal && npm ci
-      - run: cd portal && npm run build
+      - name: Install git
+        run: apk add --no-cache git
+      - name: Checkout code
+        run: |
+          cd /root
+          if [ -d attendance-gateway/.git ]; then
+            cd attendance-gateway
+            git config --global --add safe.directory /root/attendance-gateway
+            git fetch --depth=1 origin main
+            git reset --hard origin/main
+          else
+            git clone --depth=1 --branch main http://gitea:3000/het/attendance-gateway.git
+            cd attendance-gateway
+            git config --global --add safe.directory /root/attendance-gateway
+          fi
+      - name: Install Node.js
+        run: |
+          apk add --no-cache nodejs npm
+          node --version
+          npm --version
+      - name: Install portal dependencies
+        run: cd /root/attendance-gateway/portal && npm ci
+      - name: Build portal
+        run: cd /root/attendance-gateway/portal && npm run build
 
   admin:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, docker]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: cd admin && npm install
-      - run: cd admin && npm run build
+      - name: Install git
+        run: apk add --no-cache git
+      - name: Checkout code
+        run: |
+          cd /root
+          if [ -d attendance-gateway/.git ]; then
+            cd attendance-gateway
+            git config --global --add safe.directory /root/attendance-gateway
+            git fetch --depth=1 origin main
+            git reset --hard origin/main
+          else
+            git clone --depth=1 --branch main http://gitea:3000/het/attendance-gateway.git
+            cd attendance-gateway
+            git config --global --add safe.directory /root/attendance-gateway
+          fi
+      - name: Install Node.js
+        run: |
+          apk add --no-cache nodejs npm
+          node --version
+          npm --version
+      - name: Install admin dependencies
+        run: cd /root/attendance-gateway/admin && npm install
+      - name: Build admin
+        run: cd /root/attendance-gateway/admin && npm run build
 
   docker-build:
     needs: [backend, portal, admin]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, docker]
     steps:
-      - uses: actions/checkout@v4
-      - run: docker build -t attendance-backend:ci ./backend
-      - run: docker build -t attendance-portal:ci ./portal
-      - run: docker build -t attendance-admin:ci ./admin
+      - name: Install git and docker
+        run: |
+          apk add --no-cache git docker-cli
+          docker --version
+      - name: Checkout code
+        run: |
+          cd /root
+          if [ -d attendance-gateway/.git ]; then
+            cd attendance-gateway
+            git config --global --add safe.directory /root/attendance-gateway
+            git fetch --depth=1 origin main
+            git reset --hard origin/main
+          else
+            git clone --depth=1 --branch main http://gitea:3000/het/attendance-gateway.git
+            cd attendance-gateway
+            git config --global --add safe.directory /root/attendance-gateway
+          fi
+      - run: docker build -t attendance-backend:ci /root/attendance-gateway/backend
+      - run: docker build -t attendance-portal:ci /root/attendance-gateway/portal
+      - run: docker build -t attendance-admin:ci /root/attendance-gateway/admin
 
   # ---- CD: on every push to main, build the images AND update the running
-  # ---- containers on the homelab. Code change -> image -> deploy, automated.
   deploy:
-    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' && secrets.SSH_HOST != '' }}
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: [docker-build]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, docker]
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Install ssh + rsync
+      - name: Checkout code
         run: |
-          sudo apt-get -qq update
-          sudo apt-get -qq install -y openssh-client rsync
-          mkdir -p ~/.ssh && chmod 700 ~/.ssh
-      - name: Install deploy key
-        env:
-          SSH_KEY: ${{ secrets.SSH_KEY }}
+          apk add --no-cache git
+          rm -rf /tmp/attendance-gateway
+          git clone --depth=1 --branch main \
+            http://gitea:3000/het/attendance-gateway.git \
+            /tmp/attendance-gateway
+
+      - name: Copy deployment files
         run: |
-          printf '%s' "$SSH_KEY" > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
-      - name: Deploy to homelab (build + recreate containers)
-        env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_KEY: ~/.ssh/id_deploy
-          HOST_STACKS: ${{ secrets.HOST_STACKS }}
-        run: ./scripts/deploy-all.sh
+          set -e
+
+          echo "=== COPYING BACKEND ==="
+          cp -r /tmp/attendance-gateway/backend/. \
+            /deployment/attendance-backend/
+
+          echo "=== COPYING PORTAL ==="
+          cp -r /tmp/attendance-gateway/portal/. \
+            /deployment/attendance-portal/portal/
+
+          echo "=== COPYING ADMIN ==="
+          cp -r /tmp/attendance-gateway/admin/. \
+            /deployment/attendance-admin/admin/
+
+      - name: Deploy backend
+        run: |
+          set -e
+          cd /deployment/attendance-backend
+          docker compose up -d --build
+
+      - name: Deploy portal
+        run: |
+          set -e
+          cd /deployment/attendance-portal
+          docker compose up -d --build
+
+      - name: Deploy admin
+        run: |
+          set -e
+          cd /deployment/attendance-admin
+          docker compose up -d --build
+
       - name: Verify health
-        env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_KEY: ~/.ssh/id_deploy
         run: |
-          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=no "$SSH_HOST" \
-            'docker ps --filter name=attendance- --format "{{.Names}} {{.Status}}"'
+          set -e
+
+          echo "=== CONTAINERS ==="
+          docker ps --filter name=attendance- \
+            --format "{{.Names}} {{.Image}} {{.Status}}"
+
+          echo "=== API ==="
+          curl -sf https://api.atmyhome.tech/health
+          echo
+
+          echo "=== PORTAL ==="
+          curl -sf https://portal.atmyhome.tech/ > /dev/null
+          echo "Portal OK"
+
+          echo "=== ADMIN ==="
+          curl -sf https://admin.atmyhome.tech/ > /dev/null
+          echo "Admin OK"
+
+          echo "=== DEPLOYMENT SUCCESS ==="

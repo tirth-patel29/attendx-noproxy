@@ -1,0 +1,11 @@
+node_modules
+dist
+.git
+.env
+.env.*
+*.log
+.DS_Store
+postcss.config.js
+postcss.config.cjs
+tailwind.config.js
+tailwind.config.cjs

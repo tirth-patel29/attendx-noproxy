@@ -1,0 +1,44 @@
+name: runner-mount-test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: [self-hosted, docker]
+
+    steps:
+      - name: Inspect environment
+        run: |
+          set -eux
+
+          echo "=== WHO AM I ==="
+          id
+
+          echo "=== ROOT ==="
+          ls -la /
+
+          echo "=== DEPLOYMENT ==="
+          ls -la /deployment
+
+          echo "=== ATTENDANCE DIRECTORIES ==="
+          ls -ld /deployment/attendance-*
+
+      - name: Test Docker
+        run: |
+          set -eux
+
+          echo "=== DOCKER ==="
+          docker version
+
+          echo "=== CONTAINERS ==="
+          docker ps -a
+
+          echo "=== TEST CHILD CONTAINER ==="
+          docker run --rm \
+            --volume /home/hetp/docker-stacks:/deployment:rw \
+            alpine:latest \
+            sh -c 'ls -la /deployment; ls -ld /deployment/attendance-*'
+
+      - name: Done
+        run: echo "MOUNT TEST PASSED"

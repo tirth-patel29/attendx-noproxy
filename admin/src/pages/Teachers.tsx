@@ -1,39 +1,17 @@
-﻿import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { adminApi, Teacher } from '../services/adminApi';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { FloatingInput } from '@/components/ui/floating-input';
-import { InlineDisclosureMenu, MenuItemProps } from '@/components/ui/inline-disclosure-menu';
-import { Plus, Pencil, KeyRound, Trash2, Mail, Building2, RefreshCw } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
+import { InlineDisclosureMenu } from '@/components/ui/inline-disclosure-menu';
+import { Plus, Pencil, KeyRound, Trash2 } from 'lucide-react';
+import { PageHeader } from '@/components/attendx/PageHeader';
+import { GlassCard } from '@/components/attendx/GlassCard';
+import { DataTable, type Column } from '@/components/attendx/DataTable';
+import { staggerContainer, riseItem } from '@/lib/motion';
 
 interface FormState { email: string; name: string; department: string; password: string; }
 const empty: FormState = { email: '', name: '', department: '', password: '' };
@@ -112,220 +90,180 @@ export default function Teachers() {
     }
   };
 
-  const getMenuItems = (t: Teacher): MenuItemProps[] => [
-    {
-      icon: <Pencil className="h-5 w-5" />,
-      label: 'Edit',
-      onClick: () => openEdit(t),
-    },
-    {
-      icon: <KeyRound className="h-5 w-5" />,
-      label: 'Reset Password',
-      onClick: () => { setPw(''); setPwDialog({ id: t.id, name: t.name }); },
-    },
+  const columns: Column<Teacher>[] = [
+    { key: "name", header: "Teacher", render: (r) => (
+      <div className="flex items-center gap-3">
+        <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent text-[12px] font-semibold text-accent-foreground">
+          {r.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
+        </div>
+        <div>
+          <p className="font-medium">{r.name}</p>
+          <a href={`mailto:${r.email}`} className="text-[11.5px] text-muted-foreground hover:text-foreground">
+            {r.email}
+          </a>
+        </div>
+      </div>
+    )},
+    { key: "department", header: "Department", render: (r) => (
+      <span className="inline-flex items-center rounded-md bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground ring-1 ring-inset ring-border">
+        {r.department || '—'}
+      </span>
+    )},
+    { key: "actions", header: "", className: "text-right w-[60px]", render: (r) => (
+      <InlineDisclosureMenu
+        trigger={<Button variant="ghost" size="icon-sm" className="h-7 w-7 text-muted-foreground" aria-label="Actions">...</Button>}
+        items={[
+          {
+            key: 'edit',
+            label: 'Edit Profile',
+            icon: Pencil,
+            onClick: () => openEdit(r)
+          },
+          {
+            key: 'reset',
+            label: 'Reset Password',
+            icon: KeyRound,
+            onClick: () => setPwDialog({ id: r.id, name: r.name })
+          },
+          {
+            key: 'delete',
+            label: 'Delete',
+            icon: Trash2,
+            variant: 'danger',
+            onClick: () => setDeleteTarget(r)
+          }
+        ]}
+      />
+    )}
   ];
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.3 }}
-      className="space-y-4"
-    >
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Teachers</h1>
-          <p className="text-muted-foreground">Manage faculty members and their access</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={load} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          </Button>
-          <Button onClick={openCreate}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Teacher
-          </Button>
-        </div>
-      </div>
+    <div className="px-4 py-6 sm:px-6 lg:px-8">
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="show"
+        className="mx-auto max-w-6xl space-y-6"
+      >
+        <PageHeader
+          title="Faculty"
+          subtitle={`${rows.length} faculty members registered.`}
+        />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Faculty Directory</CardTitle>
-          <CardDescription>{rows.length} teachers registered</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="space-y-2">
-              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12" />)}
+        <motion.div variants={riseItem}>
+          <GlassCard padded={false}>
+            <div className="p-5">
+              <DataTable
+                data={rows}
+                columns={columns}
+                keyExtractor={(r) => r.id}
+                searchPlaceholder="Search faculty by name, email, or department…"
+                searchKeys={["name", "email", "department"]}
+                pageSize={10}
+                loading={loading}
+                emptyTitle="No faculty found"
+                emptyDescription="Add a teacher to get started."
+                toolbar={
+                  <Button onClick={openCreate} className="h-9 text-[13px] font-medium">
+                    <Plus className="mr-1.5 size-4" /> Add Teacher
+                  </Button>
+                }
+              />
             </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Assignments</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                      No teachers found. Add one to get started.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  <AnimatePresence initial={false}>
-                    {rows.map((t, index) => (
-                      <motion.tr
-                        key={t.id}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: 10 }}
-                        transition={{ duration: 0.2, delay: index * 0.03 }}
-                        className="border-b transition-colors hover:bg-muted/50"
-                      >
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-semibold">
-                              {t.name[0]?.toUpperCase()}
-                            </div>
-                            {t.name}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <Mail className="h-3 w-3" />
-                            {t.email}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Building2 className="h-3 w-3 text-muted-foreground" />
-                            {t.department}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                            t.has_login
-                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                              : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                          }`}>
-                            {t.has_login ? 'Active' : 'Pending'}
-                          </span>
-                        </TableCell>
-                        <TableCell>{t.assignment_count ?? 0}</TableCell>
-                        <TableCell className="text-right">
-                          <InlineDisclosureMenu
-                            menuItems={getMenuItems(t)}
-                            showDelete={true}
-                            onDelete={() => setDeleteTarget(t)}
-                          />
-                        </TableCell>
-                      </motion.tr>
-                    ))}
-                  </AnimatePresence>
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+          </GlassCard>
+        </motion.div>
+      </motion.div>
 
-      {/* Create/Edit Dialog */}
-      <Dialog open={Boolean(dialog)} onOpenChange={() => setDialog(null)}>
-        <DialogContent>
+      {/* Dialog for Create/Edit */}
+      <Dialog open={!!dialog} onOpenChange={(v) => !v && setDialog(null)}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {dialog?.mode === 'create' ? 'Add New Teacher' : 'Edit Teacher'}
-            </DialogTitle>
+            <DialogTitle>{dialog?.mode === 'create' ? 'Add Teacher' : 'Edit Teacher'}</DialogTitle>
             <DialogDescription>
               {dialog?.mode === 'create'
-                ? 'Create a new teacher account. They will receive login credentials.'
-                : 'Update teacher information. Password is not required for updates.'}
+                ? 'Create a new teacher account. They will use this email and password to sign in.'
+                : 'Update teacher details.'}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-5 py-4">
+          <div className="space-y-4 py-4">
             <FloatingInput
+              id="name"
               label="Full Name"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder=" "
+              autoFocus
             />
             <FloatingInput
-              label="Email"
+              id="email"
+              label="Email Address"
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
-              placeholder=" "
             />
             <FloatingInput
+              id="department"
               label="Department"
               value={form.department}
               onChange={(e) => setForm({ ...form, department: e.target.value })}
-              placeholder=" "
             />
             {dialog?.mode === 'create' && (
               <FloatingInput
-                label="Initial Password (min 8 chars)"
+                id="password"
+                label="Initial Password"
                 type="password"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
-                placeholder=" "
               />
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialog(null)}>
-              Cancel
-            </Button>
-            <Button onClick={save} disabled={busy}>
-              {busy ? 'Saving...' : dialog?.mode === 'create' ? 'Create Teacher' : 'Save Changes'}
+            <Button variant="outline" onClick={() => setDialog(null)}>Cancel</Button>
+            <Button
+              onClick={save}
+              disabled={busy || !form.name || !form.email || (dialog?.mode === 'create' && form.password.length < 6)}
+            >
+              {busy ? 'Saving...' : 'Save'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Password Reset Dialog */}
-      <Dialog open={Boolean(pwDialog)} onOpenChange={() => setPwDialog(null)}>
-        <DialogContent>
+      {/* Dialog for Password Reset */}
+      <Dialog open={!!pwDialog} onOpenChange={(v) => !v && setPwDialog(null)}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Reset Password</DialogTitle>
             <DialogDescription>
-              Reset password for {pwDialog?.name}. They will need to use this new password for their next login.
+              Set a new password for <strong className="text-foreground">{pwDialog?.name}</strong>.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-5 py-4">
+          <div className="space-y-4 py-4">
             <FloatingInput
-              label="New Password (min 8 chars)"
+              id="new-pw"
+              label="New Password"
               type="password"
               value={pw}
               onChange={(e) => setPw(e.target.value)}
-              placeholder=" "
               autoFocus
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPwDialog(null)}>
-              Cancel
-            </Button>
-            <Button onClick={doResetPw} disabled={busy || pw.length < 8}>
+            <Button variant="outline" onClick={() => { setPwDialog(null); setPw(''); }}>Cancel</Button>
+            <Button onClick={doResetPw} disabled={busy || pw.length < 6}>
               {busy ? 'Resetting...' : 'Reset Password'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation AlertDialog */}
-      <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(v) => !v && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete {deleteTarget?.name}?</AlertDialogTitle>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will remove their sessions and assignments. This action cannot be undone.
+              This will permanently delete <strong className="text-foreground">{deleteTarget?.name}</strong>.
+              This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -339,6 +277,6 @@ export default function Teachers() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </motion.div>
+    </div>
   );
 }

@@ -5,7 +5,7 @@ interface FloatingInputProps extends React.InputHTMLAttributes<HTMLInputElement>
   label: string;
 }
 
-export function FloatingInput({ label, className, ...props }: FloatingInputProps) {
+export function FloatingInput({ label, className, placeholder, ...props }: FloatingInputProps) {
   const [focused, setFocused] = useState(false);
   const [hasValue, setHasValue] = useState(false);
 

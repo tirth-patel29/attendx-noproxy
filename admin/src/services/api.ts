@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_BASE = 'https://api.atmyhome.tech/api/v1';
+// Use relative /api/v1 by default to leverage Vite's proxy and bypass CORS in local dev.
+// In production, this can be overridden via VITE_API_URL if hosted on a different domain.
+const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
 
 export const api = axios.create({
   baseURL: API_BASE,

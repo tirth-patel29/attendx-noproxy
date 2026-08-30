@@ -1,6 +1,6 @@
 {
   "name": "attendance-backend",
-  "version": "1.0.1",
+  "version": "1.0.0",
   "description": "Zero-Trust Cryptographic Attendance Gateway - Backend Judge + Metronome",
   "main": "dist/index.js",
   "scripts": {

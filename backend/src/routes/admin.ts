@@ -27,6 +27,8 @@ import { config } from '../config';
 import { generateHmacKey } from '../utils/crypto';
 import { generateApiKey } from '../utils/apiKey';
 import { sendError } from '../utils/apiError';
+import { academicRouter } from './academic';
+import { academicResolver } from '../services/academic_resolver';
 
 const JWT_SECRET = config.jwtSecret || 'dev-secret-change-in-production-min-32-chars-long';
 
@@ -150,6 +152,8 @@ adminPublicRouter.post('/login/refresh', async (req: Request, res: Response, nex
 // ---------------------------------------------------------------------------
 export const adminRouter = Router();
 
+adminRouter.use('/academic', academicRouter);
+
 // ---- Validation schemas ----
 const teacherCreate = z.object({
   email: z.string().email(),
@@ -165,16 +169,18 @@ const teacherUpdate = z.object({
 const resetPwSchema = z.object({ password: z.string().min(8).max(128) });
 
 const studentCreate = z.object({
-  roll_no: z.string().regex(/^[0-9]{2}[A-Z]{3}[0-9]{3}$/, 'Invalid roll number format (e.g. 24BCS001)'),
+  roll_no: z.string().regex(/^(?:D)?\d{2}[A-Z]{1,4}\d{3}$/i, 'Invalid roll number format (e.g. 24BCS001, 24DCE071)'),
   email: z.string().email(),
   name: z.string().min(1).max(100),
   division_id: z.string().uuid().optional().nullable(),
+  batch_id: z.string().uuid().optional().nullable(),
 });
 const studentUpdate = z.object({
-  roll_no: z.string().regex(/^[0-9]{2}[A-Z]{3}[0-9]{3}$/),
+  roll_no: z.string().regex(/^(?:D)?\d{2}[A-Z]{1,4}\d{3}$/i),
   email: z.string().email(),
   name: z.string().min(1).max(100),
   division_id: z.string().uuid().optional().nullable(),
+  batch_id: z.string().uuid().optional().nullable(),
 });
 
 const divisionCreate = z.object({ name: z.string().min(1).max(50) });
@@ -350,10 +356,16 @@ adminRouter.get('/students', async (_req: Request, res: Response, next: NextFunc
   try {
     const r = await query(`
       SELECT s.student_uuid, s.roll_no, s.email, s.name, s.bound_device_id,
-             s.secret_hmac_key, s.division_id, d.name AS division_name, s.created_at,
-             s.password_hash IS NOT NULL AS has_password
+             s.secret_hmac_key, s.division_id, d.name AS division_name, 
+             s.batch_id, b.name AS batch_name,
+             br.name AS branch_name, dept.name AS department_name, c.name AS college_name,
+             s.created_at, s.password_hash IS NOT NULL AS has_password
       FROM students s
       LEFT JOIN divisions d ON d.division_id = s.division_id
+      LEFT JOIN batches b ON b.id = s.batch_id
+      LEFT JOIN branches br ON d.branch_id = br.id
+      LEFT JOIN departments dept ON br.department_id = dept.id
+      LEFT JOIN colleges c ON dept.college_id = c.id
       ORDER BY s.roll_no
     `);
     res.json(r.rows.map((row) => ({
@@ -363,6 +375,11 @@ adminRouter.get('/students', async (_req: Request, res: Response, next: NextFunc
       name: row.name,
       division_id: row.division_id,
       division_name: row.division_name,
+      batch_id: row.batch_id,
+      batch_name: row.batch_name,
+      branch_name: row.branch_name,
+      department_name: row.department_name,
+      college_name: row.college_name,
       bound_device_id: row.bound_device_id,
       has_password: row.has_password,
       // Mask long secrets for the dashboard list; full value via GET detail
@@ -379,8 +396,16 @@ adminRouter.get('/students/:uuid', async (req: Request, res: Response, next: Nex
   try {
     const r = await query(
       `SELECT s.student_uuid, s.roll_no, s.email, s.name, s.bound_device_id, s.secret_hmac_key,
-              s.division_id, d.name AS division_name, s.created_at, s.updated_at
-       FROM students s LEFT JOIN divisions d ON d.division_id = s.division_id
+              s.division_id, d.name AS division_name,
+              s.batch_id, b.name AS batch_name, 
+              br.name AS branch_name, dept.name AS department_name, c.name AS college_name,
+              s.created_at, s.updated_at
+       FROM students s 
+       LEFT JOIN divisions d ON d.division_id = s.division_id
+       LEFT JOIN batches b ON b.id = s.batch_id
+       LEFT JOIN branches br ON d.branch_id = br.id
+       LEFT JOIN departments dept ON br.department_id = dept.id
+       LEFT JOIN colleges c ON dept.college_id = c.id
        WHERE s.student_uuid = $1`, [req.params.uuid]
     );
     if (r.rows.length === 0) return res.status(404).json({ error: 'Student not found' });
@@ -392,6 +417,11 @@ adminRouter.get('/students/:uuid', async (req: Request, res: Response, next: Nex
       name: row.name,
       division_id: row.division_id,
       division_name: row.division_name,
+      batch_id: row.batch_id,
+      batch_name: row.batch_name,
+      branch_name: row.branch_name,
+      department_name: row.department_name,
+      college_name: row.college_name,
       bound_device_id: row.bound_device_id,
       secret_hmac_key: row.secret_hmac_key,
       created_at: row.created_at,
@@ -408,15 +438,27 @@ adminRouter.post('/students', async (req: Request, res: Response, next: NextFunc
     if (!parsed.success) {
       return res.status(400).json({ error: 'Invalid payload', details: parsed.error.flatten().fieldErrors });
     }
-    const { roll_no, email, name, division_id } = parsed.data;
+    let { roll_no, email, name, division_id, batch_id } = parsed.data;
+
+    // Resolve academic identity if not explicitly provided
+    if (!batch_id || !division_id) {
+      try {
+        const resolved = await academicResolver.resolveStudentIdentity(roll_no);
+        batch_id = batch_id || resolved.batch_id || null;
+        division_id = division_id || resolved.division_id || null;
+      } catch (err) {
+        console.warn('Could not auto-resolve student identity:', err);
+      }
+    }
+
     const secret = generateHmacKey(); // fresh Gate-4 signer for the new student
     const r = await query(
-      `INSERT INTO students (roll_no, email, name, division_id, secret_hmac_key)
-       VALUES ($1, $2, $3, $4, $5) RETURNING student_uuid`,
-      [roll_no, email, name, division_id ?? null, secret]
+      `INSERT INTO students (roll_no, email, name, division_id, batch_id, secret_hmac_key)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING student_uuid`,
+      [roll_no, email, name, division_id ?? null, batch_id ?? null, secret]
     );
     await audit((req as any).admin.sub, 'STUDENT_CREATE', { student_uuid: r.rows[0].student_uuid, roll_no });
-    res.status(201).json({ id: r.rows[0].student_uuid, roll_no, email, name, division_id: division_id ?? null, secret_hmac_key: secret });
+    res.status(201).json({ id: r.rows[0].student_uuid, roll_no, email, name, division_id: division_id ?? null, batch_id: batch_id ?? null, secret_hmac_key: secret });
   } catch (err: any) {
     if (err?.code === '23505') return res.status(409).json({ error: 'Duplicate roll number or email' });
     next(err);
@@ -429,11 +471,23 @@ adminRouter.put('/students/:uuid', async (req: Request, res: Response, next: Nex
     if (!parsed.success) {
       return res.status(400).json({ error: 'Invalid payload', details: parsed.error.flatten().fieldErrors });
     }
-    const { roll_no, email, name, division_id } = parsed.data;
+    let { roll_no, email, name, division_id, batch_id } = parsed.data;
+
+    // Resolve academic identity if not explicitly provided
+    if (!batch_id || !division_id) {
+      try {
+        const resolved = await academicResolver.resolveStudentIdentity(roll_no);
+        batch_id = batch_id || resolved.batch_id || null;
+        division_id = division_id || resolved.division_id || null;
+      } catch (err) {
+        console.warn('Could not auto-resolve student identity:', err);
+      }
+    }
+
     const r = await query(
-      `UPDATE students SET roll_no=$1, email=$2, name=$3, division_id=$4, updated_at=NOW()
-       WHERE student_uuid=$5 RETURNING student_uuid`,
-      [roll_no, email, name, division_id ?? null, req.params.uuid]
+      `UPDATE students SET roll_no=$1, email=$2, name=$3, division_id=$4, batch_id=$5, updated_at=NOW()
+       WHERE student_uuid=$6 RETURNING student_uuid`,
+      [roll_no, email, name, division_id ?? null, batch_id ?? null, req.params.uuid]
     );
     if (r.rows.length === 0) return res.status(404).json({ error: 'Student not found' });
     await audit((req as any).admin.sub, 'STUDENT_UPDATE', { student_uuid: req.params.uuid, roll_no });
