@@ -41,7 +41,7 @@ interface NavItem {
 const teacherNav: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/sessions/new", label: "Start Session", icon: Play },
-  { to: "/sessions/new", label: "Manual Session", icon: FileText },
+  { to: "/sessions/new", label: "Manual Session", icon: BookOpen },
 ];
 
 const teacherBottom: NavItem[] = [
@@ -56,7 +56,7 @@ const adminNav: NavItem[] = [
   { to: "/admin/divisions", label: "Divisions", icon: Layers },
   { to: "/admin/sessions", label: "Sessions", icon: CalendarDays },
   { to: "/admin/attendance", label: "Attendance", icon: BarChart3 },
-  { to: "/admin/reports", label: "Reports", icon: FileText },
+  { to: "/admin/reports", label: "Reports", icon: BookOpen },
   { to: "/admin/security", label: "Security", icon: Shield },
 ];
 
