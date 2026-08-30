@@ -43,17 +43,13 @@ interface NavItem {
 }
 
 const teacherNav: NavItem[] = [
-  { to: "/teacher/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/teacher/session/start", label: "Start Session", icon: Play },
-  { to: "/teacher/session/live", label: "Live Attendance", icon: Radio },
-  { to: "/teacher/session/manual", label: "Manual Session", icon: FileText },
-  { to: "/teacher/session/history", label: "Session History", icon: Clock },
-  { to: "/teacher/qr-projector", label: "QR Projector", icon: QrCode },
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/sessions/new", label: "Start Session", icon: Play },
+  { to: "/sessions/new", label: "Manual Session", icon: FileText },
 ];
 
 const teacherBottom: NavItem[] = [
-  { to: "/teacher/profile", label: "Profile", icon: User },
-  { to: "/teacher/settings", label: "Settings", icon: Settings },
+  { to: "/dashboard", label: "Profile", icon: User },
 ];
 
 const adminNav: NavItem[] = [
@@ -128,7 +124,7 @@ function SidebarContent({
   const mainNav = role === "teacher" ? teacherNav : adminNav;
   const bottomNav = role === "teacher" ? teacherBottom : adminBottom;
   const subtitle = role === "teacher" ? "Teacher Portal" : "Admin Portal";
-  const loginPath = role === "teacher" ? "/teacher/login" : "/admin/login";
+  const loginPath = "/login";
 
   const { logout: authLogout } = useAuth();
 

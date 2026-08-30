@@ -20,7 +20,7 @@ export default function Layout() {
   const { user } = useAuth();
   const location = useLocation();
 
-  const role = user?.role === 'admin' ? 'admin' : 'teacher';
+  const role = (user?.role === 'admin') ? 'admin' : 'teacher';
   const pageTitle = formatPageTitle(location.pathname);
 
   return (

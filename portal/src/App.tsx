@@ -36,6 +36,16 @@ export default function App() {
     <>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        {/* Legacy /teacher/* paths redirect to root-level paths */}
+        <Route path="/teacher/login" element={<Navigate to="/login" replace />} />
+        <Route path="/teacher/dashboard" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/teacher/session/start" element={<Navigate to="/sessions/new" replace />} />
+        <Route path="/teacher/session/live" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/teacher/session/manual" element={<Navigate to="/sessions/new" replace />} />
+        <Route path="/teacher/session/history" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/teacher/qr-projector" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/teacher/profile" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/teacher/settings" element={<Navigate to="/dashboard" replace />} />
         <Route
           path="/"
           element={
@@ -47,7 +57,11 @@ export default function App() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="sessions/new" element={<NewSessionPage />} />
+          <Route path="sessions/manual" element={<NewSessionPage />} />
           <Route path="sessions/:sessionId" element={<SessionPage />} />
+          <Route path="session/history" element={<DashboardPage />} />
+          <Route path="session/live" element={<DashboardPage />} />
+          <Route path="qr-projector" element={<DashboardPage />} />
           <Route path="admin/dashboard" element={<AdminDashboardPage />} />
           <Route path="admin/divisions" element={<AcademicHierarchyPage />} />
           <Route path="admin/students" element={<StudentsPage />} />
