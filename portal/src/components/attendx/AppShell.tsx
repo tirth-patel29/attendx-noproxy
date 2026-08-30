@@ -4,10 +4,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
   Play,
-  Radio,
-  Clock,
-  FileText,
-  QrCode,
   User,
   Settings,
   LogOut,
