@@ -47,8 +47,8 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
 
-            # Remove any orphaned containers that block compose recreate
-            docker rm -f attendance-backend attendance-portal attendance-admin 2>/dev/null || true
+            # Nuke ALL attendance containers by name pattern to avoid conflicts
+            docker ps -a --format '{{.Names}}' | grep -E 'attendance-(backend|portal|admin)' | xargs -r docker rm -f 2>/dev/null || true
 
             if [ "$RUN_MIGRATIONS" = "true" ]; then
               echo "=== Run migrations ==="
