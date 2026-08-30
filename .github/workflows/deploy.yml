@@ -3,6 +3,12 @@ name: Deploy to EC2
 on:
   push:
     branches: [main]
+    paths:
+      - 'backend/**'
+      - 'portal/**'
+      - 'admin/**'
+      - 'migrations/**'
+      - '.github/workflows/deploy.yml'
 
 jobs:
   deploy:
@@ -12,6 +18,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed services
+        id: changes
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD)
+          echo "Changed files: $CHANGED"
+          echo "backend=$(echo "$CHANGED" | grep -q '^backend/' && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "portal=$(echo "$CHANGED"   | grep -q '^portal/'  && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "admin=$(echo "$CHANGED"    | grep -q '^admin/'   && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "migrations=$(echo "$CHANGED" | grep -q '^migrations/' && echo true || echo false)" >> $GITHUB_OUTPUT
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
@@ -20,34 +38,52 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           timeout: 600s
+          envs: BUILD_BACKEND,BUILD_PORTAL,BUILD_ADMIN,RUN_MIGRATIONS
           script: |
             set -e
+            cd /home/ubuntu/attendance-gateway
 
             echo "=== Pull latest code ==="
-            cd /home/ubuntu/attendance-gateway
             git fetch origin main
             git reset --hard origin/main
 
-            echo "=== Run migrations ==="
-            for f in $(ls /home/ubuntu/attendance-gateway/migrations/*.sql | sort -V); do
-              docker exec -i supabase-db psql -U postgres -d postgres < "$f" 2>&1 | grep -vE 'NOTICE|already exists' | tail -1
-            done
+            if [ "$RUN_MIGRATIONS" = "true" ]; then
+              echo "=== Run migrations ==="
+              for f in $(ls /home/ubuntu/attendance-gateway/migrations/*.sql | sort -V); do
+                docker exec -i supabase-db psql -U postgres -d postgres < "$f" 2>&1 | grep -vE 'NOTICE|already exists' | tail -1
+              done
+            fi
 
-            echo "=== Build images ==="
-            docker build -t attendance-backend:latest /home/ubuntu/attendance-gateway/backend/ 2>&1 | tail -2
-            docker build -t attendance-portal:latest \
-              --build-arg VITE_API_URL=https://api.atmyhome.tech \
-              /home/ubuntu/attendance-gateway/portal/ 2>&1 | tail -2
-            docker build -t attendance-admin:latest \
-              /home/ubuntu/attendance-gateway/admin/ 2>&1 | tail -2
+            if [ "$BUILD_BACKEND" = "true" ]; then
+              echo "=== Build backend ==="
+              docker build -t attendance-backend:latest ./backend/ 2>&1 | tail -3
+              docker compose -f /home/ubuntu/app-compose.yml up -d --force-recreate attendance-backend
+              docker network connect supabase_default attendance-backend 2>/dev/null || true
+              sleep 10
+              curl -sf http://localhost:3001/health | grep healthy
+            fi
 
-            echo "=== Restart containers ==="
-            docker compose -f /home/ubuntu/app-compose.yml up -d --force-recreate
-            docker network connect supabase_default attendance-backend 2>/dev/null || true
+            if [ "$BUILD_PORTAL" = "true" ]; then
+              echo "=== Build portal ==="
+              docker build -t attendance-portal:latest \
+                --build-arg VITE_API_URL=https://api.atmyhome.tech \
+                ./portal/ 2>&1 | tail -3
+              docker compose -f /home/ubuntu/app-compose.yml up -d --force-recreate attendance-portal
+              sleep 5
+              curl -sf http://localhost:3010/ > /dev/null && echo "portal OK"
+            fi
 
-            echo "=== Health check ==="
-            sleep 20
-            curl -sf http://localhost:3001/health | grep healthy
-            curl -sf http://localhost:3010/ > /dev/null
-            curl -sf http://localhost:3020/ > /dev/null
+            if [ "$BUILD_ADMIN" = "true" ]; then
+              echo "=== Build admin ==="
+              docker build -t attendance-admin:latest ./admin/ 2>&1 | tail -3
+              docker compose -f /home/ubuntu/app-compose.yml up -d --force-recreate attendance-admin
+              sleep 5
+              curl -sf http://localhost:3020/ > /dev/null && echo "admin OK"
+            fi
+
             echo "=== DEPLOY COMPLETE ==="
+        env:
+          BUILD_BACKEND: ${{ steps.changes.outputs.backend }}
+          BUILD_PORTAL: ${{ steps.changes.outputs.portal }}
+          BUILD_ADMIN: ${{ steps.changes.outputs.admin }}
+          RUN_MIGRATIONS: ${{ steps.changes.outputs.migrations }}
