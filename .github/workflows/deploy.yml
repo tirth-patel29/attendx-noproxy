@@ -1,0 +1,53 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: 16.192.8.185
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          timeout: 600s
+          script: |
+            set -e
+            echo "=== Pull latest code ==="
+            cd /home/ubuntu/attendance-gateway
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "=== Run migrations ==="
+            for f in $(ls /home/ubuntu/attendance-gateway/migrations/*.sql | sort -V); do
+              echo "Running: $(basename $f)"
+              docker exec -i supabase-db psql -U postgres -d postgres < "$f" 2>&1 | grep -v NOTICE | tail -1
+            done
+
+            echo "=== Build images ==="
+            docker build -t attendance-backend:latest /home/ubuntu/attendance-gateway/backend/ 2>&1 | tail -2
+            docker build -t attendance-portal:latest \
+              --build-arg VITE_API_URL=https://api.atmyhome.tech \
+              /home/ubuntu/attendance-gateway/portal/ 2>&1 | tail -2
+            docker build -t attendance-admin:latest \
+              /home/ubuntu/attendance-gateway/admin/ 2>&1 | tail -2
+
+            echo "=== Restart containers ==="
+            docker compose -f /home/ubuntu/app-compose.yml up -d --force-recreate
+            docker network connect supabase_default attendance-backend 2>/dev/null || true
+
+            echo "=== Health check ==="
+            sleep 20
+            curl -sf http://localhost:3001/health | grep healthy
+            curl -sf http://localhost:3010/ > /dev/null
+            curl -sf http://localhost:3020/ > /dev/null
+            echo "=== DEPLOY COMPLETE ==="
