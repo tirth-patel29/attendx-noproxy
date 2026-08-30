@@ -47,6 +47,9 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
 
+            # Remove any orphaned containers that block compose recreate
+            docker rm -f attendance-backend attendance-portal attendance-admin 2>/dev/null || true
+
             if [ "$RUN_MIGRATIONS" = "true" ]; then
               echo "=== Run migrations ==="
               for f in $(ls /home/ubuntu/attendance-gateway/migrations/*.sql | sort -V); do
@@ -57,7 +60,7 @@ jobs:
             if [ "$BUILD_BACKEND" = "true" ]; then
               echo "=== Build backend ==="
               docker build -t attendance-backend:latest ./backend/ 2>&1 | tail -3
-              docker compose -f /home/ubuntu/app-compose.yml up -d --force-recreate attendance-backend
+              docker compose -f /home/ubuntu/app-compose.yml up -d attendance-backend
               docker network connect supabase_default attendance-backend 2>/dev/null || true
               sleep 10
               curl -sf http://localhost:3001/health | grep healthy
@@ -68,7 +71,7 @@ jobs:
               docker build -t attendance-portal:latest \
                 --build-arg VITE_API_URL=https://api.atmyhome.tech \
                 ./portal/ 2>&1 | tail -3
-              docker compose -f /home/ubuntu/app-compose.yml up -d --force-recreate attendance-portal
+              docker compose -f /home/ubuntu/app-compose.yml up -d attendance-portal
               sleep 5
               curl -sf http://localhost:3010/ > /dev/null && echo "portal OK"
             fi
@@ -76,7 +79,7 @@ jobs:
             if [ "$BUILD_ADMIN" = "true" ]; then
               echo "=== Build admin ==="
               docker build -t attendance-admin:latest ./admin/ 2>&1 | tail -3
-              docker compose -f /home/ubuntu/app-compose.yml up -d --force-recreate attendance-admin
+              docker compose -f /home/ubuntu/app-compose.yml up -d attendance-admin
               sleep 5
               curl -sf http://localhost:3020/ > /dev/null && echo "admin OK"
             fi
