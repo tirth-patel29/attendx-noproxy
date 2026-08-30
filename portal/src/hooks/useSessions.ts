@@ -9,7 +9,7 @@ export function useSessionAttendance(sessionId?: string) {
       const res = await portalApi.getSessionAttendance(sessionId);
       return res.data;
     },
-    enabled: !!sessionId,
+    enabled: !!sessionId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(sessionId),
     refetchInterval: 5000, // Poll every 5 seconds for live attendance
   });
 }
@@ -22,8 +22,8 @@ export function useSession(sessionId?: string) {
       const res = await portalApi.getSession(sessionId);
       return res.data;
     },
-    enabled: !!sessionId,
-  });
+    enabled: !!sessionId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(sessionId),
+  }););
 }
 
 export function useStartSession() {
