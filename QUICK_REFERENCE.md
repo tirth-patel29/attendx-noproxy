@@ -1,14 +1,18 @@
 # QUICK REFERENCE — Attendance Gateway
 
-**Repo:** `het/attendance-gateway` on Gitea (`http://gitea:3000/het/attendance-gateway`)  
-**Clone:** `git clone http://gitea:3000/het/attendance-gateway.git`  
-**Supabase:** `https://supabase.atmyhome.tech` (all 7 services healthy)  
-**Backend API:** `https://api.atmyhome.tech` (4-gate judge + metronome + **Admin API**)  
-**Admin Console:** `https://admin.atmyhome.tech` (React/MUI — manage teachers, students/HMAC, divisions, courses, timetable)  
-**Professor Teacher:** `https://teacher.atmyhome.tech` (React/MUI — dumb-terminal projector)  
-**Homelab SSH:** `hetp@192.168.0.108` (port 22) → `su -` for root (pass: 7567@Hetp)
+**Production Environment:** Dedicated AWS EC2 (~7 GB RAM, 2 vCPUs) + EBS gp3 SSD  
+**Architecture:** Host Nginx (SSL) ➔ Docker Compose (`backend:3001`, `teacher:3000`, `admin:3002`, `postgres:5432`)  
+**Production Endpoints (Example):**
+- **API Server:** `https://api.yourdomain.com` (4-gate judge + metronome + Admin API + Swagger UI at `/docs`)  
+- **Admin Console:** `https://admin.yourdomain.com` (React/Vite — faculty, students/HMAC, divisions, timetable, API keys)  
+- **Teacher Portal:** `https://teacher.yourdomain.com` (React/Vite — classroom projector QR + real-time attendance ledger stream)  
 
-**Default Admin seed:** `admin@atmyhome.tech` / `Admin@123` (CHANGE after first login — env-driven bootstrap: `ADMIN_EMAIL`/`ADMIN_PASSWORD` upsert on every boot; remove `ADMIN_PASSWORD` env to keep in-app changes)**
+**Production Quick Deploy:**
+```bash
+docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.ports.yml up -d --build
+```
+
+**Admin Bootstrap:** Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `.env.production` for initial boot; once initialized, unset `ADMIN_PASSWORD` so that in-app password rotations remain persistent.
 
 **Token protocol (SRS):** 4-char base62 rotating token every 3s · 250ms Stream Kill-Window (`0 ≤ observed − birth ≤ 250ms`) · tokens are **NOT consumed** (whole class shares each token; ledger UNIQUE(session, student) prevents double-marking) · status codes: PRESENT 200, HARDWARE_MISMATCH 403, STREAM_DETECTED/EXPIRED_TOKEN 412, FORGED_RESPONSE 401, INVALID_CLAIM 404 · nonces come from `/sessions/:uuid/challenge` (single-use, server-issued).
 

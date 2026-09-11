@@ -27,5 +27,8 @@ deploy/supabase/volumes/
 # shared client API key (never commit)
 .api_key
 
+# GitNexus local code graph and embeddings (regenerated, never commit)
+.gitnexus/
+
 # Release APKs (too large for git - distribute separately)
 releases/*.apk

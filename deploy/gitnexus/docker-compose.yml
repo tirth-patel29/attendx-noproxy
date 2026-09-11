@@ -1,0 +1,54 @@
+name: attendx-gitnexus
+
+# Private GitNexus service for the AttendX repository.
+#
+# Ports bind only to EC2 loopback. Reach them from a developer machine through
+# an SSH tunnel; do not publish this graph on the public internet.
+services:
+  gitnexus:
+    image: ghcr.io/abhigyanpatwari/gitnexus:latest
+    container_name: attendx-gitnexus
+    restart: unless-stopped
+    environment:
+      GITNEXUS_MCP_AUTH_TOKEN: ${GITNEXUS_MCP_AUTH_TOKEN:?set a long random token}
+      GITNEXUS_MCP_READ_ONLY: "1"
+    ports:
+      - "127.0.0.1:${GITNEXUS_PORT:-4747}:4747"
+    volumes:
+      # Persists the graph, registry, and any cloned repositories.
+      - gitnexus-data:/data/gitnexus
+      # Use a dedicated deployment checkout. GitNexus creates .gitnexus/
+      # alongside the repo while it indexes, so this mount must be writable.
+      - ${ATTENDX_REPO_PATH:?set the absolute EC2 checkout path}:/workspace/attendx:rw
+    mem_limit: 2g
+    cpus: 1.5
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:4747/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  gitnexus-web:
+    image: ghcr.io/abhigyanpatwari/gitnexus-web:latest
+    container_name: attendx-gitnexus-web
+    restart: unless-stopped
+    environment:
+      # Browser clients reach the backend through the authenticated Caddy host.
+      GITNEXUS_BACKEND_URL: ${GITNEXUS_PUBLIC_URL:?set the HTTPS UI URL}
+    ports:
+      - "127.0.0.1:${GITNEXUS_WEB_PORT:-4173}:4173"
+    depends_on:
+      gitnexus:
+        condition: service_healthy
+    mem_limit: 256m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:4173/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  gitnexus-data:

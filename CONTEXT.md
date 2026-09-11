@@ -49,38 +49,33 @@ cheat. The system separates "in the room" from "in the hostel" using physics.**
 | Professor web teacher | React / plain TS dashboard | QR broadcast + attendance view + 1-click device reset |
 | Reverse proxy + tunnel | proxycore (home) | NPM + on-demand proxy + cloudflared → `atmyhome.tech` |
 
-## 4. Homelab constraints (THE context that matters)
+## 4. Production Infrastructure: Dedicated AWS EC2 (~7 GB RAM)
 
-> **You are running on a homelab that can lose power mid-demo.** This is not a managed
-> cloud. Everything below is a *design requirement* because of it.
+> **Deployment Reality**: AttendX is deployed in production on a dedicated **AWS EC2 instance with ~7 GB RAM** (e.g. `t3.large` or `t4g.large`, 2 vCPUs) and AWS EBS (gp3) SSD storage.
 
-### Hardware profile
-- **CPU**: Intel i3-6000T (2 cores / 4 threads, ~2.9GHz)
-- **RAM**: 8 GB DDR4 (2×4GB, dual channel)
-- **Storage**:
-  - 256 GB SSD (boot / fast & active DB)
-  - 500 GB WD (S.M.A.R.T.) — bulk / backups
-  - 256 GB Seagate (S.M.A.R.T.) — secondary / redundancy
-- **OS**: headless Debian, Tailscale for SSH
-- **Orchestration**: Portainer (Docker stacks) — 8 stacks currently: *arr stack, web tools,
-  **proxycore** (2 reverse proxies + cloudflared tunnel, network `proxycore`)*, and a
-  Hermes stack that includes **Gitea**.
+### Production Environment Profile
+- **Compute**: AWS EC2 instance (2 vCPUs, 8 GB / ~7 GB usable RAM)
+- **Storage**: AWS EBS (gp3) SSD volume with automated snapshot capabilities
+- **OS**: Ubuntu / Debian LTS (headless)
+- **Reverse Proxy**: Host Nginx with Let's Encrypt (Certbot) TLS termination and WebSocket upgrade support
+- **Domain**: Cloud-routed domain (e.g., `api.yourdomain.com`, `teacher.yourdomain.com`, `admin.yourdomain.com`)
 
-### Consequence → decisions
-- **8 GB RAM is TIGHT.** Supabase is heavy. We must (a) tune Postgres to a small footprint,
-  (b) consider running Postgres+API+Realtime minimal, (c) cap container memory via
-  `mem_limit`, and (d) give the rest of the homelab headroom. We should NOT install the
-  full Supabase CLI stack blind.
-- **Power cuts are real.** We plan for it instead of hoping:
-  - Postgres `fsync=on` (no data-destroying fast settings)
-  - Bind-mount DB volume to the **SSD** (survives reboot)
-  - **Automated nightly backups** to the 500GB WD
-  - **restart_policy: unless-stopped** everywhere; `restart: always` on Postgres
-  - A documented restart routine (which of the 8 stacks to bring up after blackout)
-  - The proxycore network must route to the new Supabase stack by **service name**, not
-    container IP, so IPs survive restarts.
-- **Certificate/hostname**: expose via `supabase.atmyhome.tech` through proxycore +
-  cloudflared, TLS terminated at the tunnel/proxy.
+### Performance & Architectural Advantages on EC2
+1. **Dedicated ~7 GB Memory Pool**:
+   - In production, memory is dedicated strictly to AttendX (`backend`, `teacher`, `admin`, and `postgres`).
+   - PostgreSQL is tuned with `shared_buffers = 1792MB` and `effective_cache_size = 5120MB`, keeping the active session rosters, token caches, and student indexes resident in memory.
+2. **Datacenter Latency & Low Clock Jitter**:
+   - Replaces multi-hop residential tunnels (which suffered from ~470ms p95 RTT) with direct AWS network connectivity (20–60ms campus Wi-Fi / 5G RTT).
+   - Clock drift over Cristian's Algorithm is minimized, ensuring Gate 4 cryptographic timestamps are validated with high precision.
+3. **Cloud SLA & Durability**:
+   - High availability (99.99% AWS infrastructure SLA) replaces home blackout vulnerability.
+   - Durability is guaranteed through EBS block-level durability, automated snapshots, and off-site S3 database dumps.
+
+### Historical Roots: Why the Zero-Trust Architecture Is So Resilient
+The initial prototype was designed for a power-cut-prone 8 GB homelab. This heritage is the reason the system retains robust durability guarantees:
+- PostgreSQL transactions maintain atomic integrity (`fsync=on`, `synchronous_commit=on`).
+- Nonces in `crypto_challenges` use atomic single-query updates to eliminate race conditions.
+- Automated cleanup functions (`run_db_maintenance()`) purge ephemeral tokens and challenges every 5 minutes to prevent storage bloat.
 
 ## 5. What "done" looks like (group-project scope)
 

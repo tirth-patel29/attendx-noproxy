@@ -29,7 +29,7 @@ The system combines a student mobile application, teacher teacher, administrativ
 
 The original project architecture is designed to make a classroom attendance claim difficult to fake by combining multiple independent signals: device binding, biometric pre-checks, a short-lived rotating classroom token, and server-side cryptographic/time verification.
 
-The project is intentionally designed for a self-hosted homelab environment with constrained resources and power-cut recovery requirements.
+The production deployment runs on a dedicated **AWS EC2 instance (~7 GB memory)** backed by EBS gp3 SSD storage, retaining high durability and zero-trust verification guarantees.
 
 ---
 
@@ -598,41 +598,40 @@ Before applying a migration to a production database:
 
 ---
 
-# 🐳 Docker & Homelab
+# 🐳 Docker & Production Cloud Deployment (AWS EC2)
 
-AttendX is designed for a self-hosted homelab rather than requiring a large cloud deployment.
+AttendX is containerized with Docker and runs in production on an **AWS EC2 instance (~7 GB memory)** with attached EBS gp3 SSD storage.
 
-The project's original environment targets a constrained host and explicitly considers:
+The production deployment utilizes:
+- **Dedicated Memory**: ~7 GB memory dedicated to AttendX containers (PostgreSQL, Backend, Teacher, Admin).
+- **PostgreSQL 7 GB Tuning**: `shared_buffers=1792MB`, `effective_cache_size=5120MB`, `work_mem=32MB`, `maintenance_work_mem=256MB`.
+- **SSL / Reverse Proxy**: Host Nginx terminating TLS (Let's Encrypt / Certbot) with WebSocket upgrade support for Socket.IO.
+- **Persistent Storage**: AWS EBS gp3 volume ensuring data durability and rapid I/O.
+- **Automatic Recovery**: Docker restart policies (`restart: unless-stopped`) + host systemd service (`attendx.service`).
 
-- RAM usage
-- persistent storage
-- power outages
-- automatic restart
-- backups
-- Docker networking
-
-High-level deployment:
+High-level production deployment:
 
 ```mermaid
 flowchart LR
     Git["Git Repository"]
-    Actions["Gitea Actions"]
-    Host["Homelab"]
-    Docker["Docker"]
-    Gateway["Attendance Gateway"]
-    Teacher["Teacher Teacher"]
-    Admin["Admin Teacher"]
-    DB["Supabase / PostgreSQL"]
+    Host["AWS EC2 (~7 GB RAM)"]
+    Nginx["Host Nginx (TLS / 443)"]
+    Docker["Docker Compose"]
+    Gateway["Attendance Gateway (:3001)"]
+    Teacher["Teacher Portal (:3000)"]
+    Admin["Admin Console (:3002)"]
+    DB["PostgreSQL (:5432)"]
 
-    Git --> Actions
-    Actions --> Host
-    Host --> Docker
-
+    Git --> Host
+    Host --> Nginx
+    Nginx --> Docker
     Docker --> Gateway
     Docker --> Teacher
     Docker --> Admin
     Docker --> DB
 ```
+
+Detailed deployment walkthrough, environment variable configuration, and Nginx templates are documented in [DEPLOY.md](file:///d:/attendx-noproxy/DEPLOY.md).
 
 ---
 
