@@ -32,15 +32,12 @@ import { ChartCard } from "@/components/attendx/ChartCard";
 import { Button } from "@/components/ui/button";
 import { staggerContainer, riseItem } from "@/lib/motion";
 import {
-  attendanceTrend,
-  subjectAttendance
-} from "@/data/mock";
-import {
   useTeacherProfile,
   useTeacherSummary,
   useTeacherTimetable,
   useCurrentLecture,
   useSessions,
+  useTeacherTrend,
 } from "@/hooks/useTeacherDashboard";
 import { teacherApi } from "@/services/teacherApi";
 
@@ -60,6 +57,7 @@ export default function DashboardPage() {
   const { data: timetableData } = useTeacherTimetable();
   const { data: currentLecture } = useCurrentLecture();
   const { data: allSessions } = useSessions();
+  const { data: trendData } = useTeacherTrend();
   const [starting, setStarting] = React.useState<string | null>(null);
 
   const timetable = timetableData?.today || [];
@@ -76,7 +74,9 @@ export default function DashboardPage() {
   const realSubjectAttendance = summary?.map(s => ({
     subject: s.course_code,
     rate: Math.round((s.present_count / (s.total_students * Math.max(1, s.sessions_total))) * 100) || 0
-  })) || subjectAttendance;
+  })) || [];
+
+  const realAttendanceTrend = trendData || [];
 
   const teacherName = teacher?.name || 'Professor';
 
@@ -303,7 +303,7 @@ export default function DashboardPage() {
             description="Students present per day"
           >
             <ResponsiveContainer width="100%" height={180}>
-              <AreaChart data={attendanceTrend} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+              <AreaChart data={realAttendanceTrend} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor={CYAN} stopOpacity={0.18} />

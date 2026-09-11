@@ -42,12 +42,21 @@ export function useSessions() {
 }
 
 export function useCurrentLecture() {
-  const { data: sessions } = useSessions();
-  
-  // Find the first active session
-  const activeSession = sessions?.find(s => s.is_active);
-  
-  return {
-    data: activeSession ? { active_session: activeSession } : null,
-  };
+  return useQuery({
+    queryKey: ['currentLecture'],
+    queryFn: async () => {
+      const res = await teacherApi.getCurrentLecture();
+      return res.data;
+    },
+  });
+}
+
+export function useTeacherTrend() {
+  return useQuery({
+    queryKey: ['teacherTrend'],
+    queryFn: async () => {
+      const res = await teacherApi.getAttendanceTrend();
+      return res.data;
+    },
+  });
 }

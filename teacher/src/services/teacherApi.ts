@@ -72,6 +72,8 @@ export const teacherApi = {
   // Teacher timetable + analytics (JWT-scoped)
   getTimetable: () => api.get<{ today_dow: number; today: any[]; week: any[] }>('/professor/timetable'),
   getSummary: () => api.get<any[]>('/professor/summary'),
+  getAttendanceTrend: () => api.get<{ day: string; rate: number }[]>('/professor/attendance-trend'),
+  getCurrentLecture: () => api.get<any>('/professor/current-lecture'),
 
   // Tokens
   getSessionTokens: (sessionId: string) =>

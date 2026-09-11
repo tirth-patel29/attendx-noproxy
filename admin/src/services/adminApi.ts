@@ -16,6 +16,43 @@ export interface Stats {
   active_sessions: number;
 }
 
+export interface TrendData {
+  day: string;
+  rate: number;
+}
+
+export interface SplitData {
+  name: string;
+  value: number;
+}
+
+export interface ActivityData {
+  event_type: string;
+  payload: any;
+  created_at: string;
+}
+
+export interface DeptStats {
+  department: string;
+  students: number;
+  courses: number;
+}
+
+export interface SessionActivityData {
+  hour: number;
+  sessions: number;
+}
+
+export interface ActiveSessionData {
+  id: string;
+  subject: string;
+  faculty: string;
+  status: string;
+  division: string;
+  present: number;
+  total: number;
+}
+
 export interface Teacher {
   id: string;
   email: string;
@@ -137,6 +174,12 @@ export const adminApi = {
 
   // stats
   stats: () => api.get<Stats>('/admin/stats'),
+  attendanceTrend: () => api.get<TrendData[]>('/admin/dashboard/attendance-trend'),
+  verificationSplit: () => api.get<SplitData[]>('/admin/dashboard/verification-split'),
+  recentActivity: () => api.get<ActivityData[]>('/admin/dashboard/recent-activity'),
+  departmentStats: () => api.get<DeptStats[]>('/admin/dashboard/department-stats'),
+  sessionActivity: () => api.get<SessionActivityData[]>('/admin/dashboard/session-activity'),
+  activeSessions: () => api.get<ActiveSessionData[]>('/admin/dashboard/active-sessions'),
 
   // teachers
   teachers: () => api.get<Teacher[]>('/admin/teachers'),

@@ -12,19 +12,12 @@ import { GlassCard, CardHead } from '@/components/attendx/GlassCard';
 import { StatusBadge } from '@/components/attendx/StatusBadge';
 import { ChartCard } from '@/components/attendx/ChartCard';
 import { staggerContainer, riseItem } from '@/lib/motion';
-import { adminApi, Stats } from '../services/adminApi';
+import { adminApi, Stats, TrendData, SplitData, DeptStats, SessionActivityData, ActiveSessionData, ActivityData } from '../services/adminApi';
 import { useAuth } from '../context/AuthContext';
-import {
-  sessions,
-  attendanceTrend,
-  departmentStats,
-  sessionActivity,
-  verificationSplit,
-  recentActivity,
-} from '@/data/mock';
+import { formatDistanceToNow } from 'date-fns';
 
 const CYAN = "oklch(0.72 0.14 206)";
-const COLORS = [CYAN, "oklch(0.6 0.13 250)", "oklch(0.66 0.14 158)"];
+const COLORS = [CYAN, "oklch(0.6 0.13 250)", "oklch(0.66 0.14 158)", "oklch(0.8 0.1 120)"];
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -36,9 +29,21 @@ function getGreeting() {
 export default function Dashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState<Stats | null>(null);
+  const [attendanceTrend, setAttendanceTrend] = useState<TrendData[]>([]);
+  const [verificationSplit, setVerificationSplit] = useState<SplitData[]>([]);
+  const [departmentStats, setDepartmentStats] = useState<DeptStats[]>([]);
+  const [sessionActivity, setSessionActivity] = useState<SessionActivityData[]>([]);
+  const [sessions, setSessions] = useState<ActiveSessionData[]>([]);
+  const [recentActivity, setRecentActivity] = useState<ActivityData[]>([]);
 
   useEffect(() => {
     adminApi.stats().then(r => setStats(r.data)).catch(console.error);
+    adminApi.attendanceTrend().then(r => setAttendanceTrend(r.data)).catch(console.error);
+    adminApi.verificationSplit().then(r => setVerificationSplit(r.data)).catch(console.error);
+    adminApi.departmentStats().then(r => setDepartmentStats(r.data)).catch(console.error);
+    adminApi.sessionActivity().then(r => setSessionActivity(r.data)).catch(console.error);
+    adminApi.activeSessions().then(r => setSessions(r.data)).catch(console.error);
+    adminApi.recentActivity().then(r => setRecentActivity(r.data)).catch(console.error);
   }, []);
 
   const liveCount = stats?.active_sessions || 0;
@@ -77,7 +82,7 @@ export default function Dashboard() {
                     </linearGradient>
                   </defs>
                   <XAxis dataKey="day" tick={{ fontSize: 11, fill: "oklch(0.55 0.02 250)" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: "oklch(0.55 0.02 250)" }} axisLine={false} tickLine={false} domain={[70, 100]} />
+                  <YAxis tick={{ fontSize: 11, fill: "oklch(0.55 0.02 250)" }} axisLine={false} tickLine={false} domain={[0, 100]} />
                   <Tooltip contentStyle={{ background: "oklch(1 0 0)", border: "1px solid oklch(0.92 0.006 240)", borderRadius: 12, fontSize: 12 }} formatter={(v: any) => [`${v}%`, "Rate"]} />
                   <Area type="monotone" dataKey="rate" stroke={CYAN} strokeWidth={2} fill="url(#adminGrad)" dot={false} activeDot={{ r: 4, strokeWidth: 0, fill: CYAN }} />
                 </AreaChart>
@@ -109,13 +114,13 @@ export default function Dashboard() {
 
         {/* Charts row 2 */}
         <div className="grid gap-4 lg:grid-cols-2">
-          <ChartCard title="Department Statistics" description="Attendance rate by department">
+          <ChartCard title="Department Statistics" description="Total Students by department">
             <ResponsiveContainer width="100%" height={160}>
               <BarChart data={departmentStats} layout="vertical" margin={{ top: 4, right: 4, left: 60, bottom: 0 }} barSize={12}>
-                <XAxis type="number" tick={{ fontSize: 11, fill: "oklch(0.55 0.02 250)" }} axisLine={false} tickLine={false} domain={[0, 100]} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: "oklch(0.55 0.02 250)" }} axisLine={false} tickLine={false} width={58} />
-                <Tooltip contentStyle={{ background: "oklch(1 0 0)", border: "1px solid oklch(0.92 0.006 240)", borderRadius: 12, fontSize: 12 }} formatter={(v: any) => [`${v}%`, "Rate"]} />
-                <Bar dataKey="rate" radius={[0, 5, 5, 0]} fill={CYAN} />
+                <XAxis type="number" tick={{ fontSize: 11, fill: "oklch(0.55 0.02 250)" }} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="department" tick={{ fontSize: 10, fill: "oklch(0.55 0.02 250)" }} axisLine={false} tickLine={false} width={58} />
+                <Tooltip contentStyle={{ background: "oklch(1 0 0)", border: "1px solid oklch(0.92 0.006 240)", borderRadius: 12, fontSize: 12 }} formatter={(v: any) => [`${v}`, "Students"]} />
+                <Bar dataKey="students" radius={[0, 5, 5, 0]} fill={CYAN} />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>
@@ -146,7 +151,11 @@ export default function Dashboard() {
               } />
               <div className="mt-4 space-y-1">
                 {recentActivity.map((a, i) => {
-                  const tone = a.tone === "primary" ? "primary" : a.tone === "danger" ? "danger" : a.tone === "success" ? "success" : "neutral";
+                  let tone = "neutral";
+                  if (a.event_type.includes("ERROR") || a.event_type.includes("FAIL")) tone = "danger";
+                  else if (a.event_type.includes("SUCCESS") || a.event_type.includes("CREATE")) tone = "success";
+                  else if (a.event_type.includes("LOGIN") || a.event_type.includes("ADMIN")) tone = "primary";
+                  
                   return (
                     <div key={i} className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-canvas/60">
                       <span className={`h-2 w-2 shrink-0 rounded-full ${
@@ -156,10 +165,12 @@ export default function Dashboard() {
                         "bg-muted-foreground/40"
                       }`} />
                       <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-medium">{a.title}</p>
-                        <p className="text-[11.5px] text-muted-foreground">{a.meta}</p>
+                        <p className="text-[13px] font-medium">{a.event_type}</p>
+                        <p className="text-[11.5px] text-muted-foreground truncate">{JSON.stringify(a.payload)}</p>
                       </div>
-                      <span className="shrink-0 text-[11px] text-muted-foreground">{a.time}</span>
+                      <span className="shrink-0 text-[11px] text-muted-foreground">
+                        {formatDistanceToNow(new Date(a.created_at), { addSuffix: true })}
+                      </span>
                     </div>
                   );
                 })}
@@ -176,7 +187,7 @@ export default function Dashboard() {
                 </Link>
               } />
               <div className="mt-4 space-y-2">
-                {sessions.filter((s) => s.status === "LIVE" || s.status === "COMPLETED").slice(0, 5).map((s, i) => (
+                {sessions.map((s) => (
                   <div key={s.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-canvas/60">
                     <div className="min-w-0 flex-1">
                       <p className="text-[13px] font-medium truncate">{s.subject}</p>
@@ -188,6 +199,9 @@ export default function Dashboard() {
                     </div>
                   </div>
                 ))}
+                {sessions.length === 0 && (
+                  <p className="text-[12px] text-muted-foreground p-3 text-center">No active sessions right now.</p>
+                )}
               </div>
             </GlassCard>
           </motion.div>
@@ -196,3 +210,4 @@ export default function Dashboard() {
     </div>
   );
 }
+

@@ -335,6 +335,40 @@ router.get(
   },
 );
 
+router.get(
+  "/professor/attendance-trend",
+  requireProfessor,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const profUuid = (req as any).professor.sub as string;
+      const r = await query(
+        `SELECT 
+          to_char(cs.session_date, 'Mon DD') as day,
+          ROUND((COUNT(DISTINCT al.ledger_uuid)::float / NULLIF(SUM(
+            (SELECT COUNT(*) FROM students s JOIN courses c ON c.division_id = s.division_id WHERE c.course_code = cs.course_code)
+          ), 0) * 100)::numeric, 0)::int as rate
+        FROM course_sessions cs
+        LEFT JOIN attendance_ledger al ON al.session_uuid = cs.session_uuid AND al.status = 'PRESENT'
+        WHERE cs.prof_uuid = $1 AND cs.session_date >= CURRENT_DATE - INTERVAL '6 days'
+        GROUP BY cs.session_date
+        ORDER BY cs.session_date ASC`,
+        [profUuid],
+      );
+      if (r.rows.length === 0) {
+        const empty = Array.from({ length: 7 }).map((_, i) => {
+          const d = new Date();
+          d.setDate(d.getDate() - (6 - i));
+          return { day: d.toLocaleDateString('en-US', { month: 'short', day: '2-digit' }), rate: 0 };
+        });
+        return res.json(empty);
+      }
+      res.json(r.rows);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 router.post(
   "/sessions/:sessionUuid/challenge",
   async (req: Request, res: Response, next: NextFunction) => {
