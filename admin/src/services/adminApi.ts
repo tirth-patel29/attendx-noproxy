@@ -79,7 +79,7 @@ export interface Batch {
 }
 
 export interface Division {
-  id: string | undefined; // some responses might map this as division_id
+  id: string;
   division_id?: string;
   branch_id?: string | null;
   branch_name?: string;
@@ -160,12 +160,6 @@ export const adminApi = {
   rotateHmac: (id: string) => api.post(`/admin/students/${id}/rotate-hmac`),
   forgotPassword: (id: string) => api.post(`/admin/students/${id}/forgot-password`),
 
-  // divisions
-  // divisions (legacy facade, new CRUD via academicApi below)
-  divisions: () => api.get<Division[]>('/admin/divisions'),
-  createDivision: (name: string) => api.post('/admin/divisions', { name }),
-  updateDivision: (id: string, name: string) => api.put(`/admin/divisions/${id}`, { name }),
-  deleteDivision: (id: string) => api.delete(`/admin/divisions/${id}`),
 
   // courses
   courses: () => api.get<Course[]>('/admin/courses'),
@@ -209,7 +203,10 @@ export const academicApi = {
   deleteBranch: (id: string) => api.delete(`/admin/academic/branches/${id}`),
 
   // Divisions (Full Academic CRUD)
-  divisions: () => api.get<Division[]>('/admin/academic/divisions'),
+  divisions: () => api.get<any[]>('/admin/academic/divisions').then(r => ({
+    ...r,
+    data: r.data.map(d => ({ ...d, id: d.division_id || d.id })) as Division[]
+  })),
   createDivision: (data: { branch_id?: string | null; name: string; code?: string | null; academic_year?: number | null }) => 
     api.post('/admin/academic/divisions', data),
   updateDivision: (id: string, data: { branch_id?: string | null; name: string; code?: string | null; academic_year?: number | null }) => 

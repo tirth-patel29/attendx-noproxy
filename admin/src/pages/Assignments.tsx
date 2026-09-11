@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { adminApi, Assignment, Teacher, Course, Division, dayName } from '../services/adminApi';
+import { adminApi, academicApi, Assignment, Teacher, Course, Division, dayName } from '../services/adminApi';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -42,7 +42,7 @@ export default function Assignments() {
       adminApi.assignments(),
       adminApi.teachers(),
       adminApi.courses(),
-      adminApi.divisions()
+      academicApi.divisions()
     ]).then(([a, t, c, d]) => {
       setRows(a.data);
       setTeachers(t.data);

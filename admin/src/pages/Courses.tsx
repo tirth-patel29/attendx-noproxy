@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { adminApi, Course, Division } from '../services/adminApi';
+import { adminApi, academicApi, Course, Division } from '../services/adminApi';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -30,7 +30,7 @@ export default function Courses() {
 
   const load = () => {
     setLoading(true);
-    Promise.all([adminApi.courses(), adminApi.divisions()])
+    Promise.all([adminApi.courses(), academicApi.divisions()])
       .then(([c, d]) => { setRows(c.data); setDivisions(d.data); })
       .catch(() => toast.error('Failed to load courses'))
       .finally(() => setLoading(false));

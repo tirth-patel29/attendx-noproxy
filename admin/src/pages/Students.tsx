@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { adminApi, Student, Division } from '../services/adminApi';
+import { adminApi, academicApi, Student, Division } from '../services/adminApi';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
@@ -36,7 +36,7 @@ export default function Students() {
 
   const load = () => {
     setLoading(true);
-    Promise.all([adminApi.students(), adminApi.divisions()])
+    Promise.all([adminApi.students(), academicApi.divisions()])
       .then(([s, d]) => { setRows(s.data); setDivisions(d.data); })
       .catch(() => toast.error('Failed to load data'))
       .finally(() => setLoading(false));

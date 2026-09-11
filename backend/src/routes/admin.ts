@@ -586,60 +586,7 @@ adminRouter.post('/students/:uuid/forgot-password', async (req: Request, res: Re
   }
 });
 
-// ===========================================================================
-// DIVISIONS
-// ===========================================================================
-adminRouter.get('/divisions', async (_req: Request, res: Response, next: NextFunction) => {
-  try {
-    const r = await query(`
-      SELECT d.division_id, d.name,
-             (SELECT COUNT(*) FROM courses c WHERE c.division_id = d.division_id)::int AS course_count,
-             (SELECT COUNT(*) FROM students s WHERE s.division_id = d.division_id)::int AS student_count
-      FROM divisions d ORDER BY d.name`);
-    res.json(r.rows.map((row) => ({ id: row.division_id, name: row.name, course_count: row.course_count, student_count: row.student_count })));
-  } catch (err) {
-    next(err);
-  }
-});
 
-adminRouter.post('/divisions', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const parsed = divisionCreate.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: 'Invalid division name' });
-    const r = await query(`INSERT INTO divisions (name) VALUES ($1) RETURNING division_id`, [parsed.data.name]);
-    await audit((req as any).admin.sub, 'DIVISION_CREATE', { division_id: r.rows[0].division_id, name: parsed.data.name });
-    res.status(201).json({ id: r.rows[0].division_id, name: parsed.data.name });
-  } catch (err: any) {
-    if (err?.code === '23505') return res.status(409).json({ error: 'Division name already exists' });
-    next(err);
-  }
-});
-
-adminRouter.put('/divisions/:uuid', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const parsed = divisionCreate.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: 'Invalid division name' });
-    const r = await query(`UPDATE divisions SET name=$1 WHERE division_id=$2 RETURNING division_id`, [parsed.data.name, req.params.uuid]);
-    if (r.rows.length === 0) return res.status(404).json({ error: 'Division not found' });
-    await audit((req as any).admin.sub, 'DIVISION_UPDATE', { division_id: req.params.uuid });
-    res.json({ id: req.params.uuid, name: parsed.data.name });
-  } catch (err: any) {
-    if (err?.code === '23505') return res.status(409).json({ error: 'Division name already exists' });
-    next(err);
-  }
-});
-
-adminRouter.delete('/divisions/:uuid', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const r = await query(`DELETE FROM divisions WHERE division_id=$1 RETURNING division_id`, [req.params.uuid]);
-    if (r.rows.length === 0) return res.status(404).json({ error: 'Division not found' });
-    await audit((req as any).admin.sub, 'DIVISION_DELETE', { division_id: req.params.uuid });
-    res.json({ message: 'Division deleted' });
-  } catch (err: any) {
-    if (err?.code === '23503') return res.status(409).json({ error: 'Division still has courses/students attached' });
-    next(err);
-  }
-});
 
 // ===========================================================================
 // COURSES (classes)
