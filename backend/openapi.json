@@ -31,6 +31,12 @@
     },
     {
       "name": "Docs"
+    },
+    {
+      "name": "Admin - Core"
+    },
+    {
+      "name": "Admin - Academic Hierarchy"
     }
   ],
   "security": [
@@ -317,8 +323,8 @@
               }
             }
           },
-          "403": {
-            "description": "Hardware mismatch (Gate 1)",
+          "400": {
+            "description": "Anti-replay: nonce consumed (Gate 4)",
             "content": {
               "application/json": {
                 "schema": {
@@ -327,8 +333,8 @@
                 "example": {
                   "success": false,
                   "error": {
-                    "code": "ERR_HW_MISMATCH",
-                    "message": "Unregistered hardware. Your account is bound to a different physical device."
+                    "code": "ERR_NONCE_USED",
+                    "message": "Anti-replay protection triggered. Nonce already consumed."
                   }
                 }
               }
@@ -346,6 +352,23 @@
                   "error": {
                     "code": "ERR_SIG_INVALID",
                     "message": "Cryptographic rejection. The HMAC signature was forged or corrupted."
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Hardware mismatch (Gate 1)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "ERR_HW_MISMATCH",
+                    "message": "Unregistered hardware. Your account is bound to a different physical device."
                   }
                 }
               }
@@ -381,23 +404,6 @@
                     "code": "ERR_STREAM_DETECTED",
                     "message": "Proxy Stream Detected. Photonic intercept lag exceeded the 250ms threshold.",
                     "latency_ms": 310
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Anti-replay: nonce consumed (Gate 4)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "example": {
-                  "success": false,
-                  "error": {
-                    "code": "ERR_NONCE_USED",
-                    "message": "Anti-replay protection triggered. Nonce already consumed."
                   }
                 }
               }
@@ -815,24 +821,31 @@
     "/api/v1/admin/login": {
       "post": {
         "tags": [
-          "Admin"
+          "Admin - Core"
         ],
+        "summary": "Admin login",
         "security": [],
-        "summary": "Admin login → admin JWT (public)",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "example": {
-                "email": "admin@...",
-                "password": "..."
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                }
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "access_token + refresh_token"
+            "description": "Success"
           }
         }
       }
@@ -840,13 +853,28 @@
     "/api/v1/admin/login/refresh": {
       "post": {
         "tags": [
-          "Admin"
+          "Admin - Core"
         ],
+        "summary": "Refresh admin token",
         "security": [],
-        "summary": "Refresh admin JWT",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "refresh_token": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "new token"
+            "description": "Success"
           }
         }
       }
@@ -854,17 +882,17 @@
     "/api/v1/admin/stats": {
       "get": {
         "tags": [
-          "Admin"
+          "Admin - Core"
         ],
+        "summary": "Dashboard stats",
         "security": [
           {
             "bearerAuth": []
           }
         ],
-        "summary": "Dashboard stats",
         "responses": {
           "200": {
-            "description": "stats"
+            "description": "Success"
           }
         }
       }
@@ -872,33 +900,57 @@
     "/api/v1/admin/teachers": {
       "get": {
         "tags": [
-          "Admin"
+          "Admin - Core"
         ],
+        "summary": "List teachers",
         "security": [
           {
             "bearerAuth": []
           }
         ],
-        "summary": "List teachers",
         "responses": {
           "200": {
-            "description": "teachers"
+            "description": "Success"
           }
         }
       },
       "post": {
         "tags": [
-          "Admin"
+          "Admin - Core"
         ],
+        "summary": "Create a teacher",
         "security": [
           {
             "bearerAuth": []
           }
         ],
-        "summary": "Create a teacher",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "department": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
-            "description": "created"
+            "description": "Created"
           }
         }
       }
@@ -906,33 +958,60 @@
     "/api/v1/admin/students": {
       "get": {
         "tags": [
-          "Admin"
+          "Admin - Core"
         ],
+        "summary": "List students",
         "security": [
           {
             "bearerAuth": []
           }
         ],
-        "summary": "List students",
         "responses": {
           "200": {
-            "description": "students"
+            "description": "Success"
           }
         }
       },
       "post": {
         "tags": [
-          "Admin"
+          "Admin - Core"
         ],
+        "summary": "Create a student",
         "security": [
           {
             "bearerAuth": []
           }
         ],
-        "summary": "Create a student",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "roll_no": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "division_id": {
+                    "type": "string"
+                  },
+                  "batch_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
-            "description": "created"
+            "description": "Created"
           }
         }
       }
@@ -974,33 +1053,54 @@
     "/api/v1/admin/courses": {
       "get": {
         "tags": [
-          "Admin"
+          "Admin - Core"
         ],
+        "summary": "List courses",
         "security": [
           {
             "bearerAuth": []
           }
         ],
-        "summary": "List courses",
         "responses": {
           "200": {
-            "description": "courses"
+            "description": "Success"
           }
         }
       },
       "post": {
         "tags": [
-          "Admin"
+          "Admin - Core"
         ],
+        "summary": "Create a course",
         "security": [
           {
             "bearerAuth": []
           }
         ],
-        "summary": "Create course",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "course_code": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "division_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
-            "description": "created"
+            "description": "Created"
           }
         }
       }
@@ -1008,33 +1108,63 @@
     "/api/v1/admin/assignments": {
       "get": {
         "tags": [
-          "Admin"
+          "Admin - Core"
         ],
+        "summary": "List assignments (timetable)",
         "security": [
           {
             "bearerAuth": []
           }
         ],
-        "summary": "List timetable assignments",
         "responses": {
           "200": {
-            "description": "assignments"
+            "description": "Success"
           }
         }
       },
       "post": {
         "tags": [
-          "Admin"
+          "Admin - Core"
         ],
+        "summary": "Create an assignment",
         "security": [
           {
             "bearerAuth": []
           }
         ],
-        "summary": "Create assignment",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "prof_uuid": {
+                    "type": "string"
+                  },
+                  "course_code": {
+                    "type": "string"
+                  },
+                  "division_id": {
+                    "type": "string"
+                  },
+                  "day_of_week": {
+                    "type": "integer"
+                  },
+                  "start_time": {
+                    "type": "string"
+                  },
+                  "end_time": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
-            "description": "created"
+            "description": "Created"
           }
         }
       }
@@ -1042,43 +1172,48 @@
     "/api/v1/admin/api-keys": {
       "get": {
         "tags": [
-          "Admin"
+          "Admin - Core"
         ],
+        "summary": "List API keys",
         "security": [
           {
             "bearerAuth": []
           }
         ],
-        "summary": "List API keys (masked — never the raw key)",
         "responses": {
           "200": {
-            "description": "keys (prefix + status)"
+            "description": "Success"
           }
         }
       },
       "post": {
         "tags": [
-          "Admin"
+          "Admin - Core"
         ],
+        "summary": "Generate a new API key",
         "security": [
           {
             "bearerAuth": []
           }
         ],
-        "summary": "Mint a new client API key (raw shown once)",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "example": {
-                "label": "student-apk"
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  }
+                }
               }
             }
           }
         },
         "responses": {
           "201": {
-            "description": "api_key (shown once)"
+            "description": "Created"
           }
         }
       }
@@ -1086,14 +1221,14 @@
     "/api/v1/admin/api-keys/{uuid}/revoke": {
       "post": {
         "tags": [
-          "Admin"
+          "Admin - Core"
         ],
+        "summary": "Revoke an API key",
         "security": [
           {
             "bearerAuth": []
           }
         ],
-        "summary": "Revoke an API key",
         "parameters": [
           {
             "name": "uuid",
@@ -1106,7 +1241,1241 @@
         ],
         "responses": {
           "200": {
-            "description": "revoked"
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/change-password": {
+      "post": {
+        "tags": [
+          "Admin - Core"
+        ],
+        "summary": "Change admin password",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "current_password": {
+                    "type": "string"
+                  },
+                  "new_password": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/teachers/{uuid}": {
+      "put": {
+        "tags": [
+          "Admin - Core"
+        ],
+        "summary": "Update a teacher",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "department": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin - Core"
+        ],
+        "summary": "Delete a teacher",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/teachers/{uuid}/reset-password": {
+      "post": {
+        "tags": [
+          "Admin - Core"
+        ],
+        "summary": "Reset teacher password",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "password": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/students/{uuid}": {
+      "get": {
+        "tags": [
+          "Admin - Core"
+        ],
+        "summary": "Get student detail",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Admin - Core"
+        ],
+        "summary": "Update a student",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "roll_no": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "division_id": {
+                    "type": "string"
+                  },
+                  "batch_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin - Core"
+        ],
+        "summary": "Delete a student",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/students/{uuid}/reset-device": {
+      "post": {
+        "tags": [
+          "Admin - Core"
+        ],
+        "summary": "Reset device bindings (Unbind hardware)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/students/{uuid}/rotate-hmac": {
+      "post": {
+        "tags": [
+          "Admin - Core"
+        ],
+        "summary": "Rotate student HMAC signature key",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/students/{uuid}/forgot-password": {
+      "post": {
+        "tags": [
+          "Admin - Core"
+        ],
+        "summary": "Force clear student password (admin initiated reset)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/courses/{code}": {
+      "put": {
+        "tags": [
+          "Admin - Core"
+        ],
+        "summary": "Update a course",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "course_code": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "division_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin - Core"
+        ],
+        "summary": "Delete a course",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/assignments/{id}": {
+      "put": {
+        "tags": [
+          "Admin - Core"
+        ],
+        "summary": "Update an assignment",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "prof_uuid": {
+                    "type": "string"
+                  },
+                  "course_code": {
+                    "type": "string"
+                  },
+                  "division_id": {
+                    "type": "string"
+                  },
+                  "day_of_week": {
+                    "type": "integer"
+                  },
+                  "start_time": {
+                    "type": "string"
+                  },
+                  "end_time": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin - Core"
+        ],
+        "summary": "Delete an assignment",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/academic/resolve/{roll_no}": {
+      "get": {
+        "tags": [
+          "Admin - Academic Hierarchy"
+        ],
+        "summary": "Resolve academic identity by roll number",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "roll_no",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/academic/colleges": {
+      "get": {
+        "tags": [
+          "Admin - Academic Hierarchy"
+        ],
+        "summary": "List colleges",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin - Academic Hierarchy"
+        ],
+        "summary": "Create college",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/academic/colleges/{id}": {
+      "put": {
+        "tags": [
+          "Admin - Academic Hierarchy"
+        ],
+        "summary": "Update college",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin - Academic Hierarchy"
+        ],
+        "summary": "Delete college",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/academic/departments": {
+      "get": {
+        "tags": [
+          "Admin - Academic Hierarchy"
+        ],
+        "summary": "List departments",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "college_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin - Academic Hierarchy"
+        ],
+        "summary": "Create department",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "college_id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/academic/departments/{id}": {
+      "put": {
+        "tags": [
+          "Admin - Academic Hierarchy"
+        ],
+        "summary": "Update department",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "college_id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin - Academic Hierarchy"
+        ],
+        "summary": "Delete department",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/academic/branches": {
+      "get": {
+        "tags": [
+          "Admin - Academic Hierarchy"
+        ],
+        "summary": "List branches",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "department_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin - Academic Hierarchy"
+        ],
+        "summary": "Create branch",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "department_id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/academic/branches/{id}": {
+      "put": {
+        "tags": [
+          "Admin - Academic Hierarchy"
+        ],
+        "summary": "Update branch",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "department_id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin - Academic Hierarchy"
+        ],
+        "summary": "Delete branch",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/academic/divisions": {
+      "get": {
+        "tags": [
+          "Admin - Academic Hierarchy"
+        ],
+        "summary": "List divisions",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "branch_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin - Academic Hierarchy"
+        ],
+        "summary": "Create division",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "branch_id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  },
+                  "academic_year": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/academic/divisions/{id}": {
+      "put": {
+        "tags": [
+          "Admin - Academic Hierarchy"
+        ],
+        "summary": "Update division",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "branch_id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  },
+                  "academic_year": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin - Academic Hierarchy"
+        ],
+        "summary": "Delete division",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/academic/batches": {
+      "get": {
+        "tags": [
+          "Admin - Academic Hierarchy"
+        ],
+        "summary": "List batches",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "division_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin - Academic Hierarchy"
+        ],
+        "summary": "Create batch",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "division_id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  },
+                  "start_roll": {
+                    "type": "string"
+                  },
+                  "end_roll": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/academic/batches/{id}": {
+      "put": {
+        "tags": [
+          "Admin - Academic Hierarchy"
+        ],
+        "summary": "Update batch",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "division_id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  },
+                  "start_roll": {
+                    "type": "string"
+                  },
+                  "end_roll": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin - Academic Hierarchy"
+        ],
+        "summary": "Delete batch",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
           }
         }
       }
