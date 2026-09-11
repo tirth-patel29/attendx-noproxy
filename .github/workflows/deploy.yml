@@ -8,6 +8,7 @@ on:
       - 'teacher/**'
       - 'admin/**'
       - 'migrations/**'
+      - '.github/workflows/**'
 
 jobs:
   deploy:
