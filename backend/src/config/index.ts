@@ -26,10 +26,11 @@ export const config = {
     user: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || '',
     ssl: process.env.DB_SSL === 'true',
-    // Connection pool: sized for high-concurrency claim herds. Each claim now
-    // runs ~2 fast statements (atomic nonce UPDATE + ledger INSERT) plus one
-    // PK-indexed student read; keep healthy headroom above peak contention.
-    max: 30,
+    // Connection pool: sized for high-concurrency claim herds. Each claim runs
+    // ~2 fast statements (atomic nonce UPDATE + ledger INSERT) plus one
+    // PK-indexed student read. 20 connections is plenty of headroom above
+    // peak contention while leaving room for Supabase's own services.
+    max: 20,
     idleTimeoutMillis: 30000,
     // Generous acquire queue: under a burst the pool waits rather than 500-ing.
     // (Async bcrypt below means a burst no longer blocks the event loop, so

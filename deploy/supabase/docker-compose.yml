@@ -56,9 +56,17 @@ services:
       - "-c"
       - "effective_cache_size=1GB"
       - "-c"
-      - "max_connections=100"
+      - "max_connections=150"         # headroom for Supabase services + backend pool
       - "-c"
       - "wal_buffers=8MB"
+      - "-c"
+      - "random_page_cost=1.1"        # SSD-optimized: makes planner prefer index scans
+      - "-c"
+      - "maintenance_work_mem=64MB"   # faster VACUUM and index creation
+      - "-c"
+      - "log_min_duration_statement=500"  # log queries slower than 500ms
+      - "-c"
+      - "autovacuum_naptime=30s"      # more aggressive autovacuum for high-churn tables
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s

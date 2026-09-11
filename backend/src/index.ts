@@ -245,6 +245,21 @@ async function startServer() {
     } catch (err) {
       console.warn('Could not auto-start metronomes:', err);
     }
+
+    // DB maintenance cron: clean up expired tokens and used crypto challenges
+    // every 5 minutes to prevent unbounded table growth on the 8GB instance.
+    const DB_MAINTENANCE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+    setInterval(async () => {
+      try {
+        const r = await pool.query(`SELECT run_db_maintenance() AS result`);
+        if (config.logLevel === 'debug') {
+          console.log(`[DB Maintenance] ${r.rows[0]?.result}`);
+        }
+      } catch (err) {
+        // Function may not exist yet (migration not applied); silently skip.
+      }
+    }, DB_MAINTENANCE_INTERVAL_MS);
+    console.log(`DB maintenance cron scheduled every ${DB_MAINTENANCE_INTERVAL_MS / 1000}s`);
   });
 }
 
