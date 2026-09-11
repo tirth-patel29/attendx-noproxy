@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - 'backend/**'
-      - 'portal/**'
+      - 'teacher/**'
       - 'admin/**'
       - 'migrations/**'
 
@@ -26,7 +26,7 @@ jobs:
           CHANGED=$(git diff --name-only HEAD~1 HEAD)
           echo "Changed files: $CHANGED"
           echo "backend=$(echo "$CHANGED" | grep -q '^backend/' && echo true || echo false)" >> $GITHUB_OUTPUT
-          echo "portal=$(echo "$CHANGED"   | grep -q '^portal/'  && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "teacher=$(echo "$CHANGED"   | grep -q '^teacher/'  && echo true || echo false)" >> $GITHUB_OUTPUT
           echo "admin=$(echo "$CHANGED"    | grep -q '^admin/'   && echo true || echo false)" >> $GITHUB_OUTPUT
           echo "migrations=$(echo "$CHANGED" | grep -q '^migrations/' && echo true || echo false)" >> $GITHUB_OUTPUT
 
@@ -37,7 +37,7 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           timeout: 600s
-          envs: BUILD_BACKEND,BUILD_PORTAL,BUILD_ADMIN,RUN_MIGRATIONS
+          envs: BUILD_BACKEND,BUILD_TEACHER,BUILD_ADMIN,RUN_MIGRATIONS
           script: |
             set -e
             cd /home/ubuntu/attendance-gateway
@@ -63,15 +63,15 @@ jobs:
               curl -sf http://localhost:3001/health | grep healthy
             fi
 
-            if [ "$BUILD_PORTAL" = "true" ]; then
-              echo "=== Build portal ==="
-              docker build -t attendance-portal:latest \
+            if [ "$BUILD_TEACHER" = "true" ]; then
+              echo "=== Build teacher ==="
+              docker build -t attendance-teacher:latest \
                 --build-arg VITE_API_URL=https://api.atmyhome.tech \
-                ./portal/ 2>&1 | tail -3
-              docker rm -f attendance-portal 2>/dev/null || true
-              docker compose -f /home/ubuntu/app-compose.yml up -d attendance-portal
+                ./teacher/ 2>&1 | tail -3
+              docker rm -f attendance-teacher 2>/dev/null || true
+              docker compose -f /home/ubuntu/app-compose.yml up -d attendance-teacher
               sleep 5
-              curl -sf http://localhost:3010/ > /dev/null && echo "portal OK"
+              curl -sf http://localhost:3010/ > /dev/null && echo "teacher OK"
             fi
 
             if [ "$BUILD_ADMIN" = "true" ]; then
@@ -86,6 +86,6 @@ jobs:
             echo "=== DEPLOY COMPLETE ==="
         env:
           BUILD_BACKEND: ${{ steps.changes.outputs.backend }}
-          BUILD_PORTAL: ${{ steps.changes.outputs.portal }}
+          BUILD_TEACHER: ${{ steps.changes.outputs.teacher }}
           BUILD_ADMIN: ${{ steps.changes.outputs.admin }}
           RUN_MIGRATIONS: ${{ steps.changes.outputs.migrations }}

@@ -54,14 +54,14 @@ Legend: `[ ]` todo · `[x]` done · `>` currently in progress
 - [ ] Run on a physical Android test device (the whole point — must work on real phones).
 - [ ] Integrate with live backend `api.atmyhome.tech` end-to-end.
 
-## Phase 4 — Professor Web Portal (React + MUI) ✅ DEPLOYED
+## Phase 4 — Professor Web Teacher (React + MUI) ✅ DEPLOYED
 
 - [x] Dashboard: list sessions, start/stop, view attendance, QR code button
 - [x] Session page: live rotating token (3s polling), attendance table with delta, CSV export
 - [x] Auth: JWT login with refresh token, protected routes
 - [x] Theme: Material 3, deep blue primary, responsive sidebar
 - [x] API integration: proxied to `https://api.atmyhome.tech`
-- [x] Deployed: `https://portal.atmyhome.tech` (docker compose on proxynet)
+- [x] Deployed: `https://teacher.atmyhome.tech` (docker compose on proxynet)
 - [x] Healthcheck: `/health` endpoint
 
 ## Phase 5 — Flutter mobile client (off-server build)
@@ -94,7 +94,7 @@ Legend: `[ ]` todo · `[x]` done · `>` currently in progress
 | **Supabase Stack** (7 services) | ✅ All Healthy | `https://supabase.atmyhome.tech` |
 | **Attendance Backend** (Node/TS) | ✅ 4-gate judge + metronome + **Admin API** | `https://api.atmyhome.tech` |
 | **Admin Console** (React/MUI) | ✅ Built + deployed (`attendance-admin`) | `https://admin.atmyhome.tech` |
-| **Professor Portal** (React/MUI) | ✅ Dumb-terminal live | `https://portal.atmyhome.tech` |
+| **Professor Teacher** (React/MUI) | ✅ Dumb-terminal live | `https://teacher.atmyhome.tech` |
 | **Flutter Client** | ✅ Scaffolded | `app/` in repo |
 | **Gitea Repo** | ✅ `het/attendance-gateway` (single `main`) | `http://gitea:3000/het/attendance-gateway` |
 
@@ -118,12 +118,12 @@ flutter build apk --release
 # Install on physical Android, provision with roll number (e.g., 24BCS001)
 ```
 
-### Teammate 2 (Professor): Test Portal
-1. Open `https://portal.atmyhome.tech`
+### Teammate 2 (Professor): Test Teacher
+1. Open `https://teacher.atmyhome.tech`
 2. Login with professor credentials
 3. Create a session → "Show QR Code"
 4. Have Teammate 1 scan with Flutter app
-5. Verify "PRESENT" appears on both portal and app
+5. Verify "PRESENT" appears on both teacher and app
 
 ### Everyone: Power-Cut Drill #2
 ```bash
@@ -132,7 +132,7 @@ reboot
 # Verify:
 # - All 7 Supabase containers Up
 # - Backend container Up  
-# - Portal container Up
+# - Teacher container Up
 # - DB schema intact
 # - Recent backup on 500GB WD
 ```

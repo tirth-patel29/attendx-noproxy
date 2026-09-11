@@ -86,13 +86,13 @@ We are building a **self-hosted attendance system** that cryptographically prove
 | 2.3 | Implement Socket.io metronome (3s token mint → WS broadcast → persist to `active_tokens`) | AI | ⏳ Pending | 2.2 | Tokens mint every 3s, visible in DB |
 | 2.4 | Implement `POST /api/v1/claim-attendance` (all 4 gates) | AI | ⏳ Pending | 2.3 | Gate logic: HW match, HMAC verify, token lookup, 250ms check |
 | 2.5 | Handle thundering herd (70 concurrent claims) — connection pooling, idempotency | AI | ⏳ Pending | 2.4 | Load test passes |
-| 2.6 | Professor portal (React/TS): start/stop session, live QR, attendance table, 1-click device reset | AI | ⏳ Pending | 2.3 | Web UI at `/portal` |
+| 2.6 | Professor teacher (React/TS): start/stop session, live QR, attendance table, 1-click device reset | AI | ⏳ Pending | 2.3 | Web UI at `/teacher` |
 | 2.7 | Unit tests for judge (honest, bad WiFi, WhatsApp photo, Discord stream, Postman spoof, friend login) | AI | ⏳ Pending | 2.4 | All 6 SRS state-matrix cases pass |
-| 2.8 | Integration test: full flow (portal → metronome → claim → verdict) | AI | ⏳ Pending | 2.6 | End-to-end works |
+| 2.8 | Integration test: full flow (teacher → metronome → claim → verdict) | AI | ⏳ Pending | 2.6 | End-to-end works |
 | 2.9 | API documentation (OpenAPI/Swagger) | AI | ⏳ Pending | 2.8 | `docs/api-spec.yaml` |
 | 2.10 | Deploy backend to homelab (Docker, Portainer stack, proxynet) | AI | ⏳ Pending | 2.8 | Backend live at `api.atmyhome.tech` |
 
-**Milestone 2:** Backend judge + metronome + portal live, all tests passing, deployed on homelab.
+**Milestone 2:** Backend judge + metronome + teacher live, all tests passing, deployed on homelab.
 
 ---
 
@@ -125,7 +125,7 @@ We are building a **self-hosted attendance system** that cryptographically prove
 | 4.4 | Security review vs SRS state matrix (all 6 vectors) | AI | ⏳ Pending | 2.7, 3.10 | No regressions |
 | 4.5 | Performance tuning (Postgres, Node pool, Flutter frame rate) | AI | ⏳ Pending | 4.3 | Meets latency budgets |
 | 4.6 | Demo script + fallback story ("power dies during demo") | Team | ⏳ Pending | 4.2 | Written script, backup plan |
-| 4.7 | Record demo video (prof portal + student app) | Team | ⏳ Pending | 4.1 | 2-3 min video for submission |
+| 4.7 | Record demo video (prof teacher + student app) | Team | ⏳ Pending | 4.1 | 2-3 min video for submission |
 | 4.8 | Architecture diagram update (actual vs planned) | AI | ⏳ Pending | 4.5 | `docs/architecture-final.svg` |
 
 **Milestone 4:** Demo-ready, load-tested, power-cut resilient, documented.
@@ -183,7 +183,7 @@ Week 7 (Sep 17-23):   ██████████ Phase 5 ██████�
 |-------|----------|
 | 0 | Repo on Gitea, all foundation docs, team can clone, CI/CD pipeline skeleton |
 | 1 | Supabase on homelab, schema applied, backups automated & tested, survives power cut |
-| 2 | Backend API + metronome + portal deployed, all 6 attack vector tests pass |
+| 2 | Backend API + metronome + teacher deployed, all 6 attack vector tests pass |
 | 3 | Flutter app on physical device, all 4 gates + pre-check work, passes attack tests |
 | 4 | E2E flow works, load test passes, power-cut drill #2 passes, demo script ready |
 | 5 | Report, slides, video, tagged release, final backup complete |

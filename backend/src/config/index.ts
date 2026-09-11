@@ -3,7 +3,7 @@ dotenv.config();
 
 /**
  * CORS_ORIGIN supports a comma-separated list of allowed origins:
- *   CORS_ORIGIN="https://portal.atmyhome.tech,https://admin.atmyhome.tech"
+ *   CORS_ORIGIN="https://teacher.atmyhome.tech,https://admin.atmyhome.tech"
  * When unset, same-origin requests are allowed (empty array = no cross-origin).
  */
 function parseCorsOrigins(raw: string | undefined): string[] {

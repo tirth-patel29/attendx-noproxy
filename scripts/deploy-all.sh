@@ -19,8 +19,8 @@ ssh "${SSH_ARGS[@]}" "$SSH_HOST" "cd /home/hetp/attendance-gateway && git pull o
 echo "▶ Syncing backend..."
 ssh "${SSH_ARGS[@]}" "$SSH_HOST" "cp -r /home/hetp/attendance-gateway/backend/* $HOST_STACKS/attendance-backend/ && cp /home/hetp/attendance-gateway/backend/.dockerignore $HOST_STACKS/attendance-backend/ 2>/dev/null || true"
 
-echo "▶ Syncing portal..."
-ssh "${SSH_ARGS[@]}" "$SSH_HOST" "cp -r /home/hetp/attendance-gateway/portal/* $HOST_STACKS/attendance-portal/portal/ && cp /home/hetp/attendance-gateway/portal/.dockerignore $HOST_STACKS/attendance-portal/portal/ 2>/dev/null || true"
+echo "▶ Syncing teacher..."
+ssh "${SSH_ARGS[@]}" "$SSH_HOST" "cp -r /home/hetp/attendance-gateway/teacher/* $HOST_STACKS/attendance-teacher/teacher/ && cp /home/hetp/attendance-gateway/teacher/.dockerignore $HOST_STACKS/attendance-teacher/teacher/ 2>/dev/null || true"
 
 echo "▶ Syncing admin..."
 ssh "${SSH_ARGS[@]}" "$SSH_HOST" "cp -r /home/hetp/attendance-gateway/admin/* $HOST_STACKS/attendance-admin/admin/ && cp /home/hetp/attendance-gateway/admin/.dockerignore $HOST_STACKS/attendance-admin/admin/ 2>/dev/null || true"
@@ -28,8 +28,8 @@ ssh "${SSH_ARGS[@]}" "$SSH_HOST" "cp -r /home/hetp/attendance-gateway/admin/* $H
 echo "▶ Rebuilding backend..."
 ssh "${SSH_ARGS[@]}" "$SSH_HOST" "cd $HOST_STACKS/attendance-backend && CACHE_BUST=\$(date +%s) docker compose up -d --build"
 
-echo "▶ Rebuilding portal..."
-ssh "${SSH_ARGS[@]}" "$SSH_HOST" "cd $HOST_STACKS/attendance-portal && CACHE_BUST=\$(date +%s) docker compose up -d --build"
+echo "▶ Rebuilding teacher..."
+ssh "${SSH_ARGS[@]}" "$SSH_HOST" "cd $HOST_STACKS/attendance-teacher && CACHE_BUST=\$(date +%s) docker compose up -d --build"
 
 echo "▶ Rebuilding admin..."
 ssh "${SSH_ARGS[@]}" "$SSH_HOST" "cd $HOST_STACKS/attendance-admin && CACHE_BUST=\$(date +%s) docker compose up -d --build"

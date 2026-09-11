@@ -65,19 +65,19 @@ services:
       - "nginx-proxy-ondemand.enable=true"
       - "nginx-proxy-ondemand.timeout=1800"
 
-  portal:
+  teacher:
     build:
-      context: ./portal
+      context: ./teacher
       dockerfile: Dockerfile
       args:
         CACHE_BUST: "${CACHE_BUST:-0}"
-    container_name: ${PORTAL_CONTAINER:-attendance-portal}
+    container_name: ${TEACHER_CONTAINER:-attendance-teacher}
     restart: unless-stopped
     environment:
       NODE_ENV: production
       # Where the nginx /api and /socket.io locations forward to.
       BACKEND_UPSTREAM: ${BACKEND_UPSTREAM:-backend:3001}
-      VIRTUAL_HOST: ${VIRTUAL_HOST_PORTAL:-}
+      VIRTUAL_HOST: ${VIRTUAL_HOST_TEACHER:-}
       VIRTUAL_PORT: "3000"
     expose:
       - "3000"

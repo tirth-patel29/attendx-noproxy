@@ -54,7 +54,7 @@ Every failed request (`4xx`/`5xx`) from `https://api.atmyhome.tech` returns the
 | Code | HTTP | Trigger | Required client UI action |
 |---|---|---|---|
 | `ERR_AUTH_MISSING` | **401** | Missing or invalid JWT **or** missing/invalid `X-Api-Key`. | "Session expired / not authenticated — please sign in again." Re-login and ensure the client key is embedded. |
-| `ERR_FORBIDDEN` | **403** | Authenticated but wrong role (e.g. a student hitting an admin route). | Show "Access denied." Route to the correct portal. |
+| `ERR_FORBIDDEN` | **403** | Authenticated but wrong role (e.g. a student hitting an admin route). | Show "Access denied." Route to the correct teacher. |
 | `ERR_BAD_REQUEST` | **400** | Malformed payload / validation failed on a generic route. | Show the first validation message inline; fix the input. |
 | `ERR_VALIDATION` | **422** | Reserved for schema-validation responses (currently routes use 400). | Same as `ERR_BAD_REQUEST`. |
 | `ERR_CONFLICT` | **409** | Duplicate / conflicting state (e.g. roll already registered). | "Already registered — sign in instead." or surface the conflicting field. |

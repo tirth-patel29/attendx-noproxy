@@ -25,7 +25,7 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD}
       - DB_SSL=${DB_SSL:-false}
       # Comma-separated allowed CORS origins (Express API + Socket.IO handshake)
-      - CORS_ORIGIN=${CORS_ORIGIN:-https://portal.atmyhome.tech,https://admin.atmyhome.tech,https://supabase.atmyhome.tech}
+      - CORS_ORIGIN=${CORS_ORIGIN:-https://teacher.atmyhome.tech,https://admin.atmyhome.tech,https://supabase.atmyhome.tech}
       - VIRTUAL_HOST=${VIRTUAL_HOST:-api.atmyhome.tech}
       - VIRTUAL_PORT=3001
       - METRONOME_INTERVAL_MS=${METRONOME_INTERVAL_MS:-3000}

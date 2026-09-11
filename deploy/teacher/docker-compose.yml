@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  attendance-teacher:
+    build:
+      context: ./teacher
+      dockerfile: Dockerfile
+      args:
+        CACHE_BUST: "${CACHE_BUST:-$(date +%s)}"
+    container_name: attendance-teacher
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - BACKEND_UPSTREAM=${BACKEND_UPSTREAM:-attendance-backend:3001}
+      - VIRTUAL_HOST=${VIRTUAL_HOST:-teacher.atmyhome.tech}
+      - VIRTUAL_PORT=3000
+    networks:
+      - proxynet
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    labels:
+      - "nginx-proxy-ondemand.enable=true"
+      - "nginx-proxy-ondemand.timeout=1800"
+      - "nginx-proxy-ondemand.group=dev-suite"
+      - "VIRTUAL_HOST=${VIRTUAL_HOST:-teacher.atmyhome.tech}"
+      - "VIRTUAL_PORT=3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+networks:
+  proxynet:
+    external: true

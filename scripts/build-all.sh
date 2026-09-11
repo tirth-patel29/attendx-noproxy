@@ -11,11 +11,11 @@ export CACHE_BUST="${CACHE_BUST:-$(date +%s)}"
 echo "▶ Backend"
 docker build --build-arg CACHE_BUST="$CACHE_BUST" -t attendance-backend:latest ./backend
 
-echo "▶ Portal"
-docker build --build-arg CACHE_BUST="$CACHE_BUST" -t attendance-portal:latest ./portal
+echo "▶ Teacher"
+docker build --build-arg CACHE_BUST="$CACHE_BUST" -t attendance-teacher:latest ./teacher
 
 echo "▶ Admin"
 docker build --build-arg CACHE_BUST="$CACHE_BUST" -t attendance-admin:latest ./admin
 
-echo "✔ All images built: attendance-backend, attendance-portal, attendance-admin"
-docker images | grep -E "attendance-(backend|portal|admin)" | head
+echo "✔ All images built: attendance-backend, attendance-teacher, attendance-admin"
+docker images | grep -E "attendance-(backend|teacher|admin)" | head

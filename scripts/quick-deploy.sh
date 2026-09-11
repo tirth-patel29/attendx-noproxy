@@ -9,17 +9,17 @@ echo "🚀 Deploying Watermelon UI to attendance-gateway..."
 cd /home/hetp/attendance-gateway
 git pull origin main
 
-# Sync portal
-echo "📦 Syncing portal..."
-cp -r portal/* /home/hetp/docker-stacks/attendance-portal/portal/
+# Sync teacher
+echo "📦 Syncing teacher..."
+cp -r teacher/* /home/hetp/docker-stacks/attendance-teacher/teacher/
 
 # Sync admin
 echo "📦 Syncing admin..."
 cp -r admin/* /home/hetp/docker-stacks/attendance-admin/admin/
 
-# Rebuild portal
-echo "🔨 Rebuilding portal container..."
-cd /home/hetp/docker-stacks/attendance-portal
+# Rebuild teacher
+echo "🔨 Rebuilding teacher container..."
+cd /home/hetp/docker-stacks/attendance-teacher
 docker compose up -d --build
 
 # Rebuild admin
@@ -30,7 +30,7 @@ docker compose up -d --build
 echo "✅ Deployment complete!"
 echo ""
 echo "Check the sites:"
-echo "  Portal: https://portal.atmyhome.tech"
+echo "  Teacher: https://teacher.atmyhome.tech"
 echo "  Admin:  https://admin.atmyhome.tech"
 echo ""
 echo "Hard refresh your browser (Ctrl+Shift+R) to see the new Watermelon UI!"

@@ -25,7 +25,7 @@ AttendX is a college software-group project built around a simple principle:
 
 > **Attendance should be a verifiable event, not a trusted checkbox.**
 
-The system combines a student mobile application, teacher portal, administrative portal, a Node.js/TypeScript attendance gateway, and a self-hosted PostgreSQL/Supabase backend.
+The system combines a student mobile application, teacher teacher, administrative teacher, a Node.js/TypeScript attendance gateway, and a self-hosted PostgreSQL/Supabase backend.
 
 The original project architecture is designed to make a classroom attendance claim difficult to fake by combining multiple independent signals: device binding, biometric pre-checks, a short-lived rotating classroom token, and server-side cryptographic/time verification.
 
@@ -42,7 +42,7 @@ Teacher starts a class
 Gateway creates short-lived token
         │
         ▼
-Live QR/token is shown in Teacher Portal
+Live QR/token is shown in Teacher Teacher
         │
         ▼
 Student performs security pre-check
@@ -94,8 +94,8 @@ The documented baseline uses a rotating token every **3 seconds** and a server-s
 ```mermaid
 flowchart TB
     Student["📱 Student App<br/>Flutter"]
-    Teacher["👨‍🏫 Teacher Portal"]
-    Admin["🛠️ Admin Portal"]
+    Teacher["👨‍🏫 Teacher Teacher"]
+    Admin["🛠️ Admin Teacher"]
 
     Gateway["⚡ Attendance Gateway<br/>Node.js + TypeScript"]
 
@@ -127,8 +127,8 @@ flowchart TB
 | Component | Responsibility |
 |---|---|
 | 📱 Student App | Attendance scanning, security pre-checks and attendance submission |
-| 👨‍🏫 Teacher Portal | Course/session control and live classroom token display |
-| 🛠️ Admin Portal | Administrative and academic hierarchy management |
+| 👨‍🏫 Teacher Teacher | Course/session control and live classroom token display |
+| 🛠️ Admin Teacher | Administrative and academic hierarchy management |
 | ⚡ Backend | REST APIs, authentication, session handling and attendance verification |
 | ⏱️ Metronome | Generates/rotates short-lived classroom tokens |
 | ⚖️ Judge | Validates attendance claims |
@@ -339,9 +339,9 @@ Relevant mobile technologies in the project include:
 
 ---
 
-## 👨‍🏫 Teacher Portal
+## 👨‍🏫 Teacher Teacher
 
-The teacher portal is the classroom-facing web application.
+The teacher teacher is the classroom-facing web application.
 
 Typical flow:
 
@@ -359,15 +359,15 @@ Students Scan
 Attendance Results
 ```
 
-The teacher portal is responsible for controlling the session rather than directly deciding whether a student is present.
+The teacher teacher is responsible for controlling the session rather than directly deciding whether a student is present.
 
 The final attendance decision belongs to the backend verification flow.
 
 ---
 
-## 🛠️ Admin Portal
+## 🛠️ Admin Teacher
 
-The Admin Portal handles system administration and academic organization.
+The Admin Teacher handles system administration and academic organization.
 
 The academic management structure is:
 
@@ -476,13 +476,13 @@ attendx-noproxy/
 ├── .gitea/
 │   └── workflows/          # Gitea Actions
 │
-├── admin/                  # Admin web portal
+├── admin/                  # Admin web teacher
 ├── app/                    # Flutter student application
 ├── backend/                # Node.js / TypeScript backend
 ├── deploy/                 # Self-hosted deployment resources
 ├── docs/                   # SRS / architecture / operations docs
 ├── migrations/             # PostgreSQL migrations
-├── portal/                 # Teacher portal
+├── teacher/                 # Teacher teacher
 ├── scripts/                # Operational/deployment scripts
 │
 ├── CONTEXT.md              # Project context and architecture rationale
@@ -518,15 +518,15 @@ npm install
 npm run dev
 ```
 
-## Teacher Portal
+## Teacher Teacher
 
 ```bash
-cd portal
+cd teacher
 npm install
 npm run dev
 ```
 
-## Admin Portal
+## Admin Teacher
 
 ```bash
 cd admin
@@ -620,8 +620,8 @@ flowchart LR
     Host["Homelab"]
     Docker["Docker"]
     Gateway["Attendance Gateway"]
-    Portal["Teacher Portal"]
-    Admin["Admin Portal"]
+    Teacher["Teacher Teacher"]
+    Admin["Admin Teacher"]
     DB["Supabase / PostgreSQL"]
 
     Git --> Actions
@@ -629,7 +629,7 @@ flowchart LR
     Host --> Docker
 
     Docker --> Gateway
-    Docker --> Portal
+    Docker --> Teacher
     Docker --> Admin
     Docker --> DB
 ```
@@ -647,7 +647,7 @@ Feature branch
       ↓
 Pull Request
       ↓
-Backend / Portal / Admin validation
+Backend / Teacher / Admin validation
       ↓
 Docker validation
       ↓
@@ -677,10 +677,10 @@ cd backend
 npm run build
 ```
 
-### Portal
+### Teacher
 
 ```bash
-cd portal
+cd teacher
 npm run build
 ```
 
@@ -738,12 +738,12 @@ It does not necessarily mean the remote Supabase database is down.
 
 ---
 
-## Portal TypeScript build errors
+## Teacher TypeScript build errors
 
 Run:
 
 ```bash
-cd portal
+cd teacher
 npm run build
 ```
 
@@ -895,7 +895,7 @@ git switch -c feat/academic-batches
 git status
 git diff
 
-git add migrations backend portal admin
+git add migrations backend teacher admin
 git commit -m "feat(admin): add academic batch management"
 
 git push -u origin feat/academic-batches
@@ -946,8 +946,8 @@ AttendX is an actively developed college software project.
 The repository began with the zero-trust attendance foundation and has expanded toward a complete ecosystem containing:
 
 - Student mobile application
-- Teacher portal
-- Admin portal
+- Teacher teacher
+- Admin teacher
 - Attendance gateway
 - Academic hierarchy
 - PostgreSQL/Supabase database
@@ -978,10 +978,10 @@ Attendance Security
     └── Cryptographic verification
           │
           ▼
-Web Portals
+Web Teachers
     │
-    ├── Teacher Portal
-    └── Admin Portal
+    ├── Teacher Teacher
+    └── Admin Teacher
           │
           ▼
 Academic Management

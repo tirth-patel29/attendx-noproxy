@@ -1,0 +1,89 @@
+server {
+    listen 3000;
+    server_name localhost;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Gzip compression
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+
+    # API proxy â€” MUST come before SPA fallback.
+    # BACKEND_UPSTREAM is injected by the nginx entrypoint (envsubst), e.g.
+    #   BACKEND_UPSTREAM=attendance-backend:3001   (docker-compose default)
+    #   BACKEND_UPSTREAM=api.example.com           (any deployment)
+    location /api/ {
+        proxy_pass http://${BACKEND_UPSTREAM};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Socket.IO (Gate 3 dumb-terminal projector) â€” websocket + long-polling.
+    # The ClassroomProjector connects to the SAME origin as the teacher, so this
+    # location must pass /socket.io to the backend with upgrade headers. Without
+    # it the handshake fell through to the SPA fallback (index.html) and the
+    # projector could never receive token:new broadcasts.
+    location /socket.io {
+        proxy_pass http://${BACKEND_UPSTREAM};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 65s;
+        proxy_send_timeout 65s;
+        # Long-polling payload post bodies
+        proxy_buffer_size 16k;
+        proxy_buffers 4 16k;
+    }
+
+    # Health check
+    location /health {
+        access_log off;
+        return 200 "healthy\n";
+        add_header Content-Type text/plain;
+    }
+
+    # Favicon - serve empty 204 if missing to avoid 404 noise
+    location = /favicon.svg {
+        access_log off;
+        return 204;
+    }
+    location = /favicon.ico {
+        access_log off;
+        return 204;
+    }
+
+    # NEVER cache index.html - force fresh fetch for SPA entry point
+    location = /index.html {
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        add_header Pragma "no-cache" always;
+        add_header Expires "0" always;
+        try_files $uri =404;
+    }
+
+    # Static assets caching - Vite already adds content hashes to filenames
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|json|map)$ {
+        try_files $uri =404;
+        expires 1y;
+        add_header Cache-Control "public, immutable" always;
+    }
+
+    # SPA fallback - ALL other routes go to index.html for client-side routing
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

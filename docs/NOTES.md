@@ -26,14 +26,14 @@
 - Backend/DB: Node + TypeScript + Postgres (Supabase-compatible), port 3001.
   - Metronome config: `intervalMs=3000`, `tokenLength=6`, lookahead=2, validity window 5s.
   - Judge: `maxLatencyMs=250`.
-- Portal (teacher dashboard, = `teacher-dashboard`) points `/api` and `/socket.io`
+- Teacher (teacher dashboard, = `teacher-dashboard`) points `/api` and `/socket.io`
   to `https://api.atmyhome.tech` in dev (vite proxy). Component default socket URL is
   `window.location.origin`.
 
 ## Recent successful work (what changed)
 
 - Created `docs/` with verbatim `ARCHITECTURE_SRS.md` (19-page PDF extraction).
-- **Deleted** the incorrect `portal/src/components/MoireQRDisplay.tsx` (it had rendered a
+- **Deleted** the incorrect `teacher/src/components/MoireQRDisplay.tsx` (it had rendered a
   Moiré CSS pattern + flashing QR — a misreading of the SRS). Replaced with
   **`ClassroomProjector.tsx`** — a clean dumb-terminal: static, constantly-visible QR,
   payload re-rendered with each 3s `token:new` socket event. No patterns, no flashing.

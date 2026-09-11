@@ -80,46 +80,7 @@ app.get('/health', async (_req, res) => {
 // ---------------------------------------------------------------------------
 import fs from 'fs';
 import path from 'path';
-
-// Self-host Swagger UI assets (CSP 'self' friendly — no CDN dependency).
-app.use('/swagger-ui', express.static(path.join(process.cwd(), 'node_modules', 'swagger-ui-dist')));
-
-// helmet's default CSP (script-src 'self') would block the docs page's inline
-// bootstrap. Relax it for /docs only — all its assets are same-origin now.
-app.use('/docs', (_req, res, next) => {
-  res.setHeader(
-    'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'",
-  );
-  next();
-});
-
-const SWAGGER_HTML = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex">
-<title>Attendance Gateway API</title>
-<link rel="stylesheet" href="/swagger-ui/swagger-ui.css">
-</head>
-<body>
-<div id="swagger-ui"></div>
-<script src="/swagger-ui/swagger-ui-bundle.js"></script>
-<script>
-window.onload = function () {
-  window.ui = SwaggerUIBundle({
-    url: '/openapi.json',
-    dom_id: '#swagger-ui',
-    deepLinking: true,
-    persistAuthorization: true,
-    displayRequestDuration: true,
-    docExpansion: 'list'
-  });
-};
-</script>
-</body>
-</html>`;
+import swaggerUi from 'swagger-ui-express';
 
 app.get('/openapi.json', (_req, res) => {
   try {
@@ -130,9 +91,12 @@ app.get('/openapi.json', (_req, res) => {
   }
 });
 
-app.get('/docs', (_req, res) => {
-  res.type('text/html').send(SWAGGER_HTML);
-});
+try {
+  const swaggerDocument = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'openapi.json'), 'utf8'));
+  app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+} catch (err) {
+  console.warn('Could not load openapi.json for Swagger UI docs.');
+}
 
 // API routes
 app.use('/api/v1', rateLimit()); // broad abuse guard -> 429 ERR_RATE_LIMIT

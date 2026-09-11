@@ -153,7 +153,7 @@ docker exec supabase-db psql -U supabase_admin -d postgres -f migrations/NNN_new
 1. **Tag on `main`** — `git tag -a v1.0.0 -m "Demo release"`
 2. **Changelog** — Auto-generated from commit messages (conventional commits)
 3. **Deploy to homelab** — Via Portainer stack update
-4. **Verify health** — All 7 Supabase services + backend + portal
+4. **Verify health** — All 7 Supabase services + backend + teacher
 5. **Rollback tag** — Keep previous tag for quick revert
 
 ---

@@ -5,7 +5,7 @@
 **Supabase:** `https://supabase.atmyhome.tech` (all 7 services healthy)  
 **Backend API:** `https://api.atmyhome.tech` (4-gate judge + metronome + **Admin API**)  
 **Admin Console:** `https://admin.atmyhome.tech` (React/MUI — manage teachers, students/HMAC, divisions, courses, timetable)  
-**Professor Portal:** `https://portal.atmyhome.tech` (React/MUI — dumb-terminal projector)  
+**Professor Teacher:** `https://teacher.atmyhome.tech` (React/MUI — dumb-terminal projector)  
 **Homelab SSH:** `hetp@192.168.0.108` (port 22) → `su -` for root (pass: 7567@Hetp)
 
 **Default Admin seed:** `admin@atmyhome.tech` / `Admin@123` (CHANGE after first login — env-driven bootstrap: `ADMIN_EMAIL`/`ADMIN_PASSWORD` upsert on every boot; remove `ADMIN_PASSWORD` env to keep in-app changes)**
@@ -131,7 +131,7 @@ Homelab Impact:
 | 1 Database/Schema | ✅ **COMPLETE** | — |
 | 2 Backend | ✅ **COMPLETE** | — |
 | 3 Flutter Client | 🔄 **SCAFFOLD COMPLETE** | Build APK on teammate laptop, test on physical device |
-| 4 Professor Portal | ✅ **DEPLOYED** | `https://portal.atmyhome.tech` live |
+| 4 Professor Teacher | ✅ **DEPLOYED** | `https://teacher.atmyhome.tech` live |
 | 5 Integration | ⏳ | End-to-end test with live backend |
 | 6 Hardening | ⏳ | Power-cut drill #2, load test |
 | 7 Polish | ⏳ | Demo prep |

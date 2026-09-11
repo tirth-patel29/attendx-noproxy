@@ -10,9 +10,9 @@ services:
     ports:
       - "${BACKEND_PORT:-3001}:3001"
 
-  portal:
+  teacher:
     ports:
-      - "${PORTAL_PORT:-3000}:3000"
+      - "${TEACHER_PORT:-3000}:3000"
 
   admin:
     ports:

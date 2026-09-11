@@ -46,7 +46,7 @@ cheat. The system separates "in the room" from "in the hostel" using physics.**
 | Mobile client | **Flutter / Dart** | `flutter_secure_storage`, `local_auth`, `mobile_scanner`, `crypto` |
 | Backend judge + metronome | **Node.js / TypeScript** | WebSocket metronome, HMAC verification, REST API |
 | Database + Auth + Realtime | **Supabase** (Postgres) | self-hosted on the homelab |
-| Professor web portal | React / plain TS dashboard | QR broadcast + attendance view + 1-click device reset |
+| Professor web teacher | React / plain TS dashboard | QR broadcast + attendance view + 1-click device reset |
 | Reverse proxy + tunnel | proxycore (home) | NPM + on-demand proxy + cloudflared → `atmyhome.tech` |
 
 ## 4. Homelab constraints (THE context that matters)
@@ -85,7 +85,7 @@ cheat. The system separates "in the room" from "in the hostel" using physics.**
 ## 5. What "done" looks like (group-project scope)
 
 - [ ] Backend with `time-sync`, `metronome` (WS token mint every 3s), `claim-attendance`
-      judge endpoint, professor portal
+      judge endpoint, professor teacher
 - [ ] Supabase self-hosted on the homelab with the full schema + indices
 - [ ] Flutter app implementing all 4 gates + the pre-check UI
 - [ ] A live class flow demo: prof starts session → QR twitches → student scans → verdict
@@ -103,7 +103,7 @@ attendance-gateway/
 ├── docs/               # SRS, architecture, security notes, homelab ops
 ├── migrations/         # SQL schema
 ├── deploy/             # docker-compose + env + backup scripts (homelab)
-├── backend/            # Node/TS judge + metronome + portal
+├── backend/            # Node/TS judge + metronome + teacher
 ├── app/                # Flutter client stub
 └── scripts/            # ops helpers (backup, status, restart)
 ```

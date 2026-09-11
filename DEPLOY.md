@@ -9,7 +9,7 @@ environment values.
 | App | Source | Image | Default port |
 |-----|--------|-------|--------------|
 | Backend (API + judge + metronome + admin API) | `backend/` | `attendance-backend` | 3001 |
-| Professor Portal (React/Vite) | `portal/` | `attendance-portal` | 3000 |
+| Professor Teacher (React/Vite) | `teacher/` | `attendance-teacher` | 3000 |
 | Admin Console (React/Vite) | `admin/` | `attendance-admin` | 3000 |
 
 ## Option A — standalone server (no reverse proxy)
@@ -27,7 +27,7 @@ export ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='S3cure!'
 docker compose -f docker-compose.yml -f docker-compose.ports.yml up -d --build
 ```
 
-- Portal: `http://localhost:3000` — backend `/api` + `/socket.io` proxied by nginx.
+- Teacher: `http://localhost:3000` — backend `/api` + `/socket.io` proxied by nginx.
 - Admin: `http://localhost:3002` (port override).
 - Backend: `http://localhost:3001` (health `/health`).
 
@@ -58,7 +58,7 @@ official nginx entrypoint (envsubst) — the **only** knob is
 | `METRONOME_TOKEN_LENGTH` | Token length (SRS: 4) | 4 |
 | `METRONOME_TOKEN_CHARSET` | base62 charset | A-Za-z0-9 |
 | `JUDGE_MAX_LATENCY_MS` | The 250ms Stream Kill-Window | 250 |
-| `BACKEND_UPSTREAM` | nginx `proxy_pass` target for portal/admin | `attendance-backend:3001` |
+| `BACKEND_UPSTREAM` | nginx `proxy_pass` target for teacher/admin | `attendance-backend:3001` |
 | `VIRTUAL_HOST_*` | docker-gen routing labels | — |
 
 > **Note on `ADMIN_PASSWORD`:** when set, the backend **re-rotates** the admin
