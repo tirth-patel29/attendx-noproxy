@@ -61,12 +61,12 @@ const router = Router();
 
 const idSchema = z.object({ id: z.string().min(3).max(40) });
 const registerSchema = z.object({
-  id: z.string().regex(/^[0-9]{2}[A-Z]{3}[0-9]{3}$/, 'ID must look like 24BCS001'),
+  id: z.string().regex(/^[0-9]{2}[A-Za-z]{2,6}[0-9]{2,4}$/, 'ID must look like 24BCS001, 24DCS093, or 24BDPH001'),
   name: z.string().min(1).max(100),
   password: z.string().min(8).max(128),
 });
 const setPasswordSchema = z.object({
-  id: z.string().regex(/^[0-9]{2}[A-Z]{3}[0-9]{3}$/),
+  id: z.string().regex(/^[0-9]{2}[A-Za-z]{2,6}[0-9]{2,4}$/),
   new_password: z.string().min(8).max(128),
 });
 const loginSchema = z.object({ id: z.string().min(3).max(40), password: z.string().min(1) });
@@ -79,11 +79,11 @@ router.post('/status', async (req: Request, res: Response, next: NextFunction) =
     if (!parsed.success) return res.status(400).json({ error: 'Invalid ID' });
     const rollNo = normalizeId(parsed.data.id);
     const r = await query(
-      `SELECT roll_no, password_hash IS NOT NULL AS has_password FROM students WHERE roll_no = $1`,
+      `SELECT roll_no, (password_hash IS NOT NULL) AS has_password, (bound_device_id IS NOT NULL) AS is_bound FROM students WHERE roll_no = $1`,
       [rollNo]
     );
-    if (r.rows.length === 0) return res.json({ exists: false, has_password: false });
-    res.json({ exists: true, has_password: r.rows[0].has_password });
+    if (r.rows.length === 0) return res.json({ exists: false, has_password: false, is_bound: false });
+    res.json({ exists: true, has_password: r.rows[0].has_password, is_bound: r.rows[0].is_bound });
   } catch (err) {
     next(err);
   }
