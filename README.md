@@ -497,6 +497,7 @@ attendx-noproxy/
 ├── docs/                   # Client integration, error dictionary, contributing guides
 ├── migrations/             # PostgreSQL migrations (001_schema through 012_...)
 ├── teacher/                # Teacher Portal (React + Vite, port 3010)
+├── make-a-client/          # Step-by-step Flutter client guides & AI mega-prompts
 ├── scripts/                # Operational and test scripts
 │
 ├── CONTEXT.md              # Project context, security model, and infrastructure
