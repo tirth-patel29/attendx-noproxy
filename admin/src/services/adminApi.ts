@@ -58,6 +58,9 @@ export interface Teacher {
   email: string;
   name: string;
   department: string;
+  department_id?: string | null;
+  department_name?: string | null;
+  college_name?: string | null;
   has_login: boolean;
   assignment_count: number;
 }
@@ -147,6 +150,8 @@ export interface Assignment {
   course_title: string;
   division_id: string;
   division_name: string;
+  batch_id?: string | null;
+  batch_name?: string | null;
   day_of_week: number;
   start_time: string;
   end_time: string;
@@ -183,9 +188,9 @@ export const adminApi = {
 
   // teachers
   teachers: () => api.get<Teacher[]>('/admin/teachers'),
-  createTeacher: (data: { email: string; name: string; department: string; password: string }) =>
+  createTeacher: (data: { email: string; name: string; department?: string; department_id?: string | null; password: string }) =>
     api.post('/admin/teachers', data),
-  updateTeacher: (id: string, data: { email: string; name: string; department: string }) =>
+  updateTeacher: (id: string, data: { email: string; name: string; department?: string; department_id?: string | null }) =>
     api.put(`/admin/teachers/${id}`, data),
   resetTeacherPassword: (id: string, password: string) =>
     api.post(`/admin/teachers/${id}/reset-password`, { password }),
@@ -214,9 +219,9 @@ export const adminApi = {
 
   // assignments (timetable)
   assignments: () => api.get<Assignment[]>('/admin/assignments'),
-  createAssignment: (data: Omit<Assignment, 'id' | 'teacher_name' | 'teacher_email' | 'course_title' | 'division_name'>) =>
+  createAssignment: (data: Omit<Assignment, 'id' | 'teacher_name' | 'teacher_email' | 'course_title' | 'division_name' | 'batch_name'>) =>
     api.post('/admin/assignments', data),
-  updateAssignment: (id: string, data: Omit<Assignment, 'id' | 'teacher_name' | 'teacher_email' | 'course_title' | 'division_name'>) =>
+  updateAssignment: (id: string, data: Omit<Assignment, 'id' | 'teacher_name' | 'teacher_email' | 'course_title' | 'division_name' | 'batch_name'>) =>
     api.put(`/admin/assignments/${id}`, data),
   deleteAssignment: (id: string) => api.delete(`/admin/assignments/${id}`),
   // API keys console (shared client keys; transport gate)

@@ -237,9 +237,20 @@ export default function DashboardPage() {
                       </p>
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-semibold">{slot.course_code}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-[13px] font-semibold">{slot.course_code}</p>
+                        {slot.batch_name ? (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                            Batch {slot.batch_name}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] text-muted-foreground bg-muted border border-border">
+                            Theory
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[11.5px] text-muted-foreground">
-                        {slot.division_name}
+                        {slot.division_name} {slot.batch_name ? '• Lab Session' : '• All Batches'}
                       </p>
                     </div>
                     {currentLecture?.active_session?.course_code === slot.course_code ? (

@@ -274,7 +274,16 @@ router.get(
     try {
       const profUuid = (req as any).professor.sub as string;
       const r = await query(
-        `SELECT a.assignment_id, a.course_code, c.title AS course_title, a.division_id, d.name AS division_name, a.day_of_week, to_char(a.start_time, 'HH24:MI') AS start_time, to_char(a.end_time, 'HH24:MI') AS end_time FROM teacher_assignments a JOIN courses c ON c.course_code = a.course_code JOIN divisions d ON d.division_id = a.division_id WHERE a.prof_uuid = $1 ORDER BY a.day_of_week, a.start_time`,
+        `SELECT a.assignment_id, a.course_code, c.title AS course_title, 
+                a.division_id, d.name AS division_name,
+                a.batch_id, b.name AS batch_name,
+                a.day_of_week, to_char(a.start_time, 'HH24:MI') AS start_time, to_char(a.end_time, 'HH24:MI') AS end_time 
+         FROM teacher_assignments a 
+         JOIN courses c ON c.course_code = a.course_code 
+         JOIN divisions d ON d.division_id = a.division_id 
+         LEFT JOIN batches b ON b.id = a.batch_id
+         WHERE a.prof_uuid = $1 
+         ORDER BY a.day_of_week, a.start_time`,
         [profUuid],
       );
       const todayDow = new Date().getDay();
@@ -508,7 +517,16 @@ router.get(
       const serverTime = serverNow.toTimeString().slice(0, 5);
       const serverDate = serverNow.toISOString().split("T")[0];
       const r = await query(
-        `SELECT a.assignment_id, a.course_code, c.title AS course_title, a.division_id, d.name AS division_name, a.day_of_week, to_char(a.start_time, 'HH24:MI') AS start_time, to_char(a.end_time, 'HH24:MI') AS end_time FROM teacher_assignments a JOIN courses c ON c.course_code = a.course_code JOIN divisions d ON d.division_id = a.division_id WHERE a.prof_uuid = $1 AND a.day_of_week = $2 AND a.start_time <= $3::time AND a.end_time > $3::time ORDER BY a.start_time LIMIT 1`,
+        `SELECT a.assignment_id, a.course_code, c.title AS course_title, 
+                a.division_id, d.name AS division_name,
+                a.batch_id, b.name AS batch_name,
+                a.day_of_week, to_char(a.start_time, 'HH24:MI') AS start_time, to_char(a.end_time, 'HH24:MI') AS end_time 
+         FROM teacher_assignments a 
+         JOIN courses c ON c.course_code = a.course_code 
+         JOIN divisions d ON d.division_id = a.division_id 
+         LEFT JOIN batches b ON b.id = a.batch_id
+         WHERE a.prof_uuid = $1 AND a.day_of_week = $2 AND a.start_time <= $3::time AND a.end_time > $3::time 
+         ORDER BY a.start_time LIMIT 1`,
         [profUuid, serverDow, serverTime],
       );
       if (r.rows.length === 0) {

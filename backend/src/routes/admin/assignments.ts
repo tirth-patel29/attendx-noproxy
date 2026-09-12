@@ -9,6 +9,7 @@ const assignmentCreate = z.object({
   prof_uuid: z.string().uuid(),
   course_code: z.string().min(1).max(20),
   division_id: z.string().uuid(),
+  batch_id: z.string().uuid().nullable().optional(),
   day_of_week: z.number().int().min(0).max(6),
   start_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
   end_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
@@ -20,12 +21,14 @@ adminAssignmentsRouter.get('/assignments', async (_req: Request, res: Response, 
     const r = await query(`
       SELECT a.assignment_id, a.prof_uuid, p.name AS teacher_name, p.email AS teacher_email,
              a.course_code, c.title AS course_title, a.division_id, d.name AS division_name,
+             a.batch_id, b.name AS batch_name,
              a.day_of_week, to_char(a.start_time, 'HH24:MI') AS start_time,
              to_char(a.end_time, 'HH24:MI') AS end_time
       FROM teacher_assignments a
       JOIN professors p ON p.prof_uuid = a.prof_uuid
       JOIN courses c ON c.course_code = a.course_code
       JOIN divisions d ON d.division_id = a.division_id
+      LEFT JOIN batches b ON b.id = a.batch_id
       ORDER BY a.day_of_week, a.start_time
     `);
     res.json(
@@ -38,6 +41,8 @@ adminAssignmentsRouter.get('/assignments', async (_req: Request, res: Response, 
         course_title: row.course_title,
         division_id: row.division_id,
         division_name: row.division_name,
+        batch_id: row.batch_id ?? null,
+        batch_name: row.batch_name ?? null,
         day_of_week: row.day_of_week,
         start_time: row.start_time,
         end_time: row.end_time,
@@ -55,16 +60,16 @@ adminAssignmentsRouter.post('/assignments', async (req: Request, res: Response, 
     if (!parsed.success) {
       return res.status(400).json({ error: 'Invalid payload', details: parsed.error.flatten().fieldErrors });
     }
-    const { prof_uuid, course_code, division_id, day_of_week, start_time, end_time } = parsed.data;
+    const { prof_uuid, course_code, division_id, batch_id, day_of_week, start_time, end_time } = parsed.data;
     const r = await query(
-      `INSERT INTO teacher_assignments (prof_uuid, course_code, division_id, day_of_week, start_time, end_time)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING assignment_id`,
-      [prof_uuid, course_code, division_id, day_of_week, start_time, end_time]
+      `INSERT INTO teacher_assignments (prof_uuid, course_code, division_id, batch_id, day_of_week, start_time, end_time)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING assignment_id`,
+      [prof_uuid, course_code, division_id, batch_id || null, day_of_week, start_time, end_time]
     );
     await auditService.log('ASSIGNMENT_CREATE', (req as any).admin?.sub, { assignment_id: r.rows[0].assignment_id });
     res.status(201).json({ id: r.rows[0].assignment_id });
   } catch (err: any) {
-    if (err?.code === '23503') return res.status(400).json({ error: 'Referenced teacher/course/division not found' });
+    if (err?.code === '23503') return res.status(400).json({ error: 'Referenced teacher/course/division/batch not found' });
     next(err);
   }
 });
@@ -74,11 +79,12 @@ adminAssignmentsRouter.put('/assignments/:id', async (req: Request, res: Respons
   try {
     const parsed = assignmentCreate.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Invalid payload' });
-    const { prof_uuid, course_code, division_id, day_of_week, start_time, end_time } = parsed.data;
+    const { prof_uuid, course_code, division_id, batch_id, day_of_week, start_time, end_time } = parsed.data;
     const r = await query(
-      `UPDATE teacher_assignments SET prof_uuid=$1, course_code=$2, division_id=$3, day_of_week=$4, start_time=$5, end_time=$6
-       WHERE assignment_id=$7 RETURNING assignment_id`,
-      [prof_uuid, course_code, division_id, day_of_week, start_time, end_time, req.params.id]
+      `UPDATE teacher_assignments 
+       SET prof_uuid=$1, course_code=$2, division_id=$3, batch_id=$4, day_of_week=$5, start_time=$6, end_time=$7
+       WHERE assignment_id=$8 RETURNING assignment_id`,
+      [prof_uuid, course_code, division_id, batch_id || null, day_of_week, start_time, end_time, req.params.id]
     );
     if (r.rows.length === 0) return res.status(404).json({ error: 'Assignment not found' });
     await auditService.log('ASSIGNMENT_UPDATE', (req as any).admin?.sub, { assignment_id: r.rows[0].assignment_id });

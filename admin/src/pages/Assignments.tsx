@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { adminApi, academicApi, Assignment, Teacher, Course, Division, dayName } from '../services/adminApi';
+import { adminApi, academicApi, Assignment, Teacher, Course, Division, Batch, dayName } from '../services/adminApi';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -19,6 +19,7 @@ const empty = {
   prof_uuid: '',
   course_code: '',
   division_id: '',
+  batch_id: '',
   day_of_week: 1,
   start_time: '09:00',
   end_time: '10:00',
@@ -29,6 +30,7 @@ export default function Assignments() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [divs, setDivs] = useState<Division[]>([]);
+  const [batches, setBatches] = useState<Batch[]>([]);
   const [teacherId, setTeacherId] = useState('');
   const [dialog, setDialog] = useState<null | { mode: 'create' | 'edit'; id?: string }>(null);
   const [form, setForm] = useState(empty);
@@ -42,12 +44,14 @@ export default function Assignments() {
       adminApi.assignments(),
       adminApi.teachers(),
       adminApi.courses(),
-      academicApi.divisions()
-    ]).then(([a, t, c, d]) => {
+      academicApi.divisions(),
+      academicApi.batches(),
+    ]).then(([a, t, c, d, b]) => {
       setRows(a.data);
       setTeachers(t.data);
       setCourses(c.data);
       setDivs(d.data);
+      setBatches(b.data);
     }).catch(() => toast.error('Failed to load timetable data'))
       .finally(() => setLoading(false));
   };
@@ -64,10 +68,14 @@ export default function Assignments() {
   const save = async () => {
     setBusy(true);
     try {
+      const payload = {
+        ...form,
+        batch_id: form.batch_id ? form.batch_id : null,
+      };
       if (dialog?.mode === 'create') {
-        await adminApi.createAssignment(form);
+        await adminApi.createAssignment(payload);
       } else if (dialog?.id) {
-        await adminApi.updateAssignment(dialog.id, form);
+        await adminApi.updateAssignment(dialog.id, payload);
       }
       setDialog(null);
       load();
@@ -98,6 +106,7 @@ export default function Assignments() {
       prof_uuid: a.prof_uuid,
       course_code: a.course_code,
       division_id: a.division_id,
+      batch_id: a.batch_id || '',
       day_of_week: a.day_of_week,
       start_time: a.start_time,
       end_time: a.end_time,
@@ -122,8 +131,19 @@ export default function Assignments() {
         <div className="text-[11.5px] text-muted-foreground">{r.course_code}</div>
       </div>
     )},
-    { key: "division_name", header: "Division", render: (r) => (
-      <span className="text-muted-foreground">{r.division_name || '—'}</span>
+    { key: "division_name", header: "Division / Target", render: (r) => (
+      <div>
+        <div className="font-medium text-foreground">{r.division_name || '—'}</div>
+        <div className="text-[11.5px] mt-0.5">
+          {r.batch_name ? (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+              Batch {r.batch_name}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">All Batches (Theory)</span>
+          )}
+        </div>
+      </div>
     )},
     { key: "actions", header: "", className: "text-right w-[60px]", render: (r) => (
       <InlineDisclosureMenu
@@ -139,7 +159,7 @@ export default function Assignments() {
             key: 'delete',
             label: 'Delete',
             icon: Trash2,
-            variant: 'danger',
+            danger: true,
             onClick: () => setDeleteTarget(r)
           }
         ]}
@@ -156,47 +176,59 @@ export default function Assignments() {
         className="mx-auto max-w-6xl space-y-6"
       >
         <PageHeader
-          title="Timetable"
-          subtitle="Manage teacher lecture schedules and room allocations"
+          title="Timetable Assignments"
+          subtitle="Map professors to courses, divisions, and batches by day and time."
+          action={
+            <Button
+              onClick={() => { setForm({ ...empty, prof_uuid: teacherId }); setDialog({ mode: 'create' }); }}
+              disabled={!teacherId}
+              size="sm"
+            >
+              <Plus className="mr-1.5 size-4" /> Add Lecture
+            </Button>
+          }
         />
 
+        {/* Teacher selector bar */}
         <motion.div variants={riseItem}>
-          <GlassCard padded={false}>
-            <div className="p-5 border-b border-border bg-canvas/30 rounded-t-2xl">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                <div className="flex items-center gap-2 shrink-0">
-                  <Calendar className="h-5 w-5 text-primary" />
-                  <span className="font-semibold text-[13.5px]">Teacher:</span>
-                </div>
-
-                <div className="flex-1 max-w-[280px]">
-                  <Select value={teacherId} onValueChange={setTeacherId}>
-                    <SelectTrigger className="h-10 text-[13px]">
-                      <SelectValue placeholder="Select a teacher…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {teachers.map((t) => (
-                        <SelectItem key={t.id} value={t.id}>
-                          {t.name} — {t.department}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+          <GlassCard className="p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <Calendar className="size-4 text-primary" />
+                <span className="text-[13px] font-medium">Filter by Teacher:</span>
+              </div>
+              <div className="w-full sm:w-72">
+                <Select value={teacherId} onValueChange={setTeacherId}>
+                  <SelectTrigger className="h-9 text-[13px]">
+                    <SelectValue placeholder="Select a teacher…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teachers.map((t) => (
+                      <SelectItem key={t.id} value={t.id} className="text-[13px]">
+                        {t.name} ({t.department})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
+          </GlassCard>
+        </motion.div>
+
+        {/* Schedule Table */}
+        <motion.div variants={riseItem}>
+          <GlassCard padded={false}>
             <div className="p-5">
               <DataTable
                 data={mine}
                 columns={columns}
                 keyExtractor={(r) => r.id}
-                searchPlaceholder="Search timetable…"
-                searchKeys={["course_code", "course_title", "division_name"]}
+                searchPlaceholder="Search courses or divisions…"
+                searchKeys={["course_code", "course_title", "division_name", "batch_name"]}
                 pageSize={10}
-                loading={loading}
-                emptyTitle={teachers.length === 0 ? "No teachers yet" : "No lectures assigned"}
-                emptyDescription={teachers.length === 0 ? "Add teachers first." : `No lectures for ${selectedTeacher?.name ?? 'this teacher'} yet.`}
-                toolbar={
+                emptyTitle="No lectures scheduled"
+                emptyDescription={selectedTeacher ? `No assignments found for ${selectedTeacher.name}. Add one to build their schedule.` : "Select a teacher to view their schedule."}
+                action={
                   <Button
                     onClick={() => { setForm({ ...empty, prof_uuid: teacherId }); setDialog({ mode: 'create' }); }}
                     disabled={!teacherId}
@@ -216,7 +248,7 @@ export default function Assignments() {
           <DialogHeader>
             <DialogTitle>{dialog?.mode === 'create' ? 'Add Lecture' : 'Edit Lecture'}</DialogTitle>
             <DialogDescription>
-              {dialog?.mode === 'create' ? 'Schedule a new lecture for this teacher.' : 'Update the lecture details.'}
+              {dialog?.mode === 'create' ? 'Schedule a new lecture or lab session for this teacher.' : 'Update the lecture details.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -246,7 +278,10 @@ export default function Assignments() {
 
             <div className="space-y-1.5">
               <label className="text-[12.5px] font-medium">Division</label>
-              <Select value={form.division_id} onValueChange={(v) => setForm({ ...form, division_id: v })}>
+              <Select 
+                value={form.division_id} 
+                onValueChange={(v) => setForm({ ...form, division_id: v, batch_id: '' })}
+              >
                 <SelectTrigger className="h-11">
                   <SelectValue placeholder="Select division…" />
                 </SelectTrigger>
@@ -254,6 +289,33 @@ export default function Assignments() {
                   {divs.map((d) => (
                     <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Batch Selector (Optional: Theory vs Lab Batch) */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[12.5px] font-medium">Batch (Optional)</label>
+                <span className="text-[11px] text-muted-foreground">Theory vs Lab</span>
+              </div>
+              <Select 
+                value={form.batch_id || 'ALL'} 
+                onValueChange={(v) => setForm({ ...form, batch_id: v === 'ALL' ? '' : v })}
+                disabled={!form.division_id}
+              >
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="All Batches (Theory Lecture)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Batches (Theory Lecture)</SelectItem>
+                  {batches
+                    .filter((b) => b.division_id === form.division_id)
+                    .map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        Batch {b.name} {b.start_roll && b.end_roll ? `(${b.start_roll}–${b.end_roll})` : ''}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -298,16 +360,15 @@ export default function Assignments() {
       <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete lecture?</AlertDialogTitle>
+            <AlertDialogTitle>Remove Lecture Assignment?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently remove the <strong className="text-foreground">{deleteTarget ? dayName(deleteTarget.day_of_week) : ''}</strong> lecture for <strong className="text-foreground">{deleteTarget?.course_code}</strong> ({deleteTarget?.division_name}).
-              This action cannot be undone.
+              Are you sure you want to remove this lecture slot from {deleteTarget?.teacher_name}'s timetable? This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteTarget && del(deleteTarget)} disabled={busy}>
-              Delete
+            <AlertDialogAction onClick={() => deleteTarget && del(deleteTarget)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Remove
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
