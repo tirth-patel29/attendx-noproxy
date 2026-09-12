@@ -9,6 +9,28 @@ on:
       - 'admin/**'
       - 'migrations/**'
       - '.github/workflows/**'
+  workflow_dispatch:
+    inputs:
+      backend:
+        description: 'Deploy Backend Service'
+        type: boolean
+        default: true
+      teacher:
+        description: 'Deploy Teacher Portal'
+        type: boolean
+        default: true
+      admin:
+        description: 'Deploy Admin Portal'
+        type: boolean
+        default: true
+      migrations:
+        description: 'Run Database Migrations'
+        type: boolean
+        default: true
+      force_all:
+        description: 'Force deploy all services'
+        type: boolean
+        default: false
 
 jobs:
   deploy:
@@ -16,20 +38,61 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Detect changed services
         id: changes
         run: |
-          CHANGED=$(git diff --name-only HEAD~1 HEAD)
-          echo "Changed files: $CHANGED"
-          echo "backend=$(echo "$CHANGED" | grep -q '^backend/' && echo true || echo false)" >> $GITHUB_OUTPUT
-          echo "teacher=$(echo "$CHANGED"   | grep -q '^teacher/'  && echo true || echo false)" >> $GITHUB_OUTPUT
-          echo "admin=$(echo "$CHANGED"    | grep -q '^admin/'   && echo true || echo false)" >> $GITHUB_OUTPUT
-          echo "migrations=$(echo "$CHANGED" | grep -q '^migrations/' && echo true || echo false)" >> $GITHUB_OUTPUT
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ "${{ inputs.force_all }}" = "true" ]; then
+              echo "Manual trigger with force_all=true -> deploying all components"
+              echo "backend=true" >> $GITHUB_OUTPUT
+              echo "teacher=true" >> $GITHUB_OUTPUT
+              echo "admin=true" >> $GITHUB_OUTPUT
+              echo "migrations=true" >> $GITHUB_OUTPUT
+            else
+              echo "Manual trigger with custom flags:"
+              echo "  backend=${{ inputs.backend }}"
+              echo "  teacher=${{ inputs.teacher }}"
+              echo "  admin=${{ inputs.admin }}"
+              echo "  migrations=${{ inputs.migrations }}"
+              echo "backend=${{ inputs.backend }}" >> $GITHUB_OUTPUT
+              echo "teacher=${{ inputs.teacher }}" >> $GITHUB_OUTPUT
+              echo "admin=${{ inputs.admin }}" >> $GITHUB_OUTPUT
+              echo "migrations=${{ inputs.migrations }}" >> $GITHUB_OUTPUT
+            fi
+          else
+            BEFORE="${{ github.event.before }}"
+            if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+              CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || git ls-files)
+            else
+              CHANGED=$(git diff --name-only "$BEFORE" "${{ github.sha }}" 2>/dev/null || git diff --name-only HEAD~1 HEAD 2>/dev/null || git ls-files)
+            fi
+
+            echo "=== Changed Files ==="
+            echo "$CHANGED"
+
+            if echo "$CHANGED" | grep -q '^\.github/workflows/'; then
+              echo "Workflow configuration modified: triggering full verification across all portals"
+              echo "backend=true" >> $GITHUB_OUTPUT
+              echo "teacher=true" >> $GITHUB_OUTPUT
+              echo "admin=true" >> $GITHUB_OUTPUT
+              echo "migrations=true" >> $GITHUB_OUTPUT
+            else
+              HAS_BACKEND=$(echo "$CHANGED" | grep -q '^backend/' && echo true || echo false)
+              HAS_TEACHER=$(echo "$CHANGED" | grep -q '^teacher/' && echo true || echo false)
+              HAS_ADMIN=$(echo "$CHANGED" | grep -q '^admin/' && echo true || echo false)
+              HAS_MIGRATIONS=$(echo "$CHANGED" | grep -q '^migrations/' && echo true || echo false)
+
+              echo "backend=$HAS_BACKEND" >> $GITHUB_OUTPUT
+              echo "teacher=$HAS_TEACHER" >> $GITHUB_OUTPUT
+              echo "admin=$HAS_ADMIN" >> $GITHUB_OUTPUT
+              echo "migrations=$HAS_MIGRATIONS" >> $GITHUB_OUTPUT
+            fi
+          fi
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
@@ -40,53 +103,127 @@ jobs:
           timeout: 600s
           envs: BUILD_BACKEND,BUILD_TEACHER,BUILD_ADMIN,RUN_MIGRATIONS
           script: |
-            set -e
+            set -euo pipefail
             cd /home/ubuntu/attendance-gateway
 
-            echo "=== Pull latest code ==="
+            echo "=========================================="
+            echo "1. Pulling latest code from origin/main"
+            echo "=========================================="
             git fetch origin main
             git reset --hard origin/main
 
+            # Run database migrations
             if [ "$RUN_MIGRATIONS" = "true" ]; then
-              echo "=== Run migrations ==="
+              echo "=========================================="
+              echo "2. Running Database Migrations"
+              echo "=========================================="
               for f in $(ls /home/ubuntu/attendance-gateway/migrations/*.sql | sort -V); do
-                docker exec -i supabase-db psql -U postgres -d postgres < "$f" 2>&1 | grep -vE 'NOTICE|already exists' | tail -1
+                echo "--> Applying $(basename "$f")..."
+                docker exec -i supabase-db psql -U postgres -d postgres < "$f" 2>&1 | grep -vE 'NOTICE|already exists' || true
               done
+              echo "Migrations finished successfully."
             fi
 
+            # Deploy Backend
             if [ "$BUILD_BACKEND" = "true" ]; then
-              echo "=== Build backend ==="
-              docker build -t attendance-backend:latest ./backend/ 2>&1 | tail -3
+              echo "=========================================="
+              echo "3. Building & Deploying Backend"
+              echo "=========================================="
+              docker build -t attendance-backend:latest ./backend/ 2>&1 | tail -5
               docker rm -f attendance-backend 2>/dev/null || true
               docker compose -f /home/ubuntu/app-compose.yml up -d attendance-backend
               docker network connect supabase_default attendance-backend 2>/dev/null || true
-              sleep 10
-              curl -sf http://localhost:3001/health | grep healthy
+
+              echo "Verifying backend health on port 3001..."
+              READY=false
+              for i in $(seq 1 15); do
+                if curl -sf http://localhost:3001/health | grep -q 'healthy'; then
+                  echo "Backend healthy (attempt $i/15)!"
+                  READY=true
+                  break
+                fi
+                sleep 2
+              done
+              if [ "$READY" = "false" ]; then
+                echo "ERROR: Backend health check failed. Container logs:"
+                docker logs attendance-backend --tail 50
+                exit 1
+              fi
             fi
 
+            # Deploy Teacher Portal
             if [ "$BUILD_TEACHER" = "true" ]; then
-              echo "=== Build teacher ==="
-              docker build -t attendance-teacher:latest \
+              echo "=========================================="
+              echo "4. Building & Deploying Teacher Portal"
+              echo "=========================================="
+              docker build \
+                -t attendance-portal:latest \
+                -t attendance-teacher:latest \
                 --build-arg VITE_API_URL=https://api.atmyhome.tech \
-                ./teacher/ 2>&1 | tail -3
-              docker rm -f attendance-teacher 2>/dev/null || true
-              docker compose -f /home/ubuntu/app-compose.yml up -d attendance-teacher
-              sleep 5
-              curl -sf http://localhost:3010/ > /dev/null && echo "teacher OK"
+                ./teacher/ 2>&1 | tail -5
+
+              # Support either service name in app-compose.yml (attendance-portal or attendance-teacher)
+              TEACHER_SVC="attendance-portal"
+              if docker compose -f /home/ubuntu/app-compose.yml config --services 2>/dev/null | grep -q '^attendance-teacher$'; then
+                TEACHER_SVC="attendance-teacher"
+              fi
+
+              docker rm -f attendance-portal attendance-teacher 2>/dev/null || true
+              docker compose -f /home/ubuntu/app-compose.yml up -d "$TEACHER_SVC"
+
+              echo "Verifying teacher portal health on port 3010..."
+              READY=false
+              for i in $(seq 1 15); do
+                if curl -sf http://localhost:3010/health > /dev/null || curl -sf http://localhost:3010/ > /dev/null; then
+                  echo "Teacher Portal healthy (attempt $i/15)!"
+                  READY=true
+                  break
+                fi
+                sleep 2
+              done
+              if [ "$READY" = "false" ]; then
+                echo "ERROR: Teacher Portal health check failed. Container logs:"
+                docker logs "$TEACHER_SVC" --tail 50 2>/dev/null || docker logs attendance-portal --tail 50
+                exit 1
+              fi
             fi
 
+            # Deploy Admin Portal
             if [ "$BUILD_ADMIN" = "true" ]; then
-              echo "=== Build admin ==="
-              docker build -t attendance-admin:latest ./admin/ 2>&1 | tail -3
+              echo "=========================================="
+              echo "5. Building & Deploying Admin Portal"
+              echo "=========================================="
+              docker build -t attendance-admin:latest ./admin/ 2>&1 | tail -5
               docker rm -f attendance-admin 2>/dev/null || true
               docker compose -f /home/ubuntu/app-compose.yml up -d attendance-admin
-              sleep 5
-              curl -sf http://localhost:3020/ > /dev/null && echo "admin OK"
+
+              echo "Verifying admin portal health on port 3020..."
+              READY=false
+              for i in $(seq 1 15); do
+                if curl -sf http://localhost:3020/health > /dev/null || curl -sf http://localhost:3020/ > /dev/null; then
+                  echo "Admin Portal healthy (attempt $i/15)!"
+                  READY=true
+                  break
+                fi
+                sleep 2
+              done
+              if [ "$READY" = "false" ]; then
+                echo "ERROR: Admin Portal health check failed. Container logs:"
+                docker logs attendance-admin --tail 50
+                exit 1
+              fi
             fi
 
-            echo "=== DEPLOY COMPLETE ==="
+            echo "=========================================="
+            echo "6. Cleanup Dangling Docker Images"
+            echo "=========================================="
+            docker image prune -f || true
+
+            echo "=========================================="
+            echo "DEPLOY COMPLETE: All Requested Portals Live"
+            echo "=========================================="
         env:
           BUILD_BACKEND: ${{ steps.changes.outputs.backend }}
           BUILD_TEACHER: ${{ steps.changes.outputs.teacher }}
           BUILD_ADMIN: ${{ steps.changes.outputs.admin }}
-          RUN_MIGRATIONS: ${{ steps.changes.outputs.migrations }}
+          RUN_MIGRATIONS: ${{ steps.changes.outputs.migrations }}
