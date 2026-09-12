@@ -1,11 +1,12 @@
 # PROJECT PLAN — Zero-Trust Cryptographic Student Attendance Gateway
 
+> **Status Note**: This document captures the initial founding engineering plan and phase tracking. For the current active status, live production endpoints (`https://api.atmyhome.tech`, `https://admin.atmyhome.tech`, `https://portal.atmyhome.tech`), and the expanded academic hierarchy, see [README.md](file:///d:/attendx-noproxy/README.md), [ROADMAP.md](file:///d:/attendx-noproxy/ROADMAP.md), and [QUICK_REFERENCE.md](file:///d:/attendx-noproxy/QUICK_REFERENCE.md).
+
 **Project:** Zero-Trust Cryptographic Student Attendance Gateway  
 **Team:** College Software Group (4 members)  
-**Repository:** `het/attendance-gateway` on Gitea (homelab)  
-**Target Environment:** Homelab — i3-6000T, 8GB RAM, power-cut-prone  
-**Start Date:** 2026-08-06  
-**Target Demo Date:** TBD (aim for 4-6 weeks)
+**Repository:** `tirth-patel29/attendx-noproxy`  
+**Production Host:** Dedicated AWS EC2 (~7 GB RAM) + EBS gp3 SSD  
+**Founding Date:** 2026-08-06  
 
 ---
 

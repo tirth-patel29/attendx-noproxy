@@ -54,49 +54,52 @@ Legend: `[ ]` todo · `[x]` done · `>` currently in progress
 - [ ] Run on a physical Android test device (the whole point — must work on real phones).
 - [ ] Integrate with live backend `api.atmyhome.tech` end-to-end.
 
-## Phase 4 — Professor Web Teacher (React + MUI) ✅ DEPLOYED
+## Phase 4 — Teacher Web Portal (React + Vite + Tailwind) ✅ DEPLOYED
 
-- [x] Dashboard: list sessions, start/stop, view attendance, QR code button
-- [x] Session page: live rotating token (3s polling), attendance table with delta, CSV export
+- [x] Dashboard: list sessions, start/stop, view today's schedule, QR projector
+- [x] Dual-state projector: 2.9s static session anchor + 100ms rotating token flash (anti-stream)
+- [x] Session page: live rotating token, attendance table with latency delta, CSV export
 - [x] Auth: JWT login with refresh token, protected routes
-- [x] Theme: Material 3, deep blue primary, responsive sidebar
-- [x] API integration: proxied to `https://api.atmyhome.tech`
-- [x] Deployed: `https://teacher.atmyhome.tech` (docker compose on proxynet)
+- [x] Modern UI: Tailwind CSS + Radix UI / shadcn components
+- [x] API integration: connected to `https://api.atmyhome.tech`
+- [x] Deployed: `https://portal.atmyhome.tech`
 - [x] Healthcheck: `/health` endpoint
 
-## Phase 5 — Flutter mobile client (off-server build)
+## Phase 5 — Academic Hierarchy & Batches (Migrations 004–012) ✅ COMPLETE
 
-- [ ] `flutter pub get` → `flutter build apk --release` on teammate's machine
+- [x] Multi-tier academic tree: Colleges → Departments → Branches → Divisions → Batches
+- [x] Roll number derivation & range definition: `batches.start_roll` to `batches.end_roll`
+- [x] Faculty department mapping: `professors.department_id` linked to `departments.id`
+- [x] Timetable batch slots: `teacher_assignments.batch_id` supports Theory (`null`, all batches) vs Lab (specific batch)
+- [x] Teacher Portal timetable display with Theory/Lab badges
+- [x] Admin Console CRUD for all hierarchy entities and batch-aware scheduling
+
+## Phase 6 — Flutter Mobile Client (Hardware Binding & Gates) ✅ SCAFFOLDED
+
+- [ ] `flutter pub get` → `flutter build apk --release`
 - [ ] Test on physical Android (provision with roll no)
 - [ ] Verify 4-gate flow: hardware UUID → biometric → QR scan → crypto timestamp
 - [ ] Verify PRESENT verdict against live backend
 
-## Phase 6 — Hardening & Demo Readiness
+## Phase 7 — Hardening & Demo Readiness
 
-- [ ] End-to-end class-flow smoke test (prof → QR twitch → scan → verdict)
-- [ ] **Power-cut drill #2**: full outage + restore, verify zero corruption + backups load
-- [ ] Load sanity: simulate ~70 concurrent claims against the judge on the i3-6000T / 8GB
-- [ ] Performance + security review against the SRS state machine matrix
-- [ ] Prepare the demo script + fallback story ("what if power dies during the demo")
-
-## Phase 7 — Polish / Submission
-
-- [ ] Final SRS↔implemented traceability
-- [ ] Screenshots / demo video / architecture re-plot for the report
-- [ ] Write-up: the homelab constraints we engineered around (great report material)
+- [x] CI/CD pipeline via GitHub Actions on AWS EC2
+- [x] Reverse-proxy setup via host Caddy with automated Let's Encrypt TLS
+- [ ] End-to-end class-flow smoke test with physical mobile devices
+- [ ] Concurrency testing: simulate 70+ claims against the judge
+- [ ] Prepare the demo script
 
 ---
 
-## ✅ Current System Status (2026-08-10)
+## ✅ Current System Status
 
 | Component | Status | URL |
 |-----------|--------|-----|
-| **Supabase Stack** (7 services) | ✅ All Healthy | `https://supabase.atmyhome.tech` |
-| **Attendance Backend** (Node/TS) | ✅ 4-gate judge + metronome + **Admin API** | `https://api.atmyhome.tech` |
-| **Admin Console** (React/MUI) | ✅ Built + deployed (`attendance-admin`) | `https://admin.atmyhome.tech` |
-| **Professor Teacher** (React/MUI) | ✅ Dumb-terminal live | `https://teacher.atmyhome.tech` |
-| **Flutter Client** | ✅ Scaffolded | `app/` in repo |
-| **Gitea Repo** | ✅ `het/attendance-gateway` (single `main`) | `http://gitea:3000/het/attendance-gateway` |
+| **Attendance Gateway** (Node/TS) | ✅ 4-gate judge + metronome + Admin API | `https://api.atmyhome.tech` |
+| **Admin Console** (React/Vite) | ✅ Hierarchy, Timetable, Batches, Hardware Reset | `https://admin.atmyhome.tech` |
+| **Teacher Portal** (React/Vite) | ✅ Schedule & Dual-State Projector | `https://portal.atmyhome.tech` |
+| **Database** (PostgreSQL/Supabase) | ✅ 12 migrations applied & indexed | Direct Cloud Connection |
+| **Mobile App** (Flutter) | ✅ 4-gate client | `app/` |
 
 > **Admin console** — "top of the database": manage teachers (CRUD + password reset),
 > students (CRUD + **device reset** = unbind hardware tattoo + rotate Gate-4 HMAC, and

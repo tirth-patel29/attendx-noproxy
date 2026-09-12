@@ -1,11 +1,11 @@
 # QUICK REFERENCE — Attendance Gateway
 
 **Production Environment:** Dedicated AWS EC2 (~7 GB RAM, 2 vCPUs) + EBS gp3 SSD  
-**Architecture:** Host Nginx (SSL) ➔ Docker Compose (`backend:3001`, `teacher:3000`, `admin:3002`, `postgres:5432`)  
-**Production Endpoints (Example):**
-- **API Server:** `https://api.yourdomain.com` (4-gate judge + metronome + Admin API + Swagger UI at `/docs`)  
-- **Admin Console:** `https://admin.yourdomain.com` (React/Vite — faculty, students/HMAC, divisions, timetable, API keys)  
-- **Teacher Portal:** `https://teacher.yourdomain.com` (React/Vite — classroom projector QR + real-time attendance ledger stream)  
+**Architecture:** Host Caddy (Auto-SSL) ➔ Docker Containers (`backend:3001`, `teacher:3010`, `admin:3020`) + Supabase PostgreSQL  
+**Live Production Endpoints:**
+- **API Server:** `https://api.atmyhome.tech` (4-gate judge + metronome + Admin API + Swagger UI at `/docs`)  
+- **Admin Console:** `https://admin.atmyhome.tech` (React/Vite — faculty departments, students/HMAC, academic hierarchy, batches, timetable, API keys)  
+- **Teacher Portal:** `https://portal.atmyhome.tech` (React/Vite — timetable schedule, dual-state projector QR, real-time attendance ledger stream)  
 
 **Production Quick Deploy:**
 ```bash
@@ -14,7 +14,7 @@ docker compose --env-file .env.production -f docker-compose.yml -f docker-compos
 
 **Admin Bootstrap:** Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `.env.production` for initial boot; once initialized, unset `ADMIN_PASSWORD` so that in-app password rotations remain persistent.
 
-**Token protocol (SRS):** 4-char base62 rotating token every 3s · 250ms Stream Kill-Window (`0 ≤ observed − birth ≤ 250ms`) · tokens are **NOT consumed** (whole class shares each token; ledger UNIQUE(session, student) prevents double-marking) · status codes: PRESENT 200, HARDWARE_MISMATCH 403, STREAM_DETECTED/EXPIRED_TOKEN 412, FORGED_RESPONSE 401, INVALID_CLAIM 404 · nonces come from `/sessions/:uuid/challenge` (single-use, server-issued).
+**Token protocol (SRS):** 4-char base62 rotating token every 3s · 250ms Stream Kill-Window (`0 ≤ observed − birth ≤ 250ms`) · dual-state classroom projector (2.9s static anchor `ATTN:<session_uuid>` + 100ms flash `TOKEN:<token_val>`) · tokens are **NOT consumed** (whole class shares each token; ledger UNIQUE(session, student) prevents double-marking) · status codes: PRESENT 200, HARDWARE_MISMATCH 403, STREAM_DETECTED/EXPIRED_TOKEN 412, FORGED_RESPONSE 401, INVALID_CLAIM 404 · nonces come from `/sessions/:uuid/challenge` (single-use, server-issued).
 
 **Provisioning (mobile):** `POST /api/v1/provision` with `roll_no` + admin-issued 64-char HMAC secret + device hash (SRS "Blood Oath"). Verify with `scripts/live_flow_test.py "<admin-password>"` (25 live checks).
 
@@ -29,7 +29,7 @@ docker compose --env-file .env.production -f docker-compose.yml -f docker-compos
 | Admin: `POST /admin/students/:uuid/forgot-password` | clears hash → app shows set-password screen |
 | Admin: `GET /admin/students` | now returns `has_password`; search in UI |
 
-**Teacher ownership (fundamental auth fix):** `POST /sessions/start`, `GET /sessions`, `GET/POST /sessions/:id`, `POST /sessions/:id/stop`, `GET /sessions/:id/attendance` all require the professor JWT and are scoped to it — `prof_uuid` in the request body is IGNORED (identity comes from the token). Teacher views: `GET /professor/timetable` (today + week) and `GET /professor/summary` (per-subject analytics).
+**Teacher ownership (fundamental auth fix):** `POST /sessions/start`, `GET /sessions`, `GET/POST /sessions/:id`, `POST /sessions/:id/stop`, `GET /sessions/:id/attendance` all require the professor JWT and are scoped to it — `prof_uuid` in the request body is IGNORED (identity comes from the token). Teacher views: `GET /professor/timetable` (today + week, returns `batch_id` and `batch_name`) and `GET /professor/summary` (per-subject analytics).
 
 ---
 
@@ -38,14 +38,19 @@ docker compose --env-file .env.production -f docker-compose.yml -f docker-compos
 **Login:** `POST /api/v1/admin/login` (JWT `role: 'admin'`) · refresh `POST /api/v1/admin/login/refresh`
 
 Protected routes (all under `/api/v1/admin/`, require `Authorization: Bearer <admin-jwt>`):
-| Resource | Endpoints |
-|----------|-----------|
-| Stats | `GET /stats` |
-| Teachers (professors) | `GET/POST /teachers`, `PUT/DELETE /teachers/:uuid`, `POST /teachers/:uuid/reset-password` |
-| Students | `GET/POST /students`, `GET/PUT/DELETE /students/:uuid`, `POST /students/:uuid/reset-device`, `POST /students/:uuid/rotate-hmac` |
-| Divisions | `GET/POST /divisions`, `PUT/DELETE /divisions/:uuid` |
-| Courses | `GET/POST /courses`, `PUT/DELETE /courses/:code` |
-| Timetable | `GET/POST /assignments`, `PUT/DELETE /assignments/:id` |
+| Resource | Endpoints | Notes |
+|----------|-----------|-------|
+| Stats | `GET /stats` | Active sessions, student counts, verification health |
+| Teachers (professors) | `GET/POST /teachers`, `PUT/DELETE /teachers/:uuid`, `POST /teachers/:uuid/reset-password` | Supports `department_id` academic department mapping |
+| Students | `GET/POST /students`, `GET/PUT/DELETE /students/:uuid`, `POST /students/:uuid/reset-device`, `POST /students/:uuid/rotate-hmac` | Hardware lock reset unbinds device + rotates HMAC |
+| Academic Colleges | `GET/POST /academic/colleges`, `PUT/DELETE /academic/colleges/:id` | e.g. DEPSTAR, CSPIT, BDPIAS |
+| Academic Departments | `GET/POST /academic/departments`, `PUT/DELETE /academic/departments/:id` | e.g. Engineering, Pharmacy |
+| Academic Branches | `GET/POST /academic/branches`, `PUT/DELETE /academic/branches/:id` | e.g. DCE, DCS |
+| Academic Divisions | `GET/POST /academic/divisions`, `PUT/DELETE /academic/divisions/:id` | e.g. CE 3rd Year |
+| Academic Batches | `GET/POST /academic/batches`, `PUT/DELETE /academic/batches/:id` | e.g. CE1, start_roll: 24DCE001, end_roll: 24DCE075 |
+| Courses | `GET/POST /courses`, `PUT/DELETE /courses/:code` | |
+| Timetable (Assignments) | `GET/POST /assignments`, `PUT/DELETE /assignments/:id` | Supports `batch_id`: `null` = Theory (All Batches), UUID = Lab |
+| API Keys | `GET/POST /keys`, `DELETE /keys/:uuid` | Mints `X-Api-Key` tokens for client access |
 
 **Security-sensitive ops** (`reset-device`, `rotate-hmac`, password resets, deletes) write an
 append-only `audit_logs` row. `reset-device` **unbinds the hardware tattoo AND rotates the

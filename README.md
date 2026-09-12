@@ -25,7 +25,7 @@ AttendX is a college software-group project built around a simple principle:
 
 > **Attendance should be a verifiable event, not a trusted checkbox.**
 
-The system combines a student mobile application, teacher teacher, administrative teacher, a Node.js/TypeScript attendance gateway, and a self-hosted PostgreSQL/Supabase backend.
+The system combines a student mobile application, teacher portal, administrative console, a Node.js/TypeScript attendance gateway, and a self-hosted PostgreSQL/Supabase backend.
 
 The original project architecture is designed to make a classroom attendance claim difficult to fake by combining multiple independent signals: device binding, biometric pre-checks, a short-lived rotating classroom token, and server-side cryptographic/time verification.
 
@@ -42,7 +42,7 @@ Teacher starts a class
 Gateway creates short-lived token
         │
         ▼
-Live QR/token is shown in Teacher Teacher
+Live QR/token is shown in Teacher Portal
         │
         ▼
 Student performs security pre-check
@@ -94,8 +94,8 @@ The documented baseline uses a rotating token every **3 seconds** and a server-s
 ```mermaid
 flowchart TB
     Student["📱 Student App<br/>Flutter"]
-    Teacher["👨‍🏫 Teacher Teacher"]
-    Admin["🛠️ Admin Teacher"]
+    Teacher["👨‍🏫 Teacher Portal<br/>React + Vite"]
+    Admin["🛠️ Admin Console<br/>React + Vite"]
 
     Gateway["⚡ Attendance Gateway<br/>Node.js + TypeScript"]
 
@@ -127,8 +127,8 @@ flowchart TB
 | Component | Responsibility |
 |---|---|
 | 📱 Student App | Attendance scanning, security pre-checks and attendance submission |
-| 👨‍🏫 Teacher Teacher | Course/session control and live classroom token display |
-| 🛠️ Admin Teacher | Administrative and academic hierarchy management |
+| 👨‍🏫 Teacher Portal | Course/session control and live classroom projector token display |
+| 🛠️ Admin Console | Administrative and academic hierarchy management |
 | ⚡ Backend | REST APIs, authentication, session handling and attendance verification |
 | ⏱️ Metronome | Generates/rotates short-lived classroom tokens |
 | ⚖️ Judge | Validates attendance claims |
@@ -339,48 +339,62 @@ Relevant mobile technologies in the project include:
 
 ---
 
-## 👨‍🏫 Teacher Teacher
+## 👨‍🏫 Teacher Portal
 
-The teacher teacher is the classroom-facing web application.
+The Teacher Portal is the classroom-facing web application deployed at `https://portal.atmyhome.tech`.
 
 Typical flow:
 
 ```text
 Teacher Login
      ↓
-Select Course
+View Today's Schedule (Theory / Lab Batches)
      ↓
-Start Session
+Start Attendance Session
      ↓
-Live QR / Token
+Projector Mode (Clean Dual-State QR Display)
      ↓
 Students Scan
      ↓
-Attendance Results
+Live Attendance Ledger Stream
 ```
 
-The teacher teacher is responsible for controlling the session rather than directly deciding whether a student is present.
+The Teacher Portal controls session lifecycle and displays the attendance projector rather than directly deciding student presence. The final attendance decision belongs to the backend verification engine.
 
-The final attendance decision belongs to the backend verification flow.
+### Classroom Projector Mechanism
+
+The projector display uses a **dual-state optical mechanism**:
+1. **Static Anchor Frame (~2.9 seconds)**: Renders a static QR code containing the session identifier (`ATTN:<session_uuid>`). This gives in-room student cameras ample time to locate, focus, and lock onto the code.
+2. **Rotating Cryptographic Flash (~100 ms)**: Briefly flashes the active, time-bound rotating token (`TOKEN:<token_val>`) before returning to the anchor state.
+3. **Stream Killer**: Because remote video streams (Discord, WhatsApp, Google Meet) suffer from video compression quantization and encoding delay, remote viewers cannot resolve and submit the 100 ms flash within the server's 250 ms verification window.
 
 ---
 
-## 🛠️ Admin Teacher
+## 🛠️ Admin Console
 
-The Admin Teacher handles system administration and academic organization.
+The Admin Console is the administrative control center deployed at `https://admin.atmyhome.tech`.
 
-The academic management structure is:
+The full academic management structure is:
 
 ```text
-College
-  └── Department
-       └── Branch
-            └── Division
-                 └── Batch
-                      └── Students
+College (e.g. DEPSTAR, CSPIT, BDPIAS)
+  └── Department (e.g. Engineering, Pharmacy)
+       ├── Faculty / Professors (mapped via department_id)
+       └── Branch (e.g. DCE, DCS)
+            └── Division (e.g. CE 3rd Year)
+                 ├── Batches (e.g. CE1: 24DCE001 - 24DCE075)
+                 │    └── Students
+                 └── Timetable Assignments
+                      ├── Theory (Division-wide, batch_id = null)
+                      └── Lab / Practical (Specific batch, batch_id = UUID)
 ```
 
-Administrative management can therefore be performed at the appropriate level instead of maintaining disconnected lists.
+Administrative operations include:
+- Managing Colleges, Departments, Branches, Divisions, and Batches.
+- Provisioning Faculty and assigning them to academic departments.
+- Scheduling Timetable lectures with batch granularity (Theory vs. Lab).
+- Managing student devices (Hardware tattoo lock reset & HMAC rotation).
+- Minting and revoking client API keys (`X-Api-Key`).
 
 ---
 
@@ -473,25 +487,24 @@ DELETE /api/v1/admin/divisions/:id
 ```text
 attendx-noproxy/
 │
-├── .gitea/
-│   └── workflows/          # Gitea Actions
+├── .github/
+│   └── workflows/          # GitHub Actions CI/CD deployment
 │
-├── admin/                  # Admin web teacher
-├── app/                    # Flutter student application
-├── backend/                # Node.js / TypeScript backend
-├── deploy/                 # Self-hosted deployment resources
-├── docs/                   # SRS / architecture / operations docs
-├── migrations/             # PostgreSQL migrations
-├── teacher/                 # Teacher teacher
-├── scripts/                # Operational/deployment scripts
+├── admin/                  # Admin Console (React + Vite, port 3020)
+├── app/                    # Student mobile application (Flutter)
+├── backend/                # Attendance Gateway (Node.js + TypeScript, port 3001)
+├── deploy/                 # Deployment configurations (Docker, Caddy, Supabase)
+├── docs/                   # Client integration, error dictionary, contributing guides
+├── migrations/             # PostgreSQL migrations (001_schema through 012_...)
+├── teacher/                # Teacher Portal (React + Vite, port 3010)
+├── scripts/                # Operational and test scripts
 │
-├── CONTEXT.md              # Project context and architecture rationale
-├── DEPLOY.md               # Deployment documentation
-├── PROJECT_PLAN.md         # Project planning
-├── QUICK_REFERENCE.md      # Quick developer reference
-├── ROADMAP.md              # Development roadmap
-├── docker-compose.yml      # Docker services
-├── docker-compose.ports.yml
+├── CONTEXT.md              # Project context, security model, and infrastructure
+├── DEPLOY.md               # Deployment documentation (AWS EC2 / Docker)
+├── QUICK_REFERENCE.md      # Developer endpoints, token protocol, and commands
+├── ROADMAP.md              # Development roadmap and completed milestones
+├── docker-compose.yml      # Base Docker services
+├── docker-compose.ports.yml# Port mapping override
 └── README.md
 ```
 
@@ -503,10 +516,9 @@ attendx-noproxy/
 
 Depending on the component being developed:
 
-- Node.js
+- Node.js (v20+)
 - npm
-- Flutter SDK
-- Dart
+- Flutter SDK & Dart
 - PostgreSQL / Supabase
 - Docker
 
@@ -518,7 +530,7 @@ npm install
 npm run dev
 ```
 
-## Teacher Teacher
+## Teacher Portal
 
 ```bash
 cd teacher
@@ -526,7 +538,7 @@ npm install
 npm run dev
 ```
 
-## Admin Teacher
+## Admin Console
 
 ```bash
 cd admin
@@ -944,14 +956,13 @@ AttendX is an actively developed college software project.
 
 The repository began with the zero-trust attendance foundation and has expanded toward a complete ecosystem containing:
 
-- Student mobile application
-- Teacher teacher
-- Admin teacher
-- Attendance gateway
-- Academic hierarchy
-- PostgreSQL/Supabase database
-- Docker/homelab deployment
-- Gitea-based development workflow
+- Student mobile application (`app/`)
+- Teacher Portal (`teacher/`)
+- Admin Console (`admin/`)
+- Attendance Gateway (`backend/`)
+- Academic hierarchy & batch assignments (Colleges, Departments, Branches, Divisions, Batches)
+- PostgreSQL/Supabase database with 12 structured migrations
+- Docker & AWS EC2 production deployment
 
 Some areas may still be under active development.
 
@@ -971,16 +982,16 @@ Foundation
           ▼
 Attendance Security
     │
-    ├── Device binding
-    ├── Biometric pre-check
-    ├── Rotating QR
-    └── Cryptographic verification
+    ├── Device binding (Gate 1)
+    ├── Biometric pre-check (Gate 2)
+    ├── Rotating QR metronome (Gate 3)
+    └── Cryptographic verification (Gate 4)
           │
           ▼
-Web Teachers
+Web Portals
     │
-    ├── Teacher Teacher
-    └── Admin Teacher
+    ├── Teacher Portal (Session control & dual-state projector)
+    └── Admin Console (Hardware lock reset, API keys, Faculty)
           │
           ▼
 Academic Management
@@ -989,7 +1000,7 @@ Academic Management
     ├── Departments
     ├── Branches
     ├── Divisions
-    └── Batches
+    └── Batches (Roll number auto-resolution & Timetable slots)
           │
           ▼
 Production Homelab
