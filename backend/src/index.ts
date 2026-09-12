@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+import swaggerUi from 'swagger-ui-express';
 import express from 'express';
 import { createServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
@@ -78,23 +81,39 @@ app.get('/health', async (_req, res) => {
 // Public (read-only) so any consumer can read the reference and build a client.
 // The API-key *console* stays locked behind the admin JWT login.
 // ---------------------------------------------------------------------------
-import fs from 'fs';
-import path from 'path';
-import swaggerUi from 'swagger-ui-express';
+function loadOpenApiSpec(): { raw: string; json: Record<string, unknown> } | null {
+  const candidatePaths = [
+    path.resolve(__dirname, '../openapi.json'),
+    path.join(process.cwd(), 'openapi.json'),
+    path.join(process.cwd(), 'backend', 'openapi.json'),
+  ];
+  for (const p of candidatePaths) {
+    if (fs.existsSync(p)) {
+      try {
+        const raw = fs.readFileSync(p, 'utf8');
+        const json = JSON.parse(raw);
+        return { raw, json };
+      } catch (err) {
+        console.warn(`Failed to parse openapi.json at ${p}:`, err);
+      }
+    }
+  }
+  return null;
+}
+
+const openApiSpec = loadOpenApiSpec();
 
 app.get('/openapi.json', (_req, res) => {
-  try {
-    const spec = fs.readFileSync(path.join(process.cwd(), 'openapi.json'), 'utf8');
-    res.type('application/json').send(spec);
-  } catch (err) {
+  if (openApiSpec) {
+    res.type('application/json').send(openApiSpec.raw);
+  } else {
     res.status(500).json({ error: 'openapi spec unavailable' });
   }
 });
 
-try {
-  const swaggerDocument = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'openapi.json'), 'utf8'));
-  app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
-} catch (err) {
+if (openApiSpec) {
+  app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec.json));
+} else {
   console.warn('Could not load openapi.json for Swagger UI docs.');
 }
 

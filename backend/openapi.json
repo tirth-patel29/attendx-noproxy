@@ -897,6 +897,114 @@
         }
       }
     },
+    "/api/v1/admin/dashboard/attendance-trend": {
+      "get": {
+        "tags": [
+          "Admin - Core"
+        ],
+        "summary": "Attendance trend over the last 7 days",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daily attendance rates"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/dashboard/verification-split": {
+      "get": {
+        "tags": [
+          "Admin - Core"
+        ],
+        "summary": "Verification split by gate status (last 24h)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Breakdown of ledger verification statuses"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/dashboard/recent-activity": {
+      "get": {
+        "tags": [
+          "Admin - Core"
+        ],
+        "summary": "Recent audit log activity",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Latest 10 audit log entries"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/dashboard/department-stats": {
+      "get": {
+        "tags": [
+          "Admin - Core"
+        ],
+        "summary": "Student and course counts per department",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Department statistics"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/dashboard/session-activity": {
+      "get": {
+        "tags": [
+          "Admin - Core"
+        ],
+        "summary": "Hourly active session count for today",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hourly session breakdown"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/dashboard/active-sessions": {
+      "get": {
+        "tags": [
+          "Admin - Core"
+        ],
+        "summary": "List currently active lecture sessions with live attendance counts",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of active sessions"
+          }
+        }
+      }
+    },
     "/api/v1/admin/teachers": {
       "get": {
         "tags": [

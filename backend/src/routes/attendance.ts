@@ -16,37 +16,8 @@ function isUuid(s: string): boolean {
 }
 const router = Router();
 
-export function requireProfessor(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer "))
-    return sendError(
-      res,
-      401,
-      "ERR_AUTH_MISSING",
-      "Missing or invalid JWT/API Key.",
-    );
-  try {
-    const decoded = jwt.verify(
-      auth.slice(7),
-      config.jwtSecret || "dev-secret-change-in-production-min-32-chars-long",
-    ) as {
-      sub: string;
-      email: string;
-      name: string;
-      role: string;
-    };
-    if (decoded.role !== "professor")
-      return sendError(res, 403, "ERR_FORBIDDEN", "Professor access required.");
-    (req as any).professor = decoded;
-    next();
-  } catch {
-    return sendError(res, 401, "ERR_AUTH_MISSING", "Invalid or expired token.");
-  }
-}
+import { requireProfessor } from "../utils/auth";
+export { requireProfessor };
 
 async function ensureOwnSession(
   sessionUuid: string,

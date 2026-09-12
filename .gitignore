@@ -32,3 +32,6 @@ deploy/supabase/volumes/
 
 # Release APKs (too large for git - distribute separately)
 releases/*.apk
+
+# Local agent configurations with tokens
+.agents/mcp_config.json

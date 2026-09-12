@@ -29,6 +29,7 @@ import { query } from '../utils/db';
 import { sendError } from '../utils/apiError';
 import { config } from '../config';
 import { generateHmacKey } from '../utils/crypto';
+import { judgeService } from '../services/judge';
 
 const JWT_SECRET = config.jwtSecret || 'dev-secret-change-in-production-min-32-chars-long';
 const STUDENT_DOMAIN = process.env.STUDENT_EMAIL_DOMAIN || 'charusat.edu.in';
@@ -53,20 +54,8 @@ function signStudent(student: { student_uuid: string; roll_no: string; email: st
   return accessToken;
 }
 
-export function requireStudent(req: Request, res: Response, next: NextFunction) {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith('Bearer ')) return sendError(res, 401, 'ERR_AUTH_MISSING', 'Missing or invalid JWT/API Key.');
-  try {
-    const decoded = jwt.verify(auth.slice(7), JWT_SECRET) as {
-      sub: string; roll_no: string; email: string; name: string; role: string;
-    };
-    if (decoded.role !== 'student') return sendError(res, 403, 'ERR_FORBIDDEN', 'Student access required.');
-    (req as any).student = decoded;
-    next();
-  } catch {
-    return sendError(res, 401, 'ERR_AUTH_MISSING', 'Invalid or expired token.');
-  }
-}
+import { requireStudent } from '../utils/auth';
+export { requireStudent };
 
 const router = Router();
 
@@ -219,6 +208,7 @@ router.post('/device/bind', requireStudent, async (req: Request, res: Response, 
         `UPDATE students SET bound_device_id = $1, secret_hmac_key = $2, updated_at = NOW() WHERE student_uuid = $3`,
         [device_id_hash, secret, student.sub]
       );
+      judgeService.invalidateStudent(student.sub);
       await query(
         `INSERT INTO audit_logs (event_type, actor_uuid, payload) VALUES ('DEVICE_BIND', $1, $2)`,
         [student.sub, JSON.stringify({ roll_no: student.roll_no, device_bound: true })]
