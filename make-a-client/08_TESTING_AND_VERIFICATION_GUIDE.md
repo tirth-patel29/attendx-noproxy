@@ -1,12 +1,52 @@
-# 08 — Client Testing, Verification Checklist & Projector Simulator
+# 08 — Client Testing, Live Verification & Projector Simulator
 
-This guide provides testing tools and verification checklists so your teammate can test the entire Flutter app locally on their desk before taking it into an actual college classroom.
+This guide explains how your teammate can test the entire Flutter app directly against the live AttendX production stack or locally on their desk.
 
 ---
 
-## 1. The Local Projector Simulator (Test Without a Live Class)
+## 1. Live Testing on `https://portal.atmyhome.tech` (Recommended)
 
-To test the **Gate 3 Dual-State Scanning** and **Gate 4 Claiming** without needing a professor to start an active lecture, save this single-file HTML page as `test_projector.html` on your laptop and open it in Google Chrome.
+> [!TIP]
+> You do **NOT** need to wait for a professor or an actual physical lecture to test! The live Teacher Portal is deployed at `https://portal.atmyhome.tech`, connected to the production backend and metronome.
+
+### How to Run a Live Test Session:
+1. **Open the Teacher Portal**:
+   Navigate to [**`https://portal.atmyhome.tech`**](https://portal.atmyhome.tech) in your laptop browser.
+2. **Log In with a Faculty / Test Account**:
+   - You can log in with an existing faculty account or create/reset a test teacher from the Admin Console at `https://admin.atmyhome.tech/teachers`.
+3. **Start an Attendance Session**:
+   - On the Teacher Dashboard, select today's lecture from the schedule (or start a new course session).
+   - Click **[INITIATE ATTENDANCE]** or **[PROJECTOR MODE]**.
+4. **Live Projector Screen Activates**:
+   - The browser connects directly to the backend metronome via WebSockets.
+   - It will immediately begin displaying the live **Dual-State QR code**:
+     - 2.9 seconds: Static Session Anchor (`ATTN:<session_uuid>`).
+     - 0.1 seconds (100 ms): Live rotating cryptographic token flash.
+5. **Scan with Your Flutter App**:
+   - Open your Flutter app on your physical Android / iOS phone.
+   - Point the camera at your laptop screen displaying the projector.
+   - Observe the viewfinder reticle turn **Amber** (Anchor Locked) and catch the 100ms flash.
+6. **Watch Real-Time Live Attendance Confirmation**:
+   - Upon successful scan, your app submits the signed claim to `https://api.atmyhome.tech`.
+   - Your phone will show the **`PRESENT`** verdict with your verification delta ($\Delta\text{ ms}$).
+   - Simultaneously, look at your laptop screen: the Teacher Portal's live attendance ledger stream updates instantly with your roll number, student name, and millisecond verification delta!
+
+---
+
+## 2. Managing Test Student Accounts & Resetting Device Locks
+
+- **Test Student Roll Numbers**:
+  - You can register any new test roll number (e.g. `24DCS093`, `24DCE001`, `24BCS001`) directly through the app's signup screen.
+- **Testing Device Re-binding & Resetting Locks**:
+  - If you test on one phone and then want to test on another phone or emulator with the same roll number, you will see the **`ERR_HW_MISMATCH`** screen.
+  - Simply open [**`https://admin.atmyhome.tech/students`**](https://admin.atmyhome.tech/students), find your test roll number, and click **[RESET HARDWARE LOCK]**.
+  - This resets `bound_device_id` and lets you re-bind on your second device!
+
+---
+
+## 3. The Offline Projector Simulator (Test Without Internet or Login)
+
+If you are traveling or working offline without internet access, you can use this standalone single-file HTML projector simulator:
 
 ### `test_projector.html`
 ```html

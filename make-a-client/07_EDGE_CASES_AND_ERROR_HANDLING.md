@@ -122,3 +122,9 @@ In `mobile_scanner`:
 | `ERR_NONCE_USED` | **400** | Nonce was already consumed. | Fetch fresh nonce and retry claim silently once. |
 | `ERR_AUTH_MISSING` | **401** | Missing `X-Api-Key` or student JWT expired. | Refresh JWT or route to login screen. |
 | `ERR_RATE_LIMIT` | **429** | Too many requests submitted in short burst. | Back off for 1.5 seconds and retry. |
+
+---
+
+## 7. Live Testing & Verification
+
+For hands-on testing of these edge cases, you can test directly against the live **Teacher Portal at `https://portal.atmyhome.tech`** or use the local simulator. See [**`08_TESTING_AND_VERIFICATION_GUIDE.md`**](file:///d:/attendx-noproxy/make-a-client/08_TESTING_AND_VERIFICATION_GUIDE.md) for full instructions on launching a test session and testing against live metronome tokens!
