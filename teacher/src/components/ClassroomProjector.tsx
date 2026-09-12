@@ -1,9 +1,9 @@
 // src/components/ClassroomProjector.tsx
-// AttendX Classroom Projector — Minimalist High-Fidelity Projector Screen
+// AttendX Classroom Projector — Modern High-Fidelity Projector Screen
 //
 // QR Rotation Protocol:
 // - Total Period: 3.0 seconds (3000 ms).
-// - Anchor Phase (2.9s / 2900ms): Statically displays `ATTN:${sessionId}`.
+// - Anchor Phase (2.9s / 2900ms): Statically displays `ATTN:${sessionId}` (100% static throughout session).
 //   Student phone cameras lock focus, exposure, and alignment on this anchor.
 // - Flash Phase (0.1s / 100ms): Briefly displays `ATTN:${sessionId}:${activeToken}`.
 //   Mobile camera captures the 100ms token visual seal.
@@ -13,12 +13,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { QRCodeSVG } from 'qrcode.react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  Monitor,
   Users,
   CheckCircle2,
   Volume2,
@@ -26,13 +25,17 @@ import {
   Maximize2,
   Minimize2,
   Smartphone,
+  X,
+  LayoutList,
+  QrCode,
 } from 'lucide-react';
 
-interface ClassroomProjectorProps {
+export interface ClassroomProjectorProps {
   sessionId: string;
   courseCode?: string;
   socketUrl?: string;
   size?: number;
+  onClose?: () => void;
 }
 
 interface EpochPayload {
@@ -63,7 +66,8 @@ export default function ClassroomProjector({
   sessionId,
   courseCode,
   socketUrl,
-  size = 440,
+  size = 460,
+  onClose,
 }: ClassroomProjectorProps) {
   // State
   const [connected, setConnected] = useState(false);
@@ -134,6 +138,17 @@ export default function ClassroomProjector({
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
+
+  // Keyboard shortcut listener (Escape to exit projector if not fullscreen)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && onClose && !document.fullscreenElement) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   // High-precision RAF loop
   // Protocol: 3000ms period
@@ -252,48 +267,51 @@ export default function ClassroomProjector({
       ? `ATTN:${sessionId}:${activeToken}`
       : `ATTN:${sessionId}`;
 
-  const qrPixelSize = splitScreen ? 350 : Math.min(size, 460);
+  const qrPixelSize = splitScreen ? 340 : Math.min(size, 460);
 
   return (
     <div
       ref={containerRef}
-      className="fixed inset-0 flex flex-col bg-[#0A0D14] text-slate-100 font-sans select-none overflow-hidden"
+      className="fixed inset-0 flex flex-col bg-[#080B11] text-slate-100 font-sans select-none overflow-hidden"
     >
       {/* ========================================================================= */}
-      {/* 1. CLEAN TOP HEADER                                                       */}
+      {/* 1. ELEGANT TOP BAR                                                        */}
       {/* ========================================================================= */}
-      <header className="h-16 px-6 lg:px-10 flex items-center justify-between bg-[#10141D]/90 backdrop-blur-md border-b border-slate-800/80 z-20">
+      <header className="h-16 px-6 lg:px-10 flex items-center justify-between bg-[#0B0F17]/85 backdrop-blur-xl border-b border-white/[0.08] z-20">
         {/* Course Name & Live Indicator */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3.5">
           <div className="flex items-center gap-2.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <h1 className="text-lg lg:text-xl font-bold tracking-tight text-white">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+            </span>
+            <h1 className="text-base lg:text-lg font-bold tracking-tight text-white">
               {courseCode || 'Live Attendance'}
             </h1>
           </div>
 
-          <span className="hidden sm:inline-block text-xs text-slate-400 font-medium px-2.5 py-0.5 rounded-full bg-slate-800/70 border border-slate-700/50">
+          <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-emerald-400/90 font-medium px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
             {connected ? 'Live Session' : 'Connecting…'}
           </span>
         </div>
 
         {/* Professor Utility Controls */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           {/* Subtle Sound Tick Toggle */}
           <Button
             onClick={() => setSoundEnabled(!soundEnabled)}
             variant="ghost"
             size="sm"
             className={cn(
-              'h-9 px-3 rounded-lg border text-xs gap-2 transition-all',
+              'h-9 px-3 rounded-xl border text-xs gap-2 transition-all',
               soundEnabled
-                ? 'bg-blue-500/10 text-blue-400 border-blue-500/30 hover:bg-blue-500/20'
-                : 'bg-slate-900/60 text-slate-400 border-slate-800 hover:bg-slate-800'
+                ? 'bg-blue-500/15 text-blue-400 border-blue-500/30 hover:bg-blue-500/25'
+                : 'bg-white/[0.04] text-slate-400 border-white/[0.08] hover:bg-white/[0.08] hover:text-slate-200'
             )}
-            title={soundEnabled ? 'Metronome sound tick active' : 'Metronome sound muted'}
+            title={soundEnabled ? 'Metronome sound cue active' : 'Metronome sound muted'}
           >
             {soundEnabled ? <Volume2 className="w-4 h-4 text-blue-400" /> : <VolumeX className="w-4 h-4" />}
-            <span className="hidden md:inline">{soundEnabled ? 'Sound On' : 'Mute'}</span>
+            <span className="hidden md:inline">{soundEnabled ? 'Audio On' : 'Mute'}</span>
           </Button>
 
           {/* Split Screen Roster Toggle */}
@@ -302,14 +320,14 @@ export default function ClassroomProjector({
             variant="ghost"
             size="sm"
             className={cn(
-              'h-9 px-3 rounded-lg border text-xs gap-2 transition-all',
+              'h-9 px-3 rounded-xl border text-xs gap-2 transition-all',
               splitScreen
                 ? 'bg-blue-600/20 text-blue-400 border-blue-500/40 hover:bg-blue-600/30'
-                : 'bg-slate-900/60 text-slate-400 border-slate-800 hover:bg-slate-800'
+                : 'bg-white/[0.04] text-slate-400 border-white/[0.08] hover:bg-white/[0.08] hover:text-slate-200'
             )}
           >
-            <Monitor className="w-4 h-4" />
-            <span className="hidden sm:inline">{splitScreen ? 'QR Only' : 'Live Roster'}</span>
+            {splitScreen ? <QrCode className="w-4 h-4" /> : <LayoutList className="w-4 h-4" />}
+            <span className="hidden sm:inline">{splitScreen ? 'QR Focus' : 'Live Roster'}</span>
           </Button>
 
           {/* Fullscreen Toggle */}
@@ -317,30 +335,46 @@ export default function ClassroomProjector({
             onClick={toggleFullscreen}
             variant="ghost"
             size="sm"
-            className="h-9 w-9 p-0 rounded-lg border border-slate-800 bg-slate-900/60 text-slate-300 hover:bg-slate-800"
+            className="h-9 w-9 p-0 rounded-xl border border-white/[0.08] bg-white/[0.04] text-slate-300 hover:bg-white/[0.08] hover:text-white transition-all"
             title="Toggle Fullscreen"
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </Button>
+
+          {/* Exit Projector Button (if modal/dismissible) */}
+          {onClose && (
+            <Button
+              onClick={onClose}
+              variant="ghost"
+              size="sm"
+              className="h-9 px-3 rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 hover:text-white transition-all text-xs gap-1.5 ml-1"
+              title="Exit Projector (Esc)"
+            >
+              <X className="w-4 h-4" />
+              <span className="hidden sm:inline">Exit</span>
+            </Button>
+          )}
         </div>
       </header>
 
       {/* ========================================================================= */}
-      {/* 2. MAIN VIEWPORT: MASSIVE CRISP QR CODE & OPTIONAL ROSTER                 */}
+      {/* 2. MAIN THEATRE VIEWPORT: MASSIVE CRISP QR CODE & OPTIONAL ROSTER          */}
       {/* ========================================================================= */}
-      <main className="flex-1 flex overflow-hidden">
+      <main className="flex-1 flex overflow-hidden relative">
+        {/* Subtle Theater Ambient Glow */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="w-[600px] h-[600px] rounded-full bg-gradient-to-tr from-blue-600/[0.06] via-indigo-600/[0.04] to-emerald-600/[0.04] blur-3xl" />
+        </div>
+
         {/* Central Clean QR Stage */}
         <motion.section
-          animate={{ width: splitScreen ? '52%' : '100%' }}
-          transition={{ duration: 0.3, ease: 'easeInOut' }}
-          className="flex flex-col items-center justify-center p-8 lg:p-12 relative border-r border-slate-800/40"
+          animate={{ width: splitScreen ? '54%' : '100%' }}
+          transition={{ type: 'spring', stiffness: 350, damping: 32 }}
+          className="flex flex-col items-center justify-center p-6 lg:p-12 relative z-10"
         >
-          {/* Subtle ambient back-glow */}
-          <div className="absolute w-[500px] h-[500px] rounded-full bg-blue-600/[0.04] blur-3xl pointer-events-none" />
-
           {/* Massive, Crisp White QR Card */}
           <div className="relative flex flex-col items-center">
-            <div className="p-7 lg:p-8 rounded-3xl bg-white shadow-[0_24px_80px_rgba(0,0,0,0.6)] flex items-center justify-center">
+            <div className="p-7 lg:p-9 rounded-3xl bg-white shadow-[0_25px_90px_-10px_rgba(0,0,0,0.85),0_0_0_1px_rgba(255,255,255,0.1)] flex items-center justify-center transition-transform duration-300 hover:scale-[1.01]">
               <QRCodeSVG
                 value={qrValue}
                 size={qrPixelSize}
@@ -352,97 +386,119 @@ export default function ClassroomProjector({
             </div>
 
             {/* Simple, Clear Student Scanning Instruction */}
-            <div className="mt-8 flex flex-col items-center text-center">
+            <div className="mt-8 flex flex-col items-center text-center max-w-md">
               <div className="flex items-center gap-2.5 text-white">
                 <Smartphone className="w-5 h-5 text-blue-400" />
                 <h2 className="text-2xl lg:text-3xl font-bold tracking-tight">
                   Scan to Mark Attendance
                 </h2>
               </div>
-              <p className="text-sm text-slate-400 mt-2 max-w-sm">
+              <p className="text-sm text-slate-400 mt-2">
                 Point your camera at the QR code to check in
               </p>
+
+              {/* Verified Count Pill under QR */}
+              <div className="mt-4 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.05] border border-white/[0.08] backdrop-blur-md">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs font-medium text-slate-300">
+                  <span className="font-bold text-white">{attendanceEntries.length}</span> students checked in
+                </span>
+              </div>
             </div>
           </div>
         </motion.section>
 
         {/* Optional Split-Screen Live Attendance Roster */}
-        {splitScreen && (
-          <motion.aside
-            initial={{ opacity: 0, x: 60 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.3, ease: 'easeOut' }}
-            className="w-[48%] flex flex-col bg-[#0E121A] border-l border-slate-800/80"
-          >
-            <Card className="m-6 flex-1 flex flex-col bg-slate-900/50 border-slate-800/70 shadow-xl overflow-hidden">
-              <CardHeader className="py-4 px-6 border-b border-slate-800/70 bg-slate-900/80">
-                <CardTitle className="flex items-center justify-between text-base font-semibold text-white">
-                  <div className="flex items-center gap-2.5">
-                    <Users className="h-5 w-5 text-emerald-400" />
-                    <span>Live Attendance</span>
-                  </div>
-                  <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 font-mono text-xs font-semibold border border-emerald-500/20">
-                    {attendanceEntries.length} Present
-                  </span>
-                </CardTitle>
-              </CardHeader>
+        <AnimatePresence>
+          {splitScreen && (
+            <motion.aside
+              initial={{ opacity: 0, x: 80 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 80 }}
+              transition={{ type: 'spring', stiffness: 350, damping: 32 }}
+              className="w-[46%] flex flex-col bg-[#0B0F17]/95 border-l border-white/[0.08] backdrop-blur-2xl z-10"
+            >
+              <Card className="m-6 flex-1 flex flex-col bg-slate-900/40 border-white/[0.08] shadow-2xl overflow-hidden rounded-2xl">
+                <CardHeader className="py-4 px-6 border-b border-white/[0.08] bg-slate-900/70 backdrop-blur-md">
+                  <CardTitle className="flex items-center justify-between text-base font-semibold text-white">
+                    <div className="flex items-center gap-2.5">
+                      <Users className="h-5 w-5 text-emerald-400" />
+                      <span>Live Roll Call</span>
+                    </div>
+                    <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 font-mono text-xs font-semibold border border-emerald-500/20">
+                      {attendanceEntries.length} Present
+                    </span>
+                  </CardTitle>
+                </CardHeader>
 
-              <CardContent className="flex-1 p-4 overflow-y-auto max-h-[calc(100vh-180px)] space-y-2">
-                {attendanceEntries.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center py-24 text-slate-500">
-                    <Users className="h-10 w-10 mb-3 opacity-30 animate-pulse" />
-                    <p className="text-sm font-medium">Waiting for students to scan…</p>
-                    <p className="text-xs text-slate-600 mt-1">Verified check-ins will appear here</p>
-                  </div>
-                ) : (
-                  attendanceEntries.map((entry, idx) => (
-                    <motion.div
-                      key={idx}
-                      initial={{ opacity: 0, y: -6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="flex items-center justify-between p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition-colors shadow-sm"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-mono text-xs font-semibold">
-                          {entry.student_name.slice(0, 2).toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-sm text-white">{entry.student_name}</p>
-                          <p className="text-xs text-slate-400 font-mono">{entry.student_enrollment}</p>
-                        </div>
+                <CardContent className="flex-1 p-4 overflow-y-auto max-h-[calc(100vh-180px)] space-y-2">
+                  {attendanceEntries.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center py-28 text-slate-500">
+                      <div className="w-14 h-14 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-4">
+                        <Users className="h-7 w-7 text-emerald-400 opacity-60 animate-pulse" />
                       </div>
+                      <p className="text-sm font-semibold text-slate-300">Waiting for student scans…</p>
+                      <p className="text-xs text-slate-500 mt-1 max-w-xs text-center">
+                        Verified attendees will appear here in real time.
+                      </p>
+                    </div>
+                  ) : (
+                    attendanceEntries.map((entry, idx) => (
+                      <motion.div
+                        key={idx}
+                        initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ duration: 0.2 }}
+                        className="flex items-center justify-between p-3.5 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:border-white/[0.12] transition-colors shadow-sm"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-mono text-xs font-bold">
+                            {entry.student_name.slice(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-semibold text-sm text-white">{entry.student_name}</p>
+                            <p className="text-xs text-slate-400 font-mono">{entry.student_enrollment}</p>
+                          </div>
+                        </div>
 
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Present</span>
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Present</span>
+                          </div>
+                          <span className="text-xs font-mono text-slate-500">
+                            {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                          </span>
                         </div>
-                        <span className="text-xs font-mono text-slate-500">
-                          {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                        </span>
-                      </div>
-                    </motion.div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          </motion.aside>
-        )}
+                      </motion.div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+            </motion.aside>
+          )}
+        </AnimatePresence>
       </main>
 
       {/* ========================================================================= */}
-      {/* 3. MINIMAL FOOTER                                                         */}
+      {/* 3. MINIMAL SLEEK FOOTER                                                   */}
       {/* ========================================================================= */}
-      <footer className="h-10 px-8 flex items-center justify-between bg-[#0B0E14] border-t border-slate-800/60 text-xs text-slate-500 z-10">
-        <span>
-          {attendanceEntries.length} {attendanceEntries.length === 1 ? 'student' : 'students'} marked present
-        </span>
-        <span className="font-mono text-slate-600">
-          {connected ? 'Sync Active' : 'Connecting…'}
+      <footer className="h-10 px-8 flex items-center justify-between bg-[#0B0F17]/90 border-t border-white/[0.06] text-xs text-slate-500 z-10 backdrop-blur-md">
+        <div className="flex items-center gap-2 font-mono">
+          <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
+          <span className="text-slate-400">{connected ? 'Real-time sync active' : 'Connecting…'}</span>
+        </div>
+
+        {onClose && (
+          <span className="hidden md:inline text-slate-500 text-[11px]">
+            Press <kbd className="px-1.5 py-0.5 rounded bg-white/[0.08] text-slate-300 font-mono text-[10px]">Esc</kbd> or click Exit to return to dashboard
+          </span>
+        )}
+
+        <span className="font-mono text-slate-400">
+          {attendanceEntries.length} {attendanceEntries.length === 1 ? 'student' : 'students'} checked in
         </span>
       </footer>
     </div>
   );
 }
-

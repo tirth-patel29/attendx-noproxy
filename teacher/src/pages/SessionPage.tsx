@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import ClassroomProjector from "../components/ClassroomProjector";
@@ -66,6 +66,9 @@ const columns: Column<AttendanceRecord>[] = [
 
 export default function SessionPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  const [searchParams] = useSearchParams();
+  const shouldOpenProjector = searchParams.get('projector') === 'true' || searchParams.get('qr') === 'true';
+
   const { data: activeSession } = useSession(sessionId);
   const { data: summary } = useTeacherSummary();
   
@@ -75,7 +78,14 @@ export default function SessionPage() {
   const startedAt = activeSession?.created_at ? new Date(activeSession.created_at).toTimeString().slice(0, 5) : "00:00";
   const elapsed = useElapsedTime(startedAt);
   const [stopOpen, setStopOpen] = React.useState(false);
-  const [qrDialogOpen, setQrDialogOpen] = React.useState(false);
+  const [qrDialogOpen, setQrDialogOpen] = React.useState(shouldOpenProjector);
+
+  // Sync searchParam state if URL changes
+  React.useEffect(() => {
+    if (shouldOpenProjector) {
+      setQrDialogOpen(true);
+    }
+  }, [shouldOpenProjector]);
 
   const stopped = !activeSession?.is_active;
 
@@ -143,7 +153,13 @@ export default function SessionPage() {
                 <Download className="size-4" />
                 Export
               </Button>
-              <Button id="live-qr" variant="outline" size="sm" onClick={() => setQrDialogOpen(true)}>
+              <Button
+                id="live-qr"
+                variant="outline"
+                size="sm"
+                onClick={() => setQrDialogOpen(true)}
+                className="gap-2 border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary transition-all font-medium shadow-sm"
+              >
                 <QrCode className="size-4" />
                 Project QR
               </Button>
@@ -218,13 +234,17 @@ export default function SessionPage() {
       />
 
       <Dialog open={qrDialogOpen} onOpenChange={setQrDialogOpen}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0">
+        <DialogContent className="max-w-[100vw] max-h-[100vh] w-screen h-screen p-0 border-0 bg-transparent shadow-none">
           <DialogHeader className="sr-only">
             <DialogTitle>Classroom Projector - QR Display</DialogTitle>
           </DialogHeader>
-          <div className="w-full h-[95vh]">
+          <div className="w-full h-full">
             {sessionId && activeSession?.course_code && (
-              <ClassroomProjector sessionId={sessionId} courseCode={activeSession.course_code} />
+              <ClassroomProjector
+                sessionId={sessionId}
+                courseCode={activeSession.course_code}
+                onClose={() => setQrDialogOpen(false)}
+              />
             )}
           </div>
         </DialogContent>

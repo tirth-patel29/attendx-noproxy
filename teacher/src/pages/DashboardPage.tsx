@@ -154,13 +154,15 @@ export default function DashboardPage() {
           <motion.div variants={riseItem}>
             <GlassCard
               variant="glass"
-              className="border border-primary/20 bg-primary-soft"
+              className="border border-emerald-500/30 bg-emerald-500/[0.04] shadow-sm relative overflow-hidden"
               padded={false}
             >
+              <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500" />
               <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/15">
-                    <Radio className="size-5 text-primary" />
+                  <div className="relative grid size-10 shrink-0 place-items-center rounded-xl bg-emerald-500/15 text-emerald-500">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-xl bg-emerald-400 opacity-20" />
+                    <Radio className="size-5 text-emerald-500" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
@@ -179,8 +181,13 @@ export default function DashboardPage() {
                       View Attendance
                     </Link>
                   </Button>
-                  <Button id="dashboard-show-qr" size="sm" asChild>
-                    <Link to="/qr-projector">
+                  <Button
+                    id="dashboard-show-qr"
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm font-medium gap-1.5"
+                    asChild
+                  >
+                    <Link to={`/sessions/${currentLecture?.active_session?.id}?projector=true`}>
                       <QrCode className="size-4" />
                       Project QR
                     </Link>
@@ -271,8 +278,8 @@ export default function DashboardPage() {
               <div className="mt-4 flex flex-col gap-2">
                 {[
                   { id: "qa-start", to: "/sessions/new", icon: Play, label: "Start QR Session", desc: "Launch a live session" },
-                  { id: "qa-live", to: currentLecture?.active_session?.id ? `/sessions/${currentLecture.active_session.id}` : "#", icon: Radio, label: "Live Attendance", desc: "View active session" },
-                  { id: "qa-qr", to: "/qr-projector", icon: QrCode, label: "Project QR Code", desc: "Open projector view" },
+                  { id: "qa-live", to: currentLecture?.active_session?.id ? `/sessions/${currentLecture.active_session.id}` : "/sessions/new", icon: Radio, label: "Live Attendance", desc: currentLecture?.active_session?.id ? "View active session" : "No live session" },
+                  { id: "qa-qr", to: currentLecture?.active_session?.id ? `/sessions/${currentLecture.active_session.id}?projector=true` : "/sessions/new", icon: QrCode, label: "Project QR Code", desc: currentLecture?.active_session?.id ? "Project active session" : "Start session to project" },
                   { id: "qa-history", to: "/session/history", icon: Clock, label: "Session History", desc: "Past sessions & records" },
                 ].map((action) => (
                   <Link
