@@ -17,6 +17,7 @@ import {
   CalendarDays,
   GraduationCap,
   ChevronRight,
+  History,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "./Logo";
@@ -42,6 +43,8 @@ const teacherNav: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/sessions/new", label: "Start Session", icon: Play },
   { to: "/sessions/new", label: "Manual Session", icon: BookOpen },
+  { to: "/sessions/history", label: "Session History", icon: History },
+  { to: "/students", label: "Students", icon: Users },
 ];
 
 const teacherBottom: NavItem[] = [
@@ -143,7 +146,7 @@ function SidebarContent({
       <nav className="flex-1 overflow-y-auto px-3 py-1" aria-label="Main navigation">
         <div className="space-y-0.5">
           {mainNav.map((item) => (
-            <NavLink key={item.to} item={item} onClick={onNavigate} />
+            <NavLink key={item.label} item={item} onClick={onNavigate} />
           ))}
         </div>
       </nav>

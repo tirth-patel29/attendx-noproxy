@@ -74,6 +74,7 @@ export const teacherApi = {
   getSummary: () => api.get<any[]>('/professor/summary'),
   getAttendanceTrend: () => api.get<{ day: string; rate: number }[]>('/professor/attendance-trend'),
   getCurrentLecture: () => api.get<any>('/professor/current-lecture'),
+  getAlerts: (threshold = 0.75) => api.get<any[]>(`/professor/alerts?threshold=${threshold}`),
 
   // Tokens
   getSessionTokens: (sessionId: string) =>

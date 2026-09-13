@@ -60,3 +60,13 @@ export function useTeacherTrend() {
     },
   });
 }
+
+export function useTeacherAlerts(threshold = 0.75) {
+  return useQuery({
+    queryKey: ['teacherAlerts', threshold],
+    queryFn: async () => {
+      const res = await teacherApi.getAlerts(threshold);
+      return res.data;
+    },
+  });
+}

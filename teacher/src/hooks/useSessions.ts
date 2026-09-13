@@ -4,7 +4,36 @@ import { teacherApi, Session, AttendanceRecord } from '../services/teacherApi';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isUuid = (s?: string) => !!s && UUID_RE.test(s);
 
+import { useEffect } from 'react';
+import { io } from 'socket.io-client';
+
 export function useSessionAttendance(sessionId?: string) {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!isUuid(sessionId)) return;
+
+    const socket = io(window.location.origin, {
+      transports: ['websocket', 'polling'],
+    });
+
+    socket.on('connect', () => {
+      socket.emit('join:session', sessionId);
+    });
+
+    socket.on('attendance:new', (entry) => {
+      queryClient.setQueryData(['sessionAttendance', sessionId], (old: AttendanceRecord[] = []) => {
+        if (old.some(r => r.id === entry.id)) return old;
+        return [entry, ...old];
+      });
+      queryClient.invalidateQueries({ queryKey: ['teacherSummary'] });
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [sessionId, queryClient]);
+
   return useQuery({
     queryKey: ['sessionAttendance', sessionId],
     queryFn: async () => {
@@ -13,7 +42,6 @@ export function useSessionAttendance(sessionId?: string) {
       return res.data;
     },
     enabled: isUuid(sessionId),
-    refetchInterval: 5000,
   });
 }
 

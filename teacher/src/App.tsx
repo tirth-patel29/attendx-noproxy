@@ -7,6 +7,8 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import SessionPage from './pages/SessionPage';
 import NewSessionPage from './pages/NewSessionPage';
+import SessionHistoryPage from './pages/SessionHistoryPage';
+import StudentsExplorerPage from './pages/StudentsExplorerPage';
 import AcademicHierarchyPage from './pages/admin/AcademicHierarchyPage';
 import StudentsPage from './pages/admin/StudentsPage';
 import FacultyPage from './pages/admin/FacultyPage';
@@ -57,9 +59,10 @@ export default function App() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="sessions/new" element={<NewSessionPage />} />
+          <Route path="sessions/history" element={<SessionHistoryPage />} />
+          <Route path="students" element={<StudentsExplorerPage />} />
           <Route path="sessions/manual" element={<NewSessionPage />} />
           <Route path="sessions/:sessionId" element={<SessionPage />} />
-          <Route path="session/history" element={<DashboardPage />} />
           <Route path="session/live" element={<DashboardPage />} />
           <Route path="qr-projector" element={<DashboardPage />} />
           <Route path="admin/dashboard" element={<AdminDashboardPage />} />
