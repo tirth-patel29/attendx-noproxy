@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { query } from '../utils/db';
 import { academicResolver } from '../services/academic_resolver';
 
-export const academicRouter = Router();
+export const academicReadRouter = Router();
+export const academicWriteRouter = Router();
 
 // ===========================================================================
 // ERROR HANDLER HELPERS
@@ -23,7 +24,7 @@ function handlePgError(err: any, res: Response, next: NextFunction, entityName: 
 // ===========================================================================
 // HIERARCHY RESOLUTION
 // ===========================================================================
-academicRouter.get('/resolve/:roll_no', async (req: Request, res: Response, next: NextFunction) => {
+academicReadRouter.get('/resolve/:roll_no', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const identity = await academicResolver.resolveStudentIdentity(req.params.roll_no);
     res.json(identity);
@@ -35,7 +36,7 @@ academicRouter.get('/resolve/:roll_no', async (req: Request, res: Response, next
 // ===========================================================================
 // COLLEGES
 // ===========================================================================
-academicRouter.get('/colleges', async (_req, res, next) => {
+academicReadRouter.get('/colleges', async (_req, res, next) => {
   try {
     const r = await query('SELECT * FROM colleges ORDER BY name');
     res.json(r.rows);
@@ -44,7 +45,7 @@ academicRouter.get('/colleges', async (_req, res, next) => {
 
 const collegeSchema = z.object({ name: z.string().min(1).max(100), code: z.string().min(1).max(10) });
 
-academicRouter.post('/colleges', async (req, res, next) => {
+academicWriteRouter.post('/colleges', async (req, res, next) => {
   try {
     const parsed = collegeSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Invalid payload', details: parsed.error.flatten().fieldErrors });
@@ -57,7 +58,7 @@ academicRouter.post('/colleges', async (req, res, next) => {
   }
 });
 
-academicRouter.put('/colleges/:id', async (req, res, next) => {
+academicWriteRouter.put('/colleges/:id', async (req, res, next) => {
   try {
     const parsed = collegeSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Invalid payload', details: parsed.error.flatten().fieldErrors });
@@ -71,7 +72,7 @@ academicRouter.put('/colleges/:id', async (req, res, next) => {
   }
 });
 
-academicRouter.delete('/colleges/:id', async (req, res, next) => {
+academicWriteRouter.delete('/colleges/:id', async (req, res, next) => {
   try {
     const r = await query(`DELETE FROM colleges WHERE id=$1 RETURNING id`, [req.params.id]);
     if (r.rows.length === 0) return res.status(404).json({ error: 'Not found' });
@@ -85,7 +86,7 @@ academicRouter.delete('/colleges/:id', async (req, res, next) => {
 // ===========================================================================
 // DEPARTMENTS
 // ===========================================================================
-academicRouter.get('/departments', async (req, res, next) => {
+academicReadRouter.get('/departments', async (req, res, next) => {
   try {
     const { college_id } = req.query;
     let sql = `
@@ -106,7 +107,7 @@ academicRouter.get('/departments', async (req, res, next) => {
 
 const deptSchema = z.object({ college_id: z.string().uuid(), name: z.string().min(1), code: z.string().min(1) });
 
-academicRouter.post('/departments', async (req, res, next) => {
+academicWriteRouter.post('/departments', async (req, res, next) => {
   try {
     const parsed = deptSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Invalid payload', details: parsed.error.flatten().fieldErrors });
@@ -120,7 +121,7 @@ academicRouter.post('/departments', async (req, res, next) => {
   }
 });
 
-academicRouter.put('/departments/:id', async (req, res, next) => {
+academicWriteRouter.put('/departments/:id', async (req, res, next) => {
   try {
     const parsed = deptSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Invalid payload', details: parsed.error.flatten().fieldErrors });
@@ -135,7 +136,7 @@ academicRouter.put('/departments/:id', async (req, res, next) => {
   }
 });
 
-academicRouter.delete('/departments/:id', async (req, res, next) => {
+academicWriteRouter.delete('/departments/:id', async (req, res, next) => {
   try {
     const r = await query(`DELETE FROM departments WHERE id=$1 RETURNING id`, [req.params.id]);
     if (r.rows.length === 0) return res.status(404).json({ error: 'Not found' });
@@ -149,7 +150,7 @@ academicRouter.delete('/departments/:id', async (req, res, next) => {
 // ===========================================================================
 // BRANCHES
 // ===========================================================================
-academicRouter.get('/branches', async (req, res, next) => {
+academicReadRouter.get('/branches', async (req, res, next) => {
   try {
     const { department_id } = req.query;
     let sql = `
@@ -171,7 +172,7 @@ academicRouter.get('/branches', async (req, res, next) => {
 
 const branchSchema = z.object({ department_id: z.string().uuid(), name: z.string().min(1), code: z.string().min(1) });
 
-academicRouter.post('/branches', async (req, res, next) => {
+academicWriteRouter.post('/branches', async (req, res, next) => {
   try {
     const parsed = branchSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Invalid payload', details: parsed.error.flatten().fieldErrors });
@@ -185,7 +186,7 @@ academicRouter.post('/branches', async (req, res, next) => {
   }
 });
 
-academicRouter.put('/branches/:id', async (req, res, next) => {
+academicWriteRouter.put('/branches/:id', async (req, res, next) => {
   try {
     const parsed = branchSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Invalid payload', details: parsed.error.flatten().fieldErrors });
@@ -200,7 +201,7 @@ academicRouter.put('/branches/:id', async (req, res, next) => {
   }
 });
 
-academicRouter.delete('/branches/:id', async (req, res, next) => {
+academicWriteRouter.delete('/branches/:id', async (req, res, next) => {
   try {
     const r = await query(`DELETE FROM branches WHERE id=$1 RETURNING id`, [req.params.id]);
     if (r.rows.length === 0) return res.status(404).json({ error: 'Not found' });
@@ -214,7 +215,7 @@ academicRouter.delete('/branches/:id', async (req, res, next) => {
 // ===========================================================================
 // DIVISIONS
 // ===========================================================================
-academicRouter.get('/divisions', async (req, res, next) => {
+academicReadRouter.get('/divisions', async (req, res, next) => {
   try {
     const { branch_id } = req.query;
     let sql = `
@@ -242,7 +243,7 @@ const divisionSchema = z.object({
   academic_year: z.number().int().optional().nullable()
 });
 
-academicRouter.post('/divisions', async (req, res, next) => {
+academicWriteRouter.post('/divisions', async (req, res, next) => {
   try {
     const parsed = divisionSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Invalid payload', details: parsed.error.flatten().fieldErrors });
@@ -259,7 +260,7 @@ academicRouter.post('/divisions', async (req, res, next) => {
   }
 });
 
-academicRouter.put('/divisions/:id', async (req, res, next) => {
+academicWriteRouter.put('/divisions/:id', async (req, res, next) => {
   try {
     const parsed = divisionSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Invalid payload', details: parsed.error.flatten().fieldErrors });
@@ -277,7 +278,7 @@ academicRouter.put('/divisions/:id', async (req, res, next) => {
   }
 });
 
-academicRouter.delete('/divisions/:id', async (req, res, next) => {
+academicWriteRouter.delete('/divisions/:id', async (req, res, next) => {
   try {
     const r = await query(`DELETE FROM divisions WHERE division_id=$1 RETURNING division_id`, [req.params.id]);
     if (r.rows.length === 0) return res.status(404).json({ error: 'Not found' });
@@ -291,7 +292,7 @@ academicRouter.delete('/divisions/:id', async (req, res, next) => {
 // ===========================================================================
 // BATCHES
 // ===========================================================================
-academicRouter.get('/batches', async (req, res, next) => {
+academicReadRouter.get('/batches', async (req, res, next) => {
   try {
     const { division_id } = req.query;
     let sql = `
@@ -319,7 +320,7 @@ const batchSchema = z.object({
   end_roll: z.string().optional().nullable()
 });
 
-academicRouter.post('/batches', async (req, res, next) => {
+academicWriteRouter.post('/batches', async (req, res, next) => {
   try {
     const parsed = batchSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Invalid payload', details: parsed.error.flatten().fieldErrors });
@@ -336,7 +337,7 @@ academicRouter.post('/batches', async (req, res, next) => {
   }
 });
 
-academicRouter.put('/batches/:id', async (req, res, next) => {
+academicWriteRouter.put('/batches/:id', async (req, res, next) => {
   try {
     const parsed = batchSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Invalid payload', details: parsed.error.flatten().fieldErrors });
@@ -354,7 +355,7 @@ academicRouter.put('/batches/:id', async (req, res, next) => {
   }
 });
 
-academicRouter.delete('/batches/:id', async (req, res, next) => {
+academicWriteRouter.delete('/batches/:id', async (req, res, next) => {
   try {
     const r = await query(`DELETE FROM batches WHERE id=$1 RETURNING id`, [req.params.id]);
     if (r.rows.length === 0) return res.status(404).json({ error: 'Not found' });
@@ -364,5 +365,9 @@ academicRouter.delete('/batches/:id', async (req, res, next) => {
     next(err);
   }
 });
+
+export const academicRouter = Router();
+academicRouter.use(academicReadRouter);
+academicRouter.use(academicWriteRouter);
 
 export default academicRouter;

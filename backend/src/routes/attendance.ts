@@ -8,6 +8,7 @@ import { requireApiKey } from "../utils/apiKey";
 import { sendError } from "../utils/apiError";
 import { config } from "../config";
 import { z } from "zod";
+import { academicReadRouter } from "./academic";
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -15,9 +16,39 @@ function isUuid(s: string): boolean {
   return UUID_REGEX.test(s);
 }
 const router = Router();
+router.use("/academic", requireProfessor, academicReadRouter);
 
-import { requireProfessor } from "../utils/auth";
-export { requireProfessor };
+export function requireProfessor(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith("Bearer "))
+    return sendError(
+      res,
+      401,
+      "ERR_AUTH_MISSING",
+      "Missing or invalid JWT/API Key.",
+    );
+  try {
+    const decoded = jwt.verify(
+      auth.slice(7),
+      config.jwtSecret || "dev-secret-change-in-production-min-32-chars-long",
+    ) as {
+      sub: string;
+      email: string;
+      name: string;
+      role: string;
+    };
+    if (decoded.role !== "professor")
+      return sendError(res, 403, "ERR_FORBIDDEN", "Professor access required.");
+    (req as any).professor = decoded;
+    next();
+  } catch {
+    return sendError(res, 401, "ERR_AUTH_MISSING", "Invalid or expired token.");
+  }
+}
 
 async function ensureOwnSession(
   sessionUuid: string,
@@ -274,16 +305,7 @@ router.get(
     try {
       const profUuid = (req as any).professor.sub as string;
       const r = await query(
-        `SELECT a.assignment_id, a.course_code, c.title AS course_title, 
-                a.division_id, d.name AS division_name,
-                a.batch_id, b.name AS batch_name,
-                a.day_of_week, to_char(a.start_time, 'HH24:MI') AS start_time, to_char(a.end_time, 'HH24:MI') AS end_time 
-         FROM teacher_assignments a 
-         JOIN courses c ON c.course_code = a.course_code 
-         JOIN divisions d ON d.division_id = a.division_id 
-         LEFT JOIN batches b ON b.id = a.batch_id
-         WHERE a.prof_uuid = $1 
-         ORDER BY a.day_of_week, a.start_time`,
+        `SELECT a.assignment_id, a.course_code, c.title AS course_title, a.division_id, d.name AS division_name, a.day_of_week, to_char(a.start_time, 'HH24:MI') AS start_time, to_char(a.end_time, 'HH24:MI') AS end_time FROM teacher_assignments a JOIN courses c ON c.course_code = a.course_code JOIN divisions d ON d.division_id = a.division_id WHERE a.prof_uuid = $1 ORDER BY a.day_of_week, a.start_time`,
         [profUuid],
       );
       const todayDow = new Date().getDay();
@@ -443,8 +465,28 @@ router.post(
           });
       const payload = parseResult.data;
       const result = await judgeService.processClaim(payload);
-      if (result.status === "PRESENT") res.json(result);
-      else
+      if (result.status === "PRESENT") {
+        // Fetch student details for the real-time broadcast
+        const studentRes = await query(
+          `SELECT roll_no, name, email FROM students WHERE student_uuid = $1`,
+          [payload.student_uuid]
+        );
+        if (studentRes.rows.length > 0) {
+          const st = studentRes.rows[0];
+          metronomeService.broadcastAttendance(payload.session_uuid, {
+            id: result.ledger_uuid,
+            session_id: payload.session_uuid,
+            student_roll_no: st.roll_no,
+            student_name: st.name,
+            student_email: st.email,
+            client_claimed_time: payload.client_claimed_time,
+            server_logged_time: new Date().toISOString(),
+            verification_delta_ms: result.verification_delta_ms,
+            status: 'PRESENT',
+          });
+        }
+        res.json(result);
+      } else
         res
           .status(400)
           .json({
@@ -517,16 +559,7 @@ router.get(
       const serverTime = serverNow.toTimeString().slice(0, 5);
       const serverDate = serverNow.toISOString().split("T")[0];
       const r = await query(
-        `SELECT a.assignment_id, a.course_code, c.title AS course_title, 
-                a.division_id, d.name AS division_name,
-                a.batch_id, b.name AS batch_name,
-                a.day_of_week, to_char(a.start_time, 'HH24:MI') AS start_time, to_char(a.end_time, 'HH24:MI') AS end_time 
-         FROM teacher_assignments a 
-         JOIN courses c ON c.course_code = a.course_code 
-         JOIN divisions d ON d.division_id = a.division_id 
-         LEFT JOIN batches b ON b.id = a.batch_id
-         WHERE a.prof_uuid = $1 AND a.day_of_week = $2 AND a.start_time <= $3::time AND a.end_time > $3::time 
-         ORDER BY a.start_time LIMIT 1`,
+        `SELECT a.assignment_id, a.course_code, c.title AS course_title, a.division_id, d.name AS division_name, a.day_of_week, to_char(a.start_time, 'HH24:MI') AS start_time, to_char(a.end_time, 'HH24:MI') AS end_time FROM teacher_assignments a JOIN courses c ON c.course_code = a.course_code JOIN divisions d ON d.division_id = a.division_id WHERE a.prof_uuid = $1 AND a.day_of_week = $2 AND a.start_time <= $3::time AND a.end_time > $3::time ORDER BY a.start_time LIMIT 1`,
         [profUuid, serverDow, serverTime],
       );
       if (r.rows.length === 0) {
@@ -619,6 +652,80 @@ router.post(
       next(err);
     }
   },
+);
+
+router.get(
+  "/professor/alerts",
+  requireProfessor,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const profUuid = (req as any).professor.sub as string;
+      const threshold = parseFloat(req.query.threshold as string) || 0.75;
+      const sql = `
+        WITH StudentSessions AS (
+          SELECT s.student_uuid, s.roll_no, s.name, s.email, a.course_code, cs.session_uuid
+          FROM students s
+          LEFT JOIN batches b ON b.id = s.batch_id
+          JOIN teacher_assignments a ON a.division_id IN (s.division_id, b.division_id)
+          JOIN course_sessions cs ON cs.course_code = a.course_code AND cs.prof_uuid = a.prof_uuid
+          WHERE a.prof_uuid = $1
+        )
+        SELECT 
+          ss.student_uuid as id, ss.roll_no, ss.name, ss.email, ss.course_code,
+          COUNT(ss.session_uuid) as total_sessions,
+          COUNT(al.ledger_uuid) as present_sessions,
+          ROUND((COUNT(al.ledger_uuid)::numeric / COUNT(ss.session_uuid)) * 100, 1) as percentage
+        FROM StudentSessions ss
+        LEFT JOIN attendance_ledger al ON al.session_uuid = ss.session_uuid AND al.student_uuid = ss.student_uuid
+        GROUP BY ss.student_uuid, ss.roll_no, ss.name, ss.email, ss.course_code
+        HAVING COUNT(ss.session_uuid) > 0 AND (COUNT(al.ledger_uuid)::float / COUNT(ss.session_uuid)) < $2
+        ORDER BY percentage ASC;
+      `;
+      const r = await query(sql, [profUuid, threshold]);
+      res.json(r.rows);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.get(
+  "/professor/divisions/:division_id/students",
+  requireProfessor,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const profUuid = (req as any).professor.sub as string;
+      const divisionId = req.params.division_id;
+      
+      const sql = `
+        WITH StudentSessions AS (
+          SELECT s.student_uuid, s.roll_no, s.name, s.email, s.bound_device_id, a.course_code, cs.session_uuid
+          FROM students s
+          LEFT JOIN batches b ON b.id = s.batch_id
+          JOIN teacher_assignments a ON a.division_id IN (s.division_id, b.division_id)
+          JOIN course_sessions cs ON cs.course_code = a.course_code AND cs.prof_uuid = a.prof_uuid
+          WHERE a.prof_uuid = $1 AND a.division_id = $2
+        )
+        SELECT 
+          ss.student_uuid as id, ss.roll_no, ss.name, ss.email, ss.bound_device_id,
+          COUNT(ss.session_uuid) as total_sessions,
+          COUNT(al.ledger_uuid) as present_sessions,
+          CASE 
+            WHEN COUNT(ss.session_uuid) > 0 
+            THEN ROUND((COUNT(al.ledger_uuid)::numeric / COUNT(ss.session_uuid)) * 100, 1) 
+            ELSE 0 
+          END as percentage
+        FROM StudentSessions ss
+        LEFT JOIN attendance_ledger al ON al.session_uuid = ss.session_uuid AND al.student_uuid = ss.student_uuid
+        GROUP BY ss.student_uuid, ss.roll_no, ss.name, ss.email, ss.bound_device_id
+        ORDER BY ss.roll_no ASC;
+      `;
+      const r = await query(sql, [profUuid, divisionId]);
+      res.json(r.rows);
+    } catch (err) {
+      next(err);
+    }
+  }
 );
 
 router.get("/health", async (_req: Request, res: Response) => {
