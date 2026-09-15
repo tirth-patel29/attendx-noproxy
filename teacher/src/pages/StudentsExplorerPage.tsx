@@ -17,14 +17,16 @@ import api from "../services/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-// Flow: Colleges -> Departments -> Branches -> Divisions -> Students
-type Level = "colleges" | "departments" | "branches" | "divisions" | "students";
+// Flow: Colleges -> Departments -> Branches -> Semesters -> Divisions -> Batches -> Students
+type Level = "colleges" | "departments" | "branches" | "semesters" | "divisions" | "batches" | "students";
 
 interface SelectionState {
   college?: any;
   department?: any;
   branch?: any;
+  semester?: any;
   division?: any;
+  batch?: any;
 }
 
 export default function StudentsExplorerPage() {
@@ -95,13 +97,23 @@ export default function StudentsExplorerPage() {
         break;
       case "branches":
         setSelections({ ...selections, branch: item });
+        setLevel("semesters");
+        fetchHierarchy("semesters", { branch_id: item.id });
+        break;
+      case "semesters":
+        setSelections({ ...selections, semester: item });
         setLevel("divisions");
-        fetchHierarchy("divisions", { branch_id: item.id });
+        fetchHierarchy("divisions", { semester_id: item.id });
         break;
       case "divisions":
         setSelections({ ...selections, division: item });
+        setLevel("batches");
+        fetchHierarchy("batches", { division_id: item.division_id || item.id });
+        break;
+      case "batches":
+        setSelections({ ...selections, batch: item });
         setLevel("students");
-        fetchHierarchy("students", { division_id: item.division_id });
+        fetchHierarchy("students", { division_id: selections.division.division_id || selections.division.id, batch_id: item.id });
         break;
     }
   };
@@ -119,10 +131,18 @@ export default function StudentsExplorerPage() {
       setSelections({ college: selections.college, department: selections.department });
       setLevel("branches");
       fetchHierarchy("branches", { department_id: selections.department.id });
+    } else if (targetLevel === "semesters") {
+      setSelections({ college: selections.college, department: selections.department, branch: selections.branch });
+      setLevel("semesters");
+      fetchHierarchy("semesters", { branch_id: selections.branch.id });
     } else if (targetLevel === "divisions") {
-      setSelections({ ...selections, division: undefined });
+      setSelections({ ...selections, division: undefined, batch: undefined });
       setLevel("divisions");
-      fetchHierarchy("divisions", { branch_id: selections.branch.id });
+      fetchHierarchy("divisions", { semester_id: selections.semester.id });
+    } else if (targetLevel === "batches") {
+      setSelections({ ...selections, batch: undefined });
+      setLevel("batches");
+      fetchHierarchy("batches", { division_id: selections.division.division_id || selections.division.id });
     }
   };
 
@@ -153,16 +173,32 @@ export default function StudentsExplorerPage() {
     if (selections.branch) {
       crumbs.push(<ChevronRight key="s3" className="h-4 w-4 mx-1.5 text-muted-foreground/50" />);
       crumbs.push(
-        <span key="br" onClick={() => handleGoBack("divisions")} className="cursor-pointer font-medium hover:text-primary transition-colors max-w-[120px] truncate block">
+        <span key="br" onClick={() => handleGoBack("semesters")} className="cursor-pointer font-medium hover:text-primary transition-colors max-w-[120px] truncate block">
           {selections.branch.name}
+        </span>
+      );
+    }
+    if (selections.semester) {
+      crumbs.push(<ChevronRight key="s3_sem" className="h-4 w-4 mx-1.5 text-muted-foreground/50" />);
+      crumbs.push(
+        <span key="sem" onClick={() => handleGoBack("divisions")} className="cursor-pointer font-medium hover:text-primary transition-colors max-w-[120px] truncate block">
+          {selections.semester.name}
         </span>
       );
     }
     if (selections.division) {
       crumbs.push(<ChevronRight key="s4" className="h-4 w-4 mx-1.5 text-muted-foreground/50" />);
       crumbs.push(
-        <span key="div" className="text-primary font-semibold max-w-[120px] truncate block">
+        <span key="div" onClick={() => handleGoBack("batches")} className="cursor-pointer font-medium hover:text-primary transition-colors max-w-[120px] truncate block">
           {selections.division.name}
+        </span>
+      );
+    }
+    if (selections.batch) {
+      crumbs.push(<ChevronRight key="s5" className="h-4 w-4 mx-1.5 text-muted-foreground/50" />);
+      crumbs.push(
+        <span key="bat" className="text-primary font-semibold max-w-[120px] truncate block">
+          {selections.batch.name}
         </span>
       );
     }
@@ -175,7 +211,9 @@ export default function StudentsExplorerPage() {
       case "colleges": return <Building2 className="h-6 w-6" />;
       case "departments": return <GraduationCap className="h-6 w-6" />;
       case "branches": return <BookOpen className="h-6 w-6" />;
+      case "semesters": return <Layers className="h-6 w-6" />;
       case "divisions": return <Layers className="h-6 w-6" />;
+      case "batches": return <Layers className="h-6 w-6" />;
       default: return <Building2 className="h-6 w-6" />;
     }
   };
@@ -251,6 +289,11 @@ export default function StudentsExplorerPage() {
               {item.code && (
                 <span className="px-2 py-0.5 rounded-md bg-secondary text-secondary-foreground text-[11px] font-mono font-medium">
                   {item.code}
+                </span>
+              )}
+              {item.level && (
+                <span className="px-2 py-0.5 rounded-md bg-secondary text-secondary-foreground text-[11px] font-mono font-medium">
+                  Level {item.level}
                 </span>
               )}
               {item.academic_year && (

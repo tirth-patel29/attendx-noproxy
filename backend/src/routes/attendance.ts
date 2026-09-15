@@ -696,15 +696,22 @@ router.get(
     try {
       const profUuid = (req as any).professor.sub as string;
       const divisionId = req.params.division_id;
+      const batchId = req.query.batch_id as string | undefined;
       
+      let filterBatch = "";
+      const params: any[] = [profUuid, divisionId];
+      if (batchId) {
+        filterBatch = " AND s.batch_id = $3";
+        params.push(batchId);
+      }
+
       const sql = `
         WITH StudentSessions AS (
           SELECT s.student_uuid, s.roll_no, s.name, s.email, s.bound_device_id, a.course_code, cs.session_uuid
           FROM students s
-          LEFT JOIN batches b ON b.id = s.batch_id
-          JOIN teacher_assignments a ON a.division_id IN (s.division_id, b.division_id)
+          JOIN teacher_assignments a ON a.division_id = s.division_id AND (a.batch_id IS NULL OR a.batch_id = s.batch_id)
           JOIN course_sessions cs ON cs.course_code = a.course_code AND cs.prof_uuid = a.prof_uuid
-          WHERE a.prof_uuid = $1 AND a.division_id = $2
+          WHERE a.prof_uuid = $1 AND a.division_id = $2${filterBatch}
         )
         SELECT 
           ss.student_uuid as id, ss.roll_no, ss.name, ss.email, ss.bound_device_id,
@@ -720,7 +727,7 @@ router.get(
         GROUP BY ss.student_uuid, ss.roll_no, ss.name, ss.email, ss.bound_device_id
         ORDER BY ss.roll_no ASC;
       `;
-      const r = await query(sql, [profUuid, divisionId]);
+      const r = await query(sql, params);
       res.json(r.rows);
     } catch (err) {
       next(err);

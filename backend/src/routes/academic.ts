@@ -213,24 +213,101 @@ academicWriteRouter.delete('/branches/:id', async (req, res, next) => {
 });
 
 // ===========================================================================
+// SEMESTERS
+// ===========================================================================
+academicReadRouter.get('/semesters', async (req, res, next) => {
+  try {
+    const { branch_id } = req.query;
+    let sql = `
+      SELECT s.*, b.name as branch_name, d.name as department_name, c.name as college_name 
+      FROM semesters s 
+      JOIN branches b ON s.branch_id = b.id 
+      JOIN departments d ON b.department_id = d.id 
+      JOIN colleges c ON d.college_id = c.id
+    `;
+    const params: any[] = [];
+    if (branch_id) {
+      sql += ` WHERE s.branch_id = $1`;
+      params.push(branch_id);
+    }
+    sql += ` ORDER BY c.name, d.name, b.name, s.level`;
+    const r = await query(sql, params);
+    res.json(r.rows);
+  } catch (err) { next(err); }
+});
+
+const semesterSchema = z.object({
+  branch_id: z.string().uuid(),
+  name: z.string().min(1).max(50),
+  level: z.number().int()
+});
+
+academicWriteRouter.post('/semesters', async (req, res, next) => {
+  try {
+    const parsed = semesterSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Invalid payload', details: parsed.error.flatten().fieldErrors });
+    const { branch_id, name, level } = parsed.data;
+    const r = await query(
+      `INSERT INTO semesters (branch_id, name, level) VALUES ($1, $2, $3) RETURNING *`, 
+      [branch_id, name, level]
+    );
+    res.status(201).json(r.rows[0]);
+  } catch (err: any) {
+    if (err?.code === '23505') return res.status(409).json({ error: 'A semester with this level already exists in this branch.' });
+    if (err?.code === '23503') return res.status(409).json({ error: 'Referenced branch does not exist.' });
+    next(err);
+  }
+});
+
+academicWriteRouter.put('/semesters/:id', async (req, res, next) => {
+  try {
+    const parsed = semesterSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Invalid payload', details: parsed.error.flatten().fieldErrors });
+    const { branch_id, name, level } = parsed.data;
+    const r = await query(
+      `UPDATE semesters SET branch_id=$1, name=$2, level=$3, updated_at=NOW() WHERE id=$4 RETURNING *`, 
+      [branch_id, name, level, req.params.id]
+    );
+    if (r.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    res.json(r.rows[0]);
+  } catch (err: any) {
+    if (err?.code === '23505') return res.status(409).json({ error: 'A semester with this level already exists in this branch.' });
+    if (err?.code === '23503') return res.status(409).json({ error: 'Referenced branch does not exist.' });
+    next(err);
+  }
+});
+
+academicWriteRouter.delete('/semesters/:id', async (req, res, next) => {
+  try {
+    const r = await query(`DELETE FROM semesters WHERE id=$1 RETURNING id`, [req.params.id]);
+    if (r.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    res.json({ message: 'Deleted' });
+  } catch (err: any) {
+    if (err?.code === '23503') return res.status(409).json({ error: 'Cannot delete semester because it has associated divisions.' });
+    next(err);
+  }
+});
+
+// ===========================================================================
 // DIVISIONS
 // ===========================================================================
 academicReadRouter.get('/divisions', async (req, res, next) => {
   try {
     const { branch_id } = req.query;
     let sql = `
-      SELECT div.*, b.name as branch_name, d.name as department_name, c.name as college_name 
+      SELECT div.*, s.name as semester_name, s.level as semester_level, b.name as branch_name, d.name as department_name, c.name as college_name 
       FROM divisions div 
-      LEFT JOIN branches b ON div.branch_id = b.id 
+      LEFT JOIN semesters s ON div.semester_id = s.id
+      LEFT JOIN branches b ON div.branch_id = b.id OR s.branch_id = b.id
       LEFT JOIN departments d ON b.department_id = d.id 
       LEFT JOIN colleges c ON d.college_id = c.id
     `;
     const params: any[] = [];
     if (branch_id) {
-      sql += ` WHERE div.branch_id = $1`;
+      sql += ` WHERE div.branch_id = $1 OR s.branch_id = $1`;
       params.push(branch_id);
     }
-    sql += ` ORDER BY c.name, d.name, b.name, div.academic_year DESC, div.name`;
+    sql += ` ORDER BY c.name, d.name, b.name, s.level, div.academic_year DESC, div.name`;
     const r = await query(sql, params);
     res.json(r.rows);
   } catch (err) { next(err); }
@@ -238,6 +315,7 @@ academicReadRouter.get('/divisions', async (req, res, next) => {
 
 const divisionSchema = z.object({ 
   branch_id: z.string().uuid().optional().nullable(),
+  semester_id: z.string().uuid().optional().nullable(),
   name: z.string().min(1),
   code: z.string().optional().nullable(),
   academic_year: z.number().int().optional().nullable()
@@ -247,10 +325,10 @@ academicWriteRouter.post('/divisions', async (req, res, next) => {
   try {
     const parsed = divisionSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Invalid payload', details: parsed.error.flatten().fieldErrors });
-    const { branch_id, name, code, academic_year } = parsed.data;
+    const { branch_id, semester_id, name, code, academic_year } = parsed.data;
     const r = await query(
-      `INSERT INTO divisions (branch_id, name, code, academic_year) VALUES ($1, $2, $3, $4) RETURNING *`, 
-      [branch_id ?? null, name, code ?? null, academic_year ?? null]
+      `INSERT INTO divisions (branch_id, semester_id, name, code, academic_year) VALUES ($1, $2, $3, $4, $5) RETURNING *`, 
+      [branch_id ?? null, semester_id ?? null, name, code ?? null, academic_year ?? null]
     );
     res.status(201).json(r.rows[0]);
   } catch (err: any) {
@@ -264,10 +342,10 @@ academicWriteRouter.put('/divisions/:id', async (req, res, next) => {
   try {
     const parsed = divisionSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Invalid payload', details: parsed.error.flatten().fieldErrors });
-    const { branch_id, name, code, academic_year } = parsed.data;
+    const { branch_id, semester_id, name, code, academic_year } = parsed.data;
     const r = await query(
-      `UPDATE divisions SET branch_id=$1, name=$2, code=$3, academic_year=$4, updated_at=NOW() WHERE division_id=$5 RETURNING *`, 
-      [branch_id ?? null, name, code ?? null, academic_year ?? null, req.params.id]
+      `UPDATE divisions SET branch_id=$1, semester_id=$2, name=$3, code=$4, academic_year=$5, updated_at=NOW() WHERE division_id=$6 RETURNING *`, 
+      [branch_id ?? null, semester_id ?? null, name, code ?? null, academic_year ?? null, req.params.id]
     );
     if (r.rows.length === 0) return res.status(404).json({ error: 'Not found' });
     res.json(r.rows[0]);

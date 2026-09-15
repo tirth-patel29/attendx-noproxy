@@ -249,7 +249,7 @@ export default function Students() {
               >
                 <option value="">-- Auto Resolve --</option>
                 {divisions.map((d) => (
-                  <option key={d.id || d.division_id!} value={d.id || d.division_id!}>{d.branch_name ? `${d.branch_name} - ` : ''}{d.name}</option>
+                  <option key={d.id || d.division_id!} value={d.id || d.division_id!}>{d.branch_name ? `${d.branch_name} - ` : ''}{d.semester_name ? `${d.semester_name} - ` : ''}{d.name}</option>
                 ))}
               </select>
             </div>

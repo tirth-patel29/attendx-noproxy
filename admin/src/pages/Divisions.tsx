@@ -15,12 +15,13 @@ import { GlassCard } from '@/components/attendx/GlassCard';
 import { DataTable, type Column } from '@/components/attendx/DataTable';
 import { staggerContainer, riseItem } from '@/lib/motion';
 
-interface FormState { name: string; code: string; branch_id: string; academic_year: string; }
-const empty: FormState = { name: '', code: '', branch_id: '', academic_year: '' };
+interface FormState { name: string; code: string; branch_id: string; semester_id: string; academic_year: string; }
+const empty: FormState = { name: '', code: '', branch_id: '', semester_id: '', academic_year: '' };
 
 export default function Divisions() {
   const [rows, setRows] = useState<Division[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [semesters, setSemesters] = useState<any[]>([]);
   const [dialog, setDialog] = useState<null | { mode: 'create' | 'edit'; id?: string }>(null);
   const [form, setForm] = useState<FormState>(empty);
   const [deleteTarget, setDeleteTarget] = useState<Division | null>(null);
@@ -29,8 +30,8 @@ export default function Divisions() {
 
   const load = () => {
     setLoading(true);
-    Promise.all([academicApi.divisions(), academicApi.branches()])
-      .then(([divs, brs]) => { setRows(divs.data); setBranches(brs.data); })
+    Promise.all([academicApi.divisions(), academicApi.branches(), academicApi.semesters()])
+      .then(([divs, brs, sems]) => { setRows(divs.data); setBranches(brs.data); setSemesters(sems.data); })
       .catch(() => toast.error('Failed to load divisions'))
       .finally(() => setLoading(false));
   };
@@ -41,6 +42,7 @@ export default function Divisions() {
       name: d.name, 
       code: d.code || '', 
       branch_id: d.branch_id || '',
+      semester_id: d.semester_id || '',
       academic_year: d.academic_year ? String(d.academic_year) : ''
     });
     setDialog({ mode: 'edit', id: d.id || d.division_id });
@@ -55,6 +57,7 @@ export default function Divisions() {
         name: form.name,
         code: form.code || null,
         branch_id: form.branch_id && form.branch_id !== 'none' ? form.branch_id : null,
+        semester_id: form.semester_id && form.semester_id !== 'none' ? form.semester_id : null,
         academic_year: form.academic_year ? parseInt(form.academic_year, 10) : null
       };
 
@@ -97,6 +100,9 @@ export default function Divisions() {
     )},
     { key: "branch_name", header: "Branch", render: (r) => (
       <span className="text-muted-foreground">{r.branch_name || '—'}</span>
+    )},
+    { key: "semester_name", header: "Semester", render: (r: any) => (
+      <span className="text-muted-foreground">{r.semester_name || '—'}</span>
     )},
     { key: "academic_year", header: "Year", render: (r) => (
       <span className="text-muted-foreground">{r.academic_year || '—'}</span>
@@ -154,7 +160,7 @@ export default function Divisions() {
                 columns={columns}
                 keyExtractor={(r) => r.id || r.division_id!}
                 searchPlaceholder="Search divisions…"
-                searchKeys={["name", "code", "branch_name"]}
+                searchKeys={["name", "code", "branch_name", "semester_name"]}
                 pageSize={10}
                 loading={loading}
                 emptyTitle="No divisions found"
@@ -183,7 +189,7 @@ export default function Divisions() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="branch" className="text-[12.5px] font-medium">Branch (Optional)</Label>
-              <Select value={form.branch_id} onValueChange={(v) => setForm({ ...form, branch_id: v })}>
+              <Select value={form.branch_id} onValueChange={(v) => setForm({ ...form, branch_id: v, semester_id: 'none' })}>
                 <SelectTrigger className="h-12">
                   <SelectValue placeholder="Select Branch" />
                 </SelectTrigger>
@@ -197,6 +203,24 @@ export default function Divisions() {
                 </SelectContent>
               </Select>
             </div>
+            {form.branch_id && form.branch_id !== 'none' && (
+              <div className="space-y-2">
+                <Label htmlFor="semester" className="text-[12.5px] font-medium">Semester (Optional)</Label>
+                <Select value={form.semester_id} onValueChange={(v) => setForm({ ...form, semester_id: v })}>
+                  <SelectTrigger className="h-12">
+                    <SelectValue placeholder="Select Semester" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {semesters.filter(s => s.branch_id === form.branch_id).map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name} (Level {s.level})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <FloatingInput
               id="name"
               label="Division Name"

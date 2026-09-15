@@ -59,6 +59,7 @@ const NAV = [
   { to: '/colleges', label: 'Colleges', icon: Building2 },
   { to: '/departments', label: 'Departments', icon: Layers },
   { to: '/branches', label: 'Branches', icon: GitBranch },
+  { to: '/semesters', label: 'Semesters', icon: Layers },
   { to: '/batches', label: 'Batches', icon: BookMarked },
   { to: '/divisions', label: 'Divisions', icon: Network },
   { to: '/courses', label: 'Courses', icon: BookOpen },
@@ -99,6 +100,7 @@ function formatBreadcrumbLabel(segment: string): string {
   if (segment === 'colleges') return 'Colleges';
   if (segment === 'departments') return 'Departments';
   if (segment === 'branches') return 'Branches';
+  if (segment === 'semesters') return 'Semesters';
   if (segment === 'batches') return 'Batches';
   if (segment === 'divisions') return 'Divisions';
   if (segment === 'courses') return 'Courses';
@@ -420,12 +422,11 @@ export default function Layout() {
           duration: 4000,
           className: 'z-[9999]',
           style: {
-            background: 'hsl(var(--background))',
-            color: 'hsl(var(--foreground))',
-            border: '1px solid hsl(var(--border))',
+            backgroundColor: '#dc2626',
+            color: '#ffffff',
+            border: 'none',
           },
         }}
-        richColors
       />
     </>
   );

@@ -58,9 +58,6 @@ export interface Teacher {
   email: string;
   name: string;
   department: string;
-  department_id?: string | null;
-  department_name?: string | null;
-  college_name?: string | null;
   has_login: boolean;
   assignment_count: number;
 }
@@ -150,8 +147,6 @@ export interface Assignment {
   course_title: string;
   division_id: string;
   division_name: string;
-  batch_id?: string | null;
-  batch_name?: string | null;
   day_of_week: number;
   start_time: string;
   end_time: string;
@@ -188,9 +183,9 @@ export const adminApi = {
 
   // teachers
   teachers: () => api.get<Teacher[]>('/admin/teachers'),
-  createTeacher: (data: { email: string; name: string; department?: string; department_id?: string | null; password: string }) =>
+  createTeacher: (data: { email: string; name: string; department: string; password: string }) =>
     api.post('/admin/teachers', data),
-  updateTeacher: (id: string, data: { email: string; name: string; department?: string; department_id?: string | null }) =>
+  updateTeacher: (id: string, data: { email: string; name: string; department: string }) =>
     api.put(`/admin/teachers/${id}`, data),
   resetTeacherPassword: (id: string, password: string) =>
     api.post(`/admin/teachers/${id}/reset-password`, { password }),
@@ -219,9 +214,9 @@ export const adminApi = {
 
   // assignments (timetable)
   assignments: () => api.get<Assignment[]>('/admin/assignments'),
-  createAssignment: (data: Omit<Assignment, 'id' | 'teacher_name' | 'teacher_email' | 'course_title' | 'division_name' | 'batch_name'>) =>
+  createAssignment: (data: Omit<Assignment, 'id' | 'teacher_name' | 'teacher_email' | 'course_title' | 'division_name'>) =>
     api.post('/admin/assignments', data),
-  updateAssignment: (id: string, data: Omit<Assignment, 'id' | 'teacher_name' | 'teacher_email' | 'course_title' | 'division_name' | 'batch_name'>) =>
+  updateAssignment: (id: string, data: Omit<Assignment, 'id' | 'teacher_name' | 'teacher_email' | 'course_title' | 'division_name'>) =>
     api.put(`/admin/assignments/${id}`, data),
   deleteAssignment: (id: string) => api.delete(`/admin/assignments/${id}`),
   // API keys console (shared client keys; transport gate)
@@ -250,14 +245,22 @@ export const academicApi = {
   updateBranch: (id: string, data: { department_id: string; name: string; code: string }) => api.put(`/admin/academic/branches/${id}`, data),
   deleteBranch: (id: string) => api.delete(`/admin/academic/branches/${id}`),
 
+  // Semesters
+  semesters: () => api.get<any[]>('/admin/academic/semesters'),
+  createSemester: (data: { branch_id: string; name: string; level: number }) => 
+    api.post('/admin/academic/semesters', data),
+  updateSemester: (id: string, data: { branch_id: string; name: string; level: number }) => 
+    api.put(`/admin/academic/semesters/${id}`, data),
+  deleteSemester: (id: string) => api.delete(`/admin/academic/semesters/${id}`),
+
   // Divisions (Full Academic CRUD)
   divisions: () => api.get<any[]>('/admin/academic/divisions').then(r => ({
     ...r,
     data: r.data.map(d => ({ ...d, id: d.division_id || d.id })) as Division[]
   })),
-  createDivision: (data: { branch_id?: string | null; name: string; code?: string | null; academic_year?: number | null }) => 
+  createDivision: (data: { branch_id?: string | null; semester_id?: string | null; name: string; code?: string | null; academic_year?: number | null }) => 
     api.post('/admin/academic/divisions', data),
-  updateDivision: (id: string, data: { branch_id?: string | null; name: string; code?: string | null; academic_year?: number | null }) => 
+  updateDivision: (id: string, data: { branch_id?: string | null; semester_id?: string | null; name: string; code?: string | null; academic_year?: number | null }) => 
     api.put(`/admin/academic/divisions/${id}`, data),
   deleteDivision: (id: string) => api.delete(`/admin/academic/divisions/${id}`),
 

@@ -8,6 +8,7 @@ import Students from './pages/Students';
 import Colleges from './pages/Colleges';
 import Departments from './pages/Departments';
 import Branches from './pages/Branches';
+import Semesters from './pages/Semesters';
 import Batches from './pages/Batches';
 import Divisions from './pages/Divisions';
 import Courses from './pages/Courses';
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="colleges" element={<Colleges />} />
         <Route path="departments" element={<Departments />} />
         <Route path="branches" element={<Branches />} />
+        <Route path="semesters" element={<Semesters />} />
         <Route path="batches" element={<Batches />} />
         <Route path="divisions" element={<Divisions />} />
         <Route path="courses" element={<Courses />} />
