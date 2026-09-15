@@ -42,10 +42,14 @@ export default function StudentsExplorerPage() {
     try {
       if (currentLevel === "students" && params.division_id) {
         const res = await api.get(`/professor/divisions/${params.division_id}/students`);
-        const divisionStudents = res.data || [];
+        let resData = res.data;
+        if (typeof resData === 'string') {
+          try { resData = JSON.parse(resData); } catch (e) { resData = []; }
+        }
+        if (!Array.isArray(resData)) resData = [];
         
         // Ensure attendance percentage is handled
-        const mappedStudents = divisionStudents.map((s: any) => ({
+        const mappedStudents = resData.map((s: any) => ({
           ...s,
           percentage: s.percentage || "N/A"
         }));
@@ -53,7 +57,13 @@ export default function StudentsExplorerPage() {
       } else {
         const queryParams = new URLSearchParams(params).toString();
         const res = await api.get(`/academic/${currentLevel}${queryParams ? `?${queryParams}` : ''}`);
-        setData(res.data || []);
+        let resData = res.data;
+        if (typeof resData === 'string') {
+          try { resData = JSON.parse(resData); } catch (e) { resData = []; }
+        }
+        if (!Array.isArray(resData)) resData = [];
+        
+        setData(resData);
       }
     } catch (err: any) {
       const errorData = err.response?.data?.error;
