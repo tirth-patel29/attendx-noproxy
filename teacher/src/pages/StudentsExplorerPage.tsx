@@ -217,10 +217,14 @@ export default function StudentsExplorerPage() {
   const renderHierarchyCards = () => (
     <motion.div
       key={`grid-${level}`}
-      initial={{ opacity: 0, y: 15 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -15 }}
-      transition={{ duration: 0.2 }}
+      variants={{
+        hidden: { opacity: 0, y: 15 },
+        show: { opacity: 1, y: 0, transition: { duration: 0.2, staggerChildren: 0.05 } },
+        exit: { opacity: 0, y: -15, transition: { duration: 0.2 } }
+      }}
+      initial="hidden"
+      animate="show"
+      exit="exit"
       className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
     >
       {data.map((item) => (
@@ -270,10 +274,14 @@ export default function StudentsExplorerPage() {
   const renderStudents = () => (
     <motion.div
       key="students"
-      initial={{ opacity: 0, y: 15 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -15 }}
-      transition={{ duration: 0.2 }}
+      variants={{
+        hidden: { opacity: 0, y: 15 },
+        show: { opacity: 1, y: 0, transition: { duration: 0.2, staggerChildren: 0.05 } },
+        exit: { opacity: 0, y: -15, transition: { duration: 0.2 } }
+      }}
+      initial="hidden"
+      animate="show"
+      exit="exit"
       className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
     >
       {data.map((student) => {
