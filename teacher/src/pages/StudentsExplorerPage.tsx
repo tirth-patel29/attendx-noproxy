@@ -41,11 +41,10 @@ export default function StudentsExplorerPage() {
     setData([]); // Clear old data to prevent stale flashes
     try {
       if (currentLevel === "students" && params.division_id) {
-        const res = await api.get(`/admin/students`);
-        const allStudents = res.data || [];
-        const divisionStudents = allStudents.filter((s: any) => s.division_id === params.division_id);
+        const res = await api.get(`/professor/divisions/${params.division_id}/students`);
+        const divisionStudents = res.data || [];
         
-        // Admin endpoint doesn't include attendance percentage, so we default to N/A or 100
+        // Ensure attendance percentage is handled
         const mappedStudents = divisionStudents.map((s: any) => ({
           ...s,
           percentage: s.percentage || "N/A"
@@ -53,7 +52,7 @@ export default function StudentsExplorerPage() {
         setData(mappedStudents);
       } else {
         const queryParams = new URLSearchParams(params).toString();
-        const res = await api.get(`/admin/academic/${currentLevel}${queryParams ? `?${queryParams}` : ''}`);
+        const res = await api.get(`/academic/${currentLevel}${queryParams ? `?${queryParams}` : ''}`);
         setData(res.data || []);
       }
     } catch (err: any) {
